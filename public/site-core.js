@@ -108,6 +108,25 @@
     return 'keep';
   }
 
+  var PANEL_KEYS = ['partidos', 'envivo', 'posiciones', 'playoffs', 'reglas'];
+
+  /**
+   * Whether a refreshed fragment can be patched region by region into the current page. Both must have the
+   * hero, tab bar, main, the server-time stamp and exactly the same set of panels; if the new fragment lacks
+   * any of them, the caller replaces everything instead of patching a half-empty page.
+   * A page is described as { main, hero, tabsBar, serverNow: booleans, panels: [data-panel keys] }.
+   */
+  function canPatchRegions(oldPage, nextPage) {
+    if (!oldPage || !nextPage) return false;
+    var regions = ['main', 'hero', 'tabsBar', 'serverNow'];
+    for (var i = 0; i < regions.length; i++) {
+      if (!oldPage[regions[i]] || !nextPage[regions[i]]) return false;
+    }
+    return PANEL_KEYS.every(function (key) {
+      return oldPage.panels.indexOf(key) >= 0 && nextPage.panels.indexOf(key) >= 0;
+    }) && oldPage.panels.length === PANEL_KEYS.length && nextPage.panels.length === PANEL_KEYS.length;
+  }
+
   // ---- Live updates -----------------------------------------------------------------------------
 
   var CLOSED = 2; // EventSource.CLOSED
@@ -216,6 +235,7 @@
     isInstant: isInstant,
     msUntilNextBoundary: msUntilNextBoundary,
     clockOffset: clockOffset,
+    canPatchRegions: canPatchRegions,
     streamPatchMode: streamPatchMode,
     backoffDelay: backoffDelay,
     createLive: createLive,

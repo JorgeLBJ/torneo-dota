@@ -101,7 +101,7 @@ describe('creating the first admin', () => {
     const t = await fresh();
     const cases: [Record<string, string>, string][] = [
       [{ username: 'a b' }, 'usuario'],
-      [{ password: 'short', confirm: 'short' }, 'al menos 8'],
+      [{ password: 'short', confirm: 'short' }, 'entre 8 y 200 caracteres'],
       [{ confirm: 'different-password' }, 'no coinciden'],
     ];
     for (const [override, message] of cases) {

@@ -34,5 +34,5 @@ export function checkUsername(raw: string): Checked<string> {
 
 /** A password to set (not the one to verify): 8 to 200 characters. */
 export function checkNewPassword(password: string): Checked<string> {
-  return password.length >= 8 && password.length <= 200 ? ok(password) : fail('La contraseña debe tener al menos 8 caracteres.');
+  return password.length >= 8 && password.length <= 200 ? ok(password) : fail('La contraseña debe tener entre 8 y 200 caracteres.');
 }

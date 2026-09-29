@@ -1,6 +1,6 @@
 import type { FC } from 'hono/jsx';
 import type { ScheduleDay, Tournament } from '../../db/repository.js';
-import type { StreamView } from '../../domain/stream.js';
+import { MAX_STREAM_URL, type StreamView } from '../../domain/stream.js';
 import { TIMEZONE_CHOICES } from '../../format/timezone.js';
 import { PageHead, Select } from './parts.js';
 
@@ -129,7 +129,7 @@ export const ConfigView: FC<{ tournament: Tournament; days: ScheduleDay[]; strea
           type="text"
           value={tournament.streamUrl ?? ''}
           placeholder="https://kick.com/tu-canal"
-          maxlength={300}
+          maxlength={MAX_STREAM_URL}
           autocomplete="off"
           spellcheck={false}
         />

@@ -2,7 +2,6 @@ import { Hono } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { hashPassword, verifyPassword } from '../../auth/password.js';
 import { destroyOtherSessions } from '../../auth/session.js';
-import { clientKey } from '../../security.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { setFlash } from '../flash.js';
 import { readBody } from '../form.js';
@@ -24,9 +23,10 @@ export function accountRoutes(deps: Deps) {
 
   app.post('/cuenta', async (c) => {
     const admin = c.get('admin');
-    const key = clientKey(c, deps.config.trustProxy);
-    // Every attempt is counted up front; only a success gives the budget back.
-    if (!deps.limiter.consume(key)) return c.html(<TooManyAttemptsPage />, 429);
+    // Its own bucket, keyed by admin: wrong attempts here (even from a stolen session) never touch the login
+    // budget of the client address. Every attempt is counted up front; only a success gives the budget back.
+    const key = `admin:${admin.id}`;
+    if (!deps.accountLimiter.consume(key)) return c.html(<TooManyAttemptsPage />, 429);
 
     const body = await readBody(c);
     const fail = (message: string) => {
@@ -43,7 +43,7 @@ export function accountRoutes(deps: Deps) {
 
     repo.setAdminPassword(admin.id, await hashPassword(next));
     destroyOtherSessions(repo, admin.id, getCookie(c, SESSION_COOKIE) ?? '');
-    deps.limiter.reset(key);
+    deps.accountLimiter.reset(key);
     setFlash(c, 'ok', 'Contraseña actualizada. Se cerraron tus otras sesiones.');
     return c.redirect('/admin/cuenta', 303);
   });

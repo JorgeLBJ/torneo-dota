@@ -3,6 +3,9 @@ import { fail, ok, type Checked } from '../checked.js';
 // Live stream links. The admin pastes a normal page URL; only the parts we validated (platform + ids)
 // are used to build the embed URL. The raw input is never put into an iframe.
 
+/** Longest stream link accepted; the admin input and the server check both use it. */
+export const MAX_STREAM_URL = 300;
+
 export type StreamPlatform = 'kick' | 'twitch' | 'youtube';
 
 export type StreamTarget =

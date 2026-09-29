@@ -1,11 +1,8 @@
 import { Hono } from 'hono';
-import { parseStream } from '../../domain/stream.js';
+import { MAX_STREAM_URL, parseStream } from '../../domain/stream.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { readBody, str } from '../form.js';
 import { setFlash } from '../flash.js';
-
-/** Longest accepted link; the form input carries the same limit. */
-export const MAX_STREAM_URL = 300;
 
 export function streamRoutes(deps: Deps) {
   const app = new Hono<AdminEnv>();

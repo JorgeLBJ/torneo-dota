@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { MAX_STREAM_URL } from '../src/domain/stream.js';
 import type { Tournament } from '../src/db/repository.js';
 import { flashText, makeApp, type TestApp } from './helpers/app.js';
 
@@ -116,7 +117,8 @@ describe('stream card in Configuración', () => {
   });
 
   it('caps the link at 300 characters, in the form and on the server', async () => {
-    expect(await config()).toContain('maxlength="300"');
+    expect(await config()).toContain(`maxlength="${MAX_STREAM_URL}"`);
+    expect(MAX_STREAM_URL).toBe(300);
     const long = `https://kick.com/${'a'.repeat(300)}`;
     const res = await t.post(url, { action: 'save', stream_url: long }, cookie);
     expect(await flashText(t, res, cookie)).toContain('demasiado largo');

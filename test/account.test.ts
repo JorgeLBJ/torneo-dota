@@ -88,8 +88,8 @@ describe('changing the password', () => {
   it('validates the new password in Spanish', async () => {
     const before = hashOf();
     const cases: [Record<string, string>, string][] = [
-      [{ next: 'short', confirm: 'short' }, 'al menos 8'],
-      [{ next: 'x'.repeat(201), confirm: 'x'.repeat(201) }, 'al menos 8'],
+      [{ next: 'short', confirm: 'short' }, 'entre 8 y 200 caracteres'],
+      [{ next: 'x'.repeat(201), confirm: 'x'.repeat(201) }, 'entre 8 y 200 caracteres'],
       [{ confirm: 'something-else-entirely' }, 'no coinciden'],
       [{ next: PASSWORD, confirm: PASSWORD }, 'distinta'],
     ];
@@ -104,6 +104,29 @@ describe('changing the password', () => {
     const blocked = await change();
     expect(blocked.status).toBe(429);
     expect(await verifyPassword(PASSWORD, hashOf())).toBe(true);
+  });
+
+  it('uses its own bucket per admin: wrong attempts here never lock the login', async () => {
+    for (let i = 0; i < 6; i++) await change({ current: 'wrong-password' });
+    expect((await change({ current: 'wrong-password' })).status).toBe(429);
+    // Same client address, but the login limiter is untouched.
+    const res = await t.post('/admin/login', { username: 'admin', password: PASSWORD });
+    expect(res.status).toBe(303);
+    expect(res.headers.getSetCookie().some((c) => c.startsWith('sid='))).toBe(true);
+  });
+
+  it('and failed logins do not use up the change-password budget', async () => {
+    for (let i = 0; i < 4; i++) await t.post('/admin/login', { username: 'admin', password: 'bad' });
+    expect((await change()).status).toBe(303);
+  });
+
+  it('keeps the buckets of different admins apart', async () => {
+    const { hashPassword } = await import('../src/auth/password.js');
+    t.repo.createAdmin('second', await hashPassword('second-password'));
+    const secondCookie = await t.login('second', 'second-password');
+    for (let i = 0; i < 6; i++) await change({ current: 'wrong-password' });
+    const res = await t.post('/admin/cuenta', { current: 'second-password', next: 'second-new-password', confirm: 'second-new-password' }, secondCookie);
+    expect(res.status).toBe(303);
   });
 
   it('a success gives the limiter a fresh budget', async () => {

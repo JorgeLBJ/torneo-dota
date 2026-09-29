@@ -8,7 +8,10 @@ export interface Deps {
   repo: Repository;
   events: Events;
   config: AppConfig;
+  /** Login and first-run setup attempts, keyed by client address. */
   limiter: LoginRateLimiter;
+  /** Change-password attempts, keyed by admin id, so they cannot lock anyone out of logging in. */
+  accountLimiter: LoginRateLimiter;
   now: Clock;
 }
 

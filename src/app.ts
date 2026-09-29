@@ -27,6 +27,7 @@ export function createApp({ db, config }: CreateAppOptions) {
   const repo = createRepository(db);
   const events = createEvents();
   const limiter = new LoginRateLimiter();
+  const accountLimiter = new LoginRateLimiter();
   const now = clockOf(config);
   const app = new Hono();
 
@@ -50,7 +51,7 @@ export function createApp({ db, config }: CreateAppOptions) {
   );
   app.get('/favicon.svg', (c) => c.body(FAVICON_SVG, 200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' }));
   app.get('/favicon.ico', (c) => c.body(null, 204));
-  app.route('/admin', adminApp({ repo, events, config, limiter, now }));
+  app.route('/admin', adminApp({ repo, events, config, limiter, accountLimiter, now }));
   app.route('/', publicApp({ repo, events, config, now }));
 
   return { app, repo, events };

@@ -180,6 +180,16 @@
     };
   }
 
+  function pageShape(root) {
+    return {
+      main: !!root.querySelector('main'),
+      hero: !!root.querySelector('.hero'),
+      tabsBar: !!root.querySelector('.tabs-bar'),
+      serverNow: !!root.querySelector('[data-server-now]'),
+      panels: Array.prototype.map.call(root.querySelectorAll('main .panel'), function (p) { return p.getAttribute('data-panel'); }),
+    };
+  }
+
   // Regions are replaced one by one. The stream panel is only patched around its player when the stream is
   // unchanged (moving or re-creating an iframe would restart the video); if the stream changed or the
   // structure is not the expected one, just that panel is replaced. If the page skeleton itself differs
@@ -195,12 +205,10 @@
     var newBar = next.querySelector('.tabs-bar');
     var oldStamp = app.querySelector('[data-server-now]');
     var newStamp = next.querySelector('[data-server-now]');
-    if (!oldMain || !newMain || !oldHero || !newHero || !oldBar || !newBar || !oldStamp || !newStamp) return false;
-    var samePanels = ['partidos', 'envivo', 'posiciones', 'playoffs', 'reglas'].every(function (key) {
-      return oldMain.querySelector('.panel[data-panel="' + key + '"]') && newMain.querySelector('.panel[data-panel="' + key + '"]');
-    });
-    if (!samePanels) return false;
+    // Do not patch unless the new fragment is a complete page: otherwise replace everything.
+    if (!window.SiteCore.canPatchRegions(pageShape(app), pageShape(next))) return false;
 
+    // The server-time stamp comes with every fragment and is read fresh (scheduleBoundary) after each swap.
     oldStamp.parentNode.replaceChild(newStamp, oldStamp);
     oldHero.parentNode.replaceChild(newHero, oldHero);
     oldBar.parentNode.replaceChild(newBar, oldBar);

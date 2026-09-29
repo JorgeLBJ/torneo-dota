@@ -11,7 +11,15 @@ interface Core {
   isInstant(value: unknown): boolean;
   msUntilNextBoundary(isos: (string | null)[], nowMs: number): number | null;
   clockOffset(serverIso: unknown, clientNowMs: number): number;
+  canPatchRegions(oldPage: PageShape | null, nextPage: PageShape | null): boolean;
   streamPatchMode(oldPanel: PanelShape | null, nextPanel: PanelShape | null): 'keep' | 'replace';
+}
+interface PageShape {
+  main: boolean;
+  hero: boolean;
+  tabsBar: boolean;
+  serverNow: boolean;
+  panels: string[];
 }
 interface PanelShape {
   frames: number;
@@ -147,5 +155,34 @@ describe('streamPatchMode: when the live refresh may keep the player node', () =
   it('replaces when a panel is missing', () => {
     expect(core.streamPatchMode(null, panel())).toBe('replace');
     expect(core.streamPatchMode(panel(), null)).toBe('replace');
+  });
+});
+
+describe('canPatchRegions: patch region by region only when both pages have the same skeleton', () => {
+  const PANELS = ['partidos', 'envivo', 'posiciones', 'playoffs', 'reglas'];
+  const page = (over: Partial<PageShape> = {}): PageShape => ({ main: true, hero: true, tabsBar: true, serverNow: true, panels: PANELS, ...over });
+
+  it('allows it for two full pages', () => {
+    expect(core.canPatchRegions(page(), page())).toBe(true);
+    expect(core.canPatchRegions(page(), page({ panels: [...PANELS].reverse() }))).toBe(true);
+  });
+  it('refuses when the new fragment lacks a panel (or has an unknown one)', () => {
+    for (const missing of PANELS) {
+      expect(core.canPatchRegions(page(), page({ panels: PANELS.filter((p) => p !== missing) }))).toBe(false);
+    }
+    expect(core.canPatchRegions(page(), page({ panels: [...PANELS, 'extra'] }))).toBe(false);
+  });
+  it('refuses when the current page lacks a panel', () => {
+    expect(core.canPatchRegions(page({ panels: PANELS.slice(1) }), page())).toBe(false);
+  });
+  it('refuses when a region or the server-time stamp is missing on either side', () => {
+    for (const key of ['main', 'hero', 'tabsBar', 'serverNow'] as const) {
+      expect(core.canPatchRegions(page({ [key]: false }), page())).toBe(false);
+      expect(core.canPatchRegions(page(), page({ [key]: false }))).toBe(false);
+    }
+  });
+  it('refuses when either page is missing entirely (for example "Próximamente")', () => {
+    expect(core.canPatchRegions(null, page())).toBe(false);
+    expect(core.canPatchRegions(page(), null)).toBe(false);
   });
 });
