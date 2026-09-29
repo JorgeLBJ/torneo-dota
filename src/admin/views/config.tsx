@@ -19,86 +19,84 @@ export const ConfigView: FC<{ tournament: Tournament; days: ScheduleDay[] }> = (
         Guardar
       </button>
     </PageHead>
-    <div class="grid2">
-      <div class="card stack" style="align-content:start">
-        <h2>General</h2>
-        <label class="f">
-          Nombre
-          <input name="name" value={tournament.name} required maxlength={80} />
-        </label>
-        <label class="f">
-          URL pública (slug)
-          <input name="slug" value={tournament.slug} required maxlength={60} />
-        </label>
-        <label class="f">
-          Juego
-          <input name="game" value={tournament.game} required maxlength={60} />
-        </label>
-        <p class="muted" style="margin:0;font-size:12px">
-          Puntos, desempates, playoffs y reglamento se editan en{' '}
-          <a href={`/admin/t/${tournament.id}/reglas`}>Reglas</a>.
-        </p>
-      </div>
-      <div class="card stack">
-        <h2>Calendario</h2>
-        <div class="scroll-x">
-          <table class="cal">
-            <thead>
+    <div class="card stack narrow">
+      <h2>General</h2>
+      <label class="f">
+        Nombre
+        <input name="name" value={tournament.name} required maxlength={80} />
+      </label>
+      <label class="f">
+        URL pública (slug)
+        <input name="slug" value={tournament.slug} required maxlength={60} />
+      </label>
+      <label class="f">
+        Juego
+        <input name="game" value={tournament.game} required maxlength={60} />
+      </label>
+      <p class="muted" style="margin:0;font-size:12px">
+        Puntos, desempates, playoffs y reglamento se editan en{' '}
+        <a href={`/admin/t/${tournament.id}/reglas`}>Reglas</a>.
+      </p>
+    </div>
+    <div class="card stack cal-card">
+      <h2>Calendario</h2>
+      <div class="scroll-x">
+        <table class="cal">
+          <thead>
+            <tr>
+              <th>Fase</th>
+              <th>Fecha</th>
+              <th>Horarios</th>
+              <th>Min. c/u</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {days.length === 0 ? (
               <tr>
-                <th>Fase</th>
-                <th>Fecha</th>
-                <th>Horarios</th>
-                <th>Min. c/u</th>
-                <th></th>
+                <td colspan={5} class="muted">
+                  Sin días. Agrega los días de juego para repartir el fixture.
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {days.length === 0 ? (
-                <tr>
-                  <td colspan={5} class="muted">
-                    Sin días. Agrega los días de juego para repartir el fixture.
-                  </td>
-                </tr>
-              ) : null}
-              {days.map((d, i) => (
-                <tr>
-                  <td>
-                    <select name="day_phase" aria-label="Fase">
-                      {(Object.keys(PHASE_LABELS) as ScheduleDay['phase'][]).map((p) => (
-                        <option value={p} selected={p === d.phase}>
-                          {PHASE_LABELS[p]}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>
-                    <input type="date" name="day_date" value={d.date} aria-label="Fecha" />
-                  </td>
-                  <td>
-                    <input name="day_times" value={d.startTimes.join(', ')} placeholder="14:00, 15:00" aria-label="Horarios" />
-                  </td>
-                  <td>
-                    <input
-                      name="day_minutes"
-                      value={String(d.slotMinutes)}
-                      inputmode="numeric"
-                      aria-label="Minutos por partido"
-                    />
-                  </td>
-                  <td>
-                    <button class="btn sm danger" type="submit" name="action" value={`remove:${i}`}>
-                      Quitar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <button class="btn sm" type="submit" name="action" value="add" style="justify-self:start">
-          + Agregar día
-        </button>
+            ) : null}
+            {days.map((d, i) => (
+              <tr>
+                <td data-label="Fase">
+                  <select name="day_phase" aria-label="Fase">
+                    {(Object.keys(PHASE_LABELS) as ScheduleDay['phase'][]).map((p) => (
+                      <option value={p} selected={p === d.phase}>
+                        {PHASE_LABELS[p]}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td data-label="Fecha">
+                  <input type="date" name="day_date" value={d.date} aria-label="Fecha" />
+                </td>
+                <td data-label="Horarios">
+                  <input name="day_times" value={d.startTimes.join(', ')} placeholder="14:00, 15:00" aria-label="Horarios" />
+                </td>
+                <td data-label="Min. c/u">
+                  <input
+                    name="day_minutes"
+                    value={String(d.slotMinutes)}
+                    inputmode="numeric"
+                    aria-label="Minutos por partido"
+                  />
+                </td>
+                <td>
+                  <button class="btn sm danger" type="submit" name="action" value={`remove:${i}`}>
+                    Quitar
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
+      <button class="btn sm" type="submit" name="action" value="add" style="justify-self:start">
+        + Agregar día
+      </button>
     </div>
   </form>
 );

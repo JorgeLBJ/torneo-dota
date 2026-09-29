@@ -40,11 +40,18 @@ describe('config screen', () => {
     // The calendar table carries the class the stylesheet sizes its columns with.
     expect(html).toContain('<table class="cal">');
     expect(html).not.toMatch(/name="day_minutes"[^>]*style=/);
+    // The calendar card sits on its own full-width row instead of sharing the two-column grid.
+    expect(html).toContain('class="card stack cal-card"');
+    expect(html).not.toMatch(/class="grid2">\s*<div class="card stack"[^>]*>\s*<h2>General/);
+    // Each cell carries its column name so phones can stack a day as a small card.
+    for (const label of ['Fase', 'Fecha', 'Horarios', 'Min. c/u']) expect(html).toContain(`data-label="${label}"`);
   });
 
   it('ships the calendar and mobile-nav rules in the admin stylesheet', async () => {
     const css = await (await t.get('/assets/admin.css')).text();
     expect(css).toMatch(/table\.cal\s*\{[^}]*table-layout:fixed/);
+    expect(css).not.toMatch(/table\.cal\s*\{[^}]*min-width:680px/);
+    expect(css).toContain('attr(data-label)');
     expect(css).toMatch(/nav\.side::-webkit-scrollbar\s*\{display:none\}/);
     expect(css).toMatch(/nav\.side\s*\{[^}]*scrollbar-width:none/);
   });

@@ -147,11 +147,12 @@ td .btn,td form{margin:0}
 a.btn{text-decoration:none;color:inherit}
 a.btn.pri{color:#1a1405}
 
-/* Calendar table: fixed column widths so the phase select and the times input stay readable. */
-table.cal{table-layout:fixed;min-width:680px}
+/* Calendar: the card takes a full row; fixed column widths keep the phase select and times input readable. */
+.cal-card{min-width:0}
+table.cal{table-layout:fixed;width:100%}
 table.cal th:nth-child(1){width:150px}
 table.cal th:nth-child(2){width:170px}
-table.cal th:nth-child(4){width:100px}
+table.cal th:nth-child(4){width:80px}
 table.cal th:nth-child(5){width:90px}
 table.cal td{vertical-align:middle}
 table.cal select,table.cal input{min-width:0;text-overflow:ellipsis}
@@ -164,5 +165,15 @@ table.cal select,table.cal input{min-width:0;text-overflow:ellipsis}
   nav.side{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;-webkit-overflow-scrolling:touch;padding-bottom:2px}
   nav.side::-webkit-scrollbar{display:none}
   nav.side a{flex:none;white-space:nowrap;gap:8px}
-  .scroll-x table.cal{min-width:680px}
+
+  /* Each calendar day becomes a small card instead of a scrolling table. */
+  .scroll-x table.cal{min-width:0}
+  table.cal,table.cal tbody,table.cal tr,table.cal td{display:block}
+  table.cal thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  table.cal tbody{display:grid;gap:10px}
+  table.cal tr{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2)}
+  table.cal td{padding:0;border:0}
+  table.cal td[data-label]::before{content:attr(data-label);display:block;margin-bottom:3px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  table.cal td:nth-child(3),table.cal td:nth-child(5){grid-column:1 / -1}
+  table.cal td[colspan]{grid-column:1 / -1}
 }
