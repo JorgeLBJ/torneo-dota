@@ -18,7 +18,7 @@ export const TournamentsView: FC<{ rows: TournamentRow[] }> = ({ rows }) => (
       </div>
     </div>
     <div class="card scroll-x">
-      <table>
+      <table class="cards">
         <thead>
           <tr>
             <th>Nombre</th>
@@ -38,16 +38,16 @@ export const TournamentsView: FC<{ rows: TournamentRow[] }> = ({ rows }) => (
           ) : null}
           {rows.map(({ tournament: t, teamCount, status, statusClass }) => (
             <tr>
-              <td>
+              <td data-label="Nombre">
                 <b>{t.name}</b> {t.isActive ? <span class="pill next">Activo</span> : null}
               </td>
-              <td class="muted">
+              <td data-label="Página pública" class="muted">
                 <a href={publicUrlFor(t)} target="_blank" rel="noopener">
                   /t/{t.slug}
                 </a>
               </td>
-              <td>{teamCount}</td>
-              <td>
+              <td data-label="Equipos">{teamCount}</td>
+              <td data-label="Estado">
                 <span class={`pill ${statusClass}`}>{status}</span>
               </td>
               <td>

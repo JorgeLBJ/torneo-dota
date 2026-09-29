@@ -55,7 +55,7 @@ export const UsersView: FC<{ admins: Admin[]; currentId: number }> = ({ admins, 
       </div>
     </div>
     <div class="card scroll-x">
-      <table>
+      <table class="cards">
         <thead>
           <tr>
             <th>Usuario</th>
@@ -66,11 +66,11 @@ export const UsersView: FC<{ admins: Admin[]; currentId: number }> = ({ admins, 
         <tbody>
           {admins.map((a) => (
             <tr>
-              <td>
+              <td data-label="Usuario">
                 <b>{a.username}</b>
                 {a.id === currentId ? <span class="pill next">Tú</span> : null}
               </td>
-              <td class="muted">{formatDateTime(a.createdAt)}</td>
+              <td class="muted" data-label="Creado">{formatDateTime(a.createdAt)}</td>
               <td>
                 {a.id === currentId ? null : (
                   <form method="post" action={`/admin/usuarios/${a.id}/eliminar`}>
@@ -85,7 +85,7 @@ export const UsersView: FC<{ admins: Admin[]; currentId: number }> = ({ admins, 
         </tbody>
       </table>
     </div>
-    <form class="card stack narrow" method="post" action="/admin/usuarios">
+    <form class="card row-form" method="post" action="/admin/usuarios">
       <h2>Agregar usuario</h2>
       <label class="f">
         Usuario

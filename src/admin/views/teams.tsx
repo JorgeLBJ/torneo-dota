@@ -1,7 +1,7 @@
 import type { FC } from 'hono/jsx';
 import { HEROES, getHero } from '../../data/heroes.js';
 import type { Team, Tournament } from '../../db/repository.js';
-import { TeamBadge } from './layout.js';
+import { teamColor } from './layout.js';
 import { PageHead, heroImage } from './parts.js';
 
 const ATTRS: [string, string][] = [
@@ -57,7 +57,7 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
         }
       />
       <div class="card scroll-x">
-        <table>
+        <table class="cards teams">
           <thead>
             <tr>
               <th>Código</th>
@@ -72,19 +72,24 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
               const formId = `team-${team.id}`;
               return (
                 <tr>
-                  <td>
-                    <div class="code-cell">
-                      <TeamBadge team={team} />
-                      <input name="code" form={formId} value={team.code} maxlength={4} aria-label="Código" />
-                    </div>
+                  <td data-label="Código">
+                    <input
+                      class="code-input"
+                      style={`--tc:${teamColor(team.id)}`}
+                      name="code"
+                      form={formId}
+                      value={team.code}
+                      maxlength={4}
+                      aria-label="Código"
+                    />
                   </td>
-                  <td>
+                  <td data-label="Emblema">
                     <HeroSlot formId={formId} team={team} />
                   </td>
-                  <td>
+                  <td data-label="Nombre">
                     <input name="name" form={formId} value={team.name} required maxlength={40} aria-label="Nombre" />
                   </td>
-                  <td>
+                  <td data-label="Capitán">
                     <input name="captain" form={formId} value={team.captain ?? ''} maxlength={40} placeholder="Opcional" aria-label="Capitán" />
                   </td>
                   <td>
@@ -105,18 +110,16 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
               );
             })}
             <tr>
-              <td>
-                <div class="code-cell">
-                  <input name="code" form="team-new" maxlength={4} placeholder="Ej. A" aria-label="Código del nuevo equipo" required />
-                </div>
+              <td data-label="Código">
+                <input class="code-input" name="code" form="team-new" maxlength={4} placeholder="Ej. A" aria-label="Código del nuevo equipo" required />
               </td>
-              <td>
+              <td data-label="Emblema">
                 <HeroSlot formId="team-new" />
               </td>
-              <td>
+              <td data-label="Nombre">
                 <input name="name" form="team-new" maxlength={40} placeholder="Nombre del equipo" aria-label="Nombre del nuevo equipo" required />
               </td>
-              <td>
+              <td data-label="Capitán">
                 <input name="captain" form="team-new" maxlength={40} placeholder="Opcional" aria-label="Capitán del nuevo equipo" />
               </td>
               <td>

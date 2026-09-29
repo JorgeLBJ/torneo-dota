@@ -233,6 +233,14 @@ td.pts { font: 800 22px/1 var(--fd); color: var(--gold-hi); }
   .bracket { grid-template-columns: 1fr; gap: 14px; }
   .link { display: none; }
   .col { gap: 14px; }
+  /* Standings keep #, Equipo, PJ, Pts and K−D so nothing needs sideways scrolling. */
+  .opt { display: none; }
+  .tbl-wrap table { min-width: 0; }
+  td.pos { width: 34px; }
+  .team { gap: 8px; }
+  .team img, .team .ph { width: 48px; height: 27px; }
+  th { padding-inline: 4px; letter-spacing: .08em; }
+  td { padding: 10px 4px; }
   .sec { flex-wrap: wrap; gap: 6px 12px; }
   .sec h2 { font-size: 20px; white-space: normal; }
   .sec::after { display: none; }

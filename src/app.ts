@@ -9,6 +9,7 @@ import { LoginRateLimiter } from './auth/rate-limit.js';
 import type { AppConfig } from './config.js';
 import { createRepository } from './db/repository.js';
 import { createEvents } from './events.js';
+import { FAVICON_SVG } from './favicon.js';
 import { publicApp } from './public/routes.js';
 
 export type { AppConfig } from './config.js';
@@ -42,6 +43,8 @@ export function createApp({ db, config }: CreateAppOptions) {
     '/assets/*',
     serveStatic({ root: relative(process.cwd(), PUBLIC_DIR) || '.', rewriteRequestPath: (p) => p.replace(/^\/assets/, '') }),
   );
+  app.get('/favicon.svg', (c) => c.body(FAVICON_SVG, 200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' }));
+  app.get('/favicon.ico', (c) => c.body(null, 204));
   app.route('/admin', adminApp({ repo, events, config, limiter }));
   app.route('/', publicApp({ repo, events, config }));
 

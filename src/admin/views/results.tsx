@@ -108,11 +108,11 @@ export const StandingsTable: FC<{ rows: StandingRow[]; qualifiers: number }> = (
           <th>#</th>
           <th>Equipo</th>
           <th>PJ</th>
-          <th>G</th>
-          <th>P</th>
+          <th class="opt">G</th>
+          <th class="opt">P</th>
           <th>Pts</th>
-          <th>K</th>
-          <th>D</th>
+          <th class="opt">K</th>
+          <th class="opt">D</th>
           <th>K−D</th>
         </tr>
       </thead>
@@ -125,13 +125,13 @@ export const StandingsTable: FC<{ rows: StandingRow[]; qualifiers: number }> = (
               {row.unresolvedTie ? <span class="pill next">Empate</span> : null}
             </td>
             <td>{row.played}</td>
-            <td>{row.wins}</td>
-            <td>{row.losses}</td>
+            <td class="opt">{row.wins}</td>
+            <td class="opt">{row.losses}</td>
             <td>
               <b>{row.points}</b>
             </td>
-            <td>{row.kills}</td>
-            <td>{row.deaths}</td>
+            <td class="opt">{row.kills}</td>
+            <td class="opt">{row.deaths}</td>
             <td>{signed(row.diff)}</td>
           </tr>
         ))}
@@ -174,9 +174,11 @@ export const ResultsView: FC<ResultsViewProps> = ({ tournament, cards, dates, ha
             Todos
           </option>
         </select>
-        <button class="btn sm" type="submit">
-          Ver
-        </button>
+        <noscript>
+          <button class="btn sm" type="submit">
+            Ver
+          </button>
+        </noscript>
       </form>
     </PageHead>
     {cards.length === 0 ? (

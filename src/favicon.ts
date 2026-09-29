@@ -1,0 +1,2 @@
+/** Small gold shield, shared by the backoffice and the public site. */
+export const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 76"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0dcaa"/><stop offset="1" stop-color="#8a6d3b"/></linearGradient></defs><path d="M32 2 60 12v22c0 18-12 32-28 40C16 66 4 52 4 34V12Z" fill="#0f1114" stroke="url(#g)" stroke-width="4"/><path d="M32 14 48 20v14c0 11-7 20-16 25-9-5-16-14-16-25V20Z" fill="url(#g)"/></svg>`;

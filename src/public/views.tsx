@@ -42,6 +42,7 @@ export const PublicDocument: FC<PropsWithChildren<{ title: string; links?: PageL
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#07080a" />
         <title>{title}</title>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
         <link rel="stylesheet" href={FONTS} />
@@ -241,16 +242,16 @@ const StandingRowView: FC<{ row: PublicStandingRow }> = ({ row }) => {
         </div>
       </td>
       <td>{row.played}</td>
-      <td>{row.wins}</td>
-      <td>{row.losses}</td>
+      <td class="opt">{row.wins}</td>
+      <td class="opt">{row.losses}</td>
       <td class="pts">{row.points}</td>
-      <td>{row.kills}</td>
-      <td>{row.deaths}</td>
+      <td class="opt">{row.kills}</td>
+      <td class="opt">{row.deaths}</td>
       <td class={row.diff > 0 ? 'pos-d' : row.diff < 0 ? 'neg-d' : ''}>
         {row.diff > 0 ? '+' : ''}
         {row.diff}
       </td>
-      <td>
+      <td class="opt">
         <span class="form">
           {row.last5.map((r) => (
             <i class={r}>{r === 'W' ? 'G' : 'P'}</i>
@@ -271,13 +272,13 @@ const StandingsPanel: FC<{ model: PublicModel }> = ({ model }) => (
             <th>#</th>
             <th class="l">Equipo</th>
             <th>PJ</th>
-            <th>G</th>
-            <th>P</th>
+            <th class="opt">G</th>
+            <th class="opt">P</th>
             <th>Pts</th>
-            <th>Kills</th>
-            <th>Deaths</th>
+            <th class="opt">Kills</th>
+            <th class="opt">Deaths</th>
             <th>K−D</th>
-            <th>Últimos</th>
+            <th class="opt">Últimos</th>
           </tr>
         </thead>
         <tbody>

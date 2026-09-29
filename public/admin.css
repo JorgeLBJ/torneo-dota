@@ -74,7 +74,7 @@ td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
 .std tr.cut td{border-bottom:2px solid var(--gold)}
 
 /* Bracket */
-.bracket{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:center}
+.bracket{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start}
 .bm{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;display:grid;gap:8px}
 .bm h3{margin:0;font-family:var(--fd);font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .champ{text-align:center;padding:20px;border-radius:14px;border:1px solid rgba(230,182,95,.5);background:var(--gold-soft)}
@@ -168,22 +168,31 @@ table.cal select,table.cal input{min-width:0;text-overflow:ellipsis}
   nav.side::-webkit-scrollbar{display:none}
   nav.side a{flex:none;white-space:nowrap;gap:8px}
 
-  /* Each calendar day becomes a small card instead of a scrolling table. */
-  .scroll-x table.cal{min-width:0}
-  table.cal,table.cal tbody,table.cal tr,table.cal td{display:block}
-  table.cal thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
-  table.cal tbody{display:grid;gap:10px}
-  table.cal tr{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2)}
-  table.cal td{padding:0;border:0}
-  table.cal td[data-label]::before{content:attr(data-label);display:block;margin-bottom:3px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
-  table.cal td:nth-child(3),table.cal td:nth-child(5){grid-column:1 / -1}
-  table.cal td[colspan]{grid-column:1 / -1}
+  /* Tables that would need sideways scrolling become stacked cards. */
+  .scroll-x table.cards,.scroll-x table.std{min-width:0}
+  table.cards,table.cards tbody,table.cards tr,table.cards td{display:block}
+  table.cards thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  table.cards tbody{display:grid;gap:10px}
+  table.cards tr{display:grid;grid-template-columns:1fr;gap:8px 10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2)}
+  table.cards td{padding:0;border:0}
+  table.cards td[data-label]::before{content:attr(data-label);display:block;margin-bottom:3px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  table.cards td[colspan]{grid-column:1 / -1}
+  table.cal tr,table.teams tr{grid-template-columns:1fr 1fr}
+  table.cal td:nth-child(3),table.cal td:nth-child(5),table.teams td:nth-child(n+3){grid-column:1 / -1}
+  .std .opt{display:none}
 }
 
 /* Controls keep their height and natural width inside grid and flex parents. */
 .stack>.btn,.stack>button{justify-self:start}
 .hero-cell{display:flex;align-items:center;gap:8px;min-width:0}
 .hero-cell .hero-name{min-width:0;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
-.code-cell{display:flex;align-items:center;gap:6px}
-.code-cell input{width:70px;flex:none}
 .pill:not(:first-child){margin-left:8px}
+aside .btn{width:100%}
+.code-input{width:90px;border-left:3px solid var(--tc,var(--gold))}
+.general-card,.row-form{display:grid;gap:12px}
+@media (min-width:1024px){
+  .general-card{grid-template-columns:repeat(3,1fr);gap:14px}
+  .general-card h2,.general-card p{grid-column:1 / -1}
+  .row-form{grid-template-columns:1fr 1fr auto;align-items:end;gap:12px 14px}
+  .row-form h2{grid-column:1 / -1}
+}

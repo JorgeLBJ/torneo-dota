@@ -9,8 +9,10 @@ const FONTS =
 
 const PALETTE = ['#e6b65f', '#6fa8ff', '#5fd3a2', '#c58cff', '#ff8f6b', '#e57580', '#62d0e0'];
 
+export const teamColor = (id: number): string => PALETTE[id % PALETTE.length]!;
+
 export const TeamBadge: FC<{ team: Pick<Team, 'id' | 'code'> }> = ({ team }) => (
-  <span class="badge" style={`--tc:${PALETTE[team.id % PALETTE.length]}`}>
+  <span class="badge" style={`--tc:${teamColor(team.id)}`}>
     {team.code}
   </span>
 );
@@ -59,6 +61,7 @@ const Document: FC<PropsWithChildren<{ title: string }>> = ({ title, children })
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{title} · Torneos Admin</title>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="stylesheet" href={FONTS} />
         <link rel="stylesheet" href={assetUrl('admin.css')} />
       </head>

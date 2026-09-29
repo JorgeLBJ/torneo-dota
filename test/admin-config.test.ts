@@ -38,7 +38,7 @@ describe('config screen', () => {
     expect(html).toContain('value="14:00, 15:00"');
     expect(html).toContain('Agregar día');
     // The calendar table carries the class the stylesheet sizes its columns with.
-    expect(html).toContain('<table class="cal">');
+    expect(html).toContain('<table class="cal cards">');
     expect(html).not.toMatch(/name="day_minutes"[^>]*style=/);
     // The calendar card sits on its own full-width row instead of sharing the two-column grid.
     expect(html).toContain('class="card stack cal-card"');

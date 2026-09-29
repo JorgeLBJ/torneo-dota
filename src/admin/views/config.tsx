@@ -19,7 +19,7 @@ export const ConfigView: FC<{ tournament: Tournament; days: ScheduleDay[] }> = (
         Guardar
       </button>
     </PageHead>
-    <div class="card stack narrow">
+    <div class="card general-card">
       <h2>General</h2>
       <label class="f">
         Nombre
@@ -41,7 +41,7 @@ export const ConfigView: FC<{ tournament: Tournament; days: ScheduleDay[] }> = (
     <div class="card stack cal-card">
       <h2>Calendario</h2>
       <div class="scroll-x">
-        <table class="cal">
+        <table class="cal cards">
           <thead>
             <tr>
               <th>Fase</th>

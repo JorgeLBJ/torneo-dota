@@ -142,7 +142,8 @@ describe('standings tab', () => {
   it('renders the table headers, points and the gold cut line', async () => {
     win(0);
     const body = await html('/');
-    for (const head of ['PJ', 'G', 'P', 'Pts', 'Kills', 'Deaths', 'K−D', 'Últimos']) expect(body).toContain(`<th>${head}</th>`);
+    for (const head of ['PJ', 'Pts', 'K−D']) expect(body).toContain(`<th>${head}</th>`);
+    for (const head of ['G', 'P', 'Kills', 'Deaths', 'Últimos']) expect(body).toContain(`<th class="opt">${head}</th>`);
     expect(body).toContain('1 de 6 partidos jugados');
     expect(body).toContain('class="q cut"');
     expect(body).toContain('+10');
