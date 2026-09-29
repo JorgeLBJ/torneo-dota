@@ -1,0 +1,39 @@
+# Producción (VPS): compose del proyecto ~/torneo-dota. Ver deploy/README.md.
+# La imagen se construye DENTRO de Docker desde GitHub: en el servidor no hace falta node, npm ni git.
+name: torneo-dota
+
+services:
+  torneo-dota:
+    container_name: torneo-dota
+    image: torneo-dota:latest
+    build:
+      # Rama main. Para volver a una versión anterior usa un commit: ...torneo-dota.git#<sha>
+      context: https://github.com/JorgeLBJ/torneo-dota.git#main
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true # PID 1 propio: reenvía SIGTERM y recoge procesos huérfanos
+    stop_grace_period: 20s # la app cierra SSE y la base en < 10 s; luego Docker enviaría SIGKILL
+    env_file: .env
+    environment:
+      # Fijo aquí para que la base de datos SIEMPRE quede en el volumen aunque falte en .env.
+      DATABASE_PATH: /data/torneos.db
+    volumes:
+      - torneo-dota_data:/data
+    networks:
+      - mbd_edge # Caddy llega a la app por el nombre del contenedor; no se publica ningún puerto
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  torneo-dota_data:
+    name: torneo-dota_data # ¡Aquí viven los datos! Nunca uses `docker compose down -v`
+
+networks:
+  mbd_edge:
+    external: true
