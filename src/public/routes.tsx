@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { AppConfig } from '../config.js';
 import type { Repository, Tournament } from '../db/repository.js';
+import { clientKey } from '../security.js';
 import type { Events } from '../events.js';
 import { loadState } from '../services/state.js';
 import { buildPublicModel } from './model.js';
@@ -17,10 +18,15 @@ import {
 export interface PublicDeps {
   repo: Repository;
   events: Events;
-  config: Pick<AppConfig, 'heartbeatMs' | 'now'>;
+  config: Pick<AppConfig, 'heartbeatMs' | 'now' | 'sseLimits' | 'trustProxy'>;
 }
 
 export const DEFAULT_HEARTBEAT_MS = 25_000;
+const DEFAULT_SSE_LIMITS = { global: 500, perIp: 10 };
+/** Reconnect delay suggested to EventSource clients. */
+const SSE_RETRY_MS = 3000;
+/** Sent with a 503 when the connection limits are reached. */
+const SSE_RETRY_AFTER_S = 30;
 
 // Deliberately no X-Frame-Options / frame-ancestors here: this site is embedded in Google Sites.
 
@@ -77,25 +83,56 @@ export function publicApp({ repo, events, config }: PublicDeps) {
     return fragment(c, tournament);
   });
 
+  // ---- Server-sent events ----------------------------------------------------------------------
+
+  const limits = { global: config.sseLimits?.global ?? DEFAULT_SSE_LIMITS.global, perIp: config.sseLimits?.perIp ?? DEFAULT_SSE_LIMITS.perIp };
+  let openStreams = 0;
+  const perClient = new Map<string, number>();
+
+  /** Takes a connection slot, or returns null when a limit is reached. The returned release is idempotent. */
+  const admit = (client: string): (() => void) | null => {
+    if (openStreams >= limits.global || (perClient.get(client) ?? 0) >= limits.perIp) return null;
+    openStreams++;
+    perClient.set(client, (perClient.get(client) ?? 0) + 1);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      openStreams--;
+      const left = (perClient.get(client) ?? 1) - 1;
+      if (left <= 0) perClient.delete(client);
+      else perClient.set(client, left);
+    };
+  };
+
   /**
-   * Server-sent events: `hello` on connect, `change` when the page's data changed (the client then
-   * re-fetches the fragment), `ping` as a heartbeat. The listener is always released on disconnect.
+   * Streams `hello` on connect, `change` when the page's data changed (the client then re-fetches the
+   * fragment) and `ping` as a heartbeat. Everything acquired for the connection (listener, slot, timer)
+   * is released by one cleanup, whichever way the connection ends.
    */
   const live = (c: Context, subscribe: (notify: () => void) => () => void) => {
+    const release = admit(clientKey(c, config.trustProxy));
+    if (!release) {
+      return c.text('Demasiadas conexiones en vivo. Reintenta en unos segundos.', 503, { 'Retry-After': String(SSE_RETRY_AFTER_S) });
+    }
     c.header('X-Accel-Buffering', 'no');
     return streamSSE(c, async (stream) => {
       let timer: ReturnType<typeof setTimeout> | undefined;
       let wake: (() => void) | undefined;
-      const off = subscribe(() => {
-        stream.writeSSE({ event: 'change', data: '{}' }).catch(() => undefined);
-      });
-      stream.onAbort(() => {
-        off();
+      let unsubscribe: (() => void) | undefined;
+      const cleanup = () => {
+        unsubscribe?.();
+        unsubscribe = undefined;
+        release();
         clearTimeout(timer);
         wake?.();
-      });
+      };
+      stream.onAbort(cleanup);
       try {
-        await stream.writeSSE({ event: 'hello', data: '{}', retry: 3000 });
+        unsubscribe = subscribe(() => {
+          stream.writeSSE({ event: 'change', data: '{}' }).catch(() => undefined);
+        });
+        await stream.writeSSE({ event: 'hello', data: '{}', retry: SSE_RETRY_MS });
         while (!stream.aborted) {
           await new Promise<void>((resolve) => {
             wake = resolve;
@@ -107,31 +144,47 @@ export function publicApp({ repo, events, config }: PublicDeps) {
       } catch {
         // The client went away mid-write; nothing to report.
       } finally {
-        off();
-        clearTimeout(timer);
+        cleanup();
       }
     });
   };
+
+  // The root follows whichever tournament is active. One shared listener serves every root connection:
+  // per event it looks the active tournament up once and wakes all of them if it concerns the page.
+  const rootStream = (() => {
+    const members = new Set<() => void>();
+    let unsubscribe: (() => void) | undefined;
+    let lastActive: number | null = null;
+    const onChange = (changedId: number) => {
+      const active = repo.getActiveTournament()?.id ?? null;
+      const relevant = changedId === active || active !== lastActive;
+      lastActive = active;
+      if (relevant) for (const notify of [...members]) notify();
+    };
+    return {
+      join(notify: () => void): () => void {
+        if (members.size === 0) {
+          lastActive = repo.getActiveTournament()?.id ?? null;
+          unsubscribe = events.onAnyChanged(onChange);
+        }
+        members.add(notify);
+        return () => {
+          members.delete(notify);
+          if (members.size === 0) {
+            unsubscribe?.();
+            unsubscribe = undefined;
+          }
+        };
+      },
+    };
+  })();
 
   app.get('/t/:slug/events', (c) => {
     const tournament = repo.getTournamentBySlug(c.req.param('slug'));
     if (!tournament) return c.text('Torneo no encontrado.', 404);
     return live(c, (notify) => events.onTournamentChanged(tournament.id, notify));
   });
-
-  // The root follows whichever tournament is active, so it listens to every change and
-  // reports the ones that concern the active tournament or switch which one is active.
-  app.get('/events', (c) =>
-    live(c, (notify) => {
-      let lastActive = repo.getActiveTournament()?.id ?? null;
-      return events.onAnyChanged((id) => {
-        const active = repo.getActiveTournament()?.id ?? null;
-        const relevant = id === active || active !== lastActive;
-        lastActive = active;
-        if (relevant) notify();
-      });
-    }),
-  );
+  app.get('/events', (c) => live(c, (notify) => rootStream.join(notify)));
 
   return app;
 }

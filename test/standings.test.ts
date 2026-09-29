@@ -216,3 +216,16 @@ describe('unknown tiebreakers', () => {
     expect(rows).toHaveLength(2);
   });
 });
+
+describe('tiebreaker names that only exist on Object.prototype', () => {
+  it('are ignored like any other unknown name', () => {
+    const teams = [1, 2, 3].map((id) => ({ id, code: String.fromCharCode(64 + id), name: `T${id}` }));
+    const win = (matchNumber: number, winner: number, loser: number, kills: number): GroupMatch => ({
+      matchNumber, team1Id: winner, team2Id: loser, winnerId: winner, team1Kills: kills, team1Deaths: 5, team2Kills: 5, team2Deaths: kills,
+    });
+    const matches = [win(1, 1, 3, 20), win(2, 2, 3, 30)];
+    const plain = computeStandings(teams, matches, 2, { tiebreakers: [] });
+    const odd = computeStandings(teams, matches, 2, { tiebreakers: ['toString' as never, 'constructor' as never, 'hasOwnProperty' as never] });
+    expect(odd.map((r) => [r.teamId, r.rank, r.unresolvedTie])).toEqual(plain.map((r) => [r.teamId, r.rank, r.unresolvedTie]));
+  });
+});

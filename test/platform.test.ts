@@ -44,9 +44,13 @@ describe('platform headers', () => {
   });
   afterEach(() => t.db.close());
 
-  it('caches static assets for a year', async () => {
-    const res = await t.get('/assets/admin.css');
-    expect(res.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+  it('caches fingerprinted assets for a year, and everything else for a day', async () => {
+    const hashed = await t.get(assetUrl('admin.css'));
+    expect(hashed.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+    for (const path of ['/assets/admin.css', '/assets/admin.css?v=stale', '/assets/heroes/axe.png', '/assets/img/hero-bg.jpg']) {
+      expect((await t.get(path)).headers.get('cache-control')).toBe('public, max-age=86400');
+    }
+    expect((await t.get('/assets/missing.css')).headers.get('cache-control') ?? '').not.toContain('max-age');
   });
 
   it('forbids framing of the backoffice, login included', async () => {

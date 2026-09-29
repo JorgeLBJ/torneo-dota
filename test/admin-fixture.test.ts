@@ -125,6 +125,7 @@ describe('match editing', () => {
       [{ ...ok, start_time: '', end_time: '' }, 'hora de inicio'],
       [{ ...ok, start_time: '18:00', end_time: '17:00' }, 'posterior'],
       [{ ...ok, start_time: '18:00', end_time: '18:00' }, 'posterior'],
+      [{ ...ok, start_time: '10:00', end_time: '09:00' }, 'posterior'],
       [{ ...ok, team2: ok.team1 }, 'distintos'],
       [{ ...ok, team1: '99999' }, 'equipo'],
     ];
@@ -132,6 +133,16 @@ describe('match editing', () => {
       const res = await t.post(`${base}/partidos/${m.id}`, form, cookie);
       expect(await flashText(t, res, cookie)).toContain(message);
     }
+  });
+
+  it('accepts a slot that runs past midnight', async () => {
+    generate();
+    const m = t.repo.listMatches(tournament.id, 'group')[0]!;
+    await t.post(`${base}/partidos/${m.id}`, { round: '1', date: '2026-10-05', start_time: '23:30', end_time: '00:30', team1: '', team2: '' }, cookie);
+    expect(t.repo.getMatch(m.id)).toMatchObject({ startTime: '23:30', endTime: '00:30', startsAt: '2026-10-06T04:30:00Z', endsAt: '2026-10-06T05:30:00Z' });
+    // The default one-hour end also crosses midnight.
+    await t.post(`${base}/partidos/${m.id}`, { round: '1', date: '2026-10-05', start_time: '23:30', end_time: '', team1: '', team2: '' }, cookie);
+    expect(t.repo.getMatch(m.id)).toMatchObject({ endTime: '00:30' });
   });
 
   it('warns when changing teams discards a result', async () => {

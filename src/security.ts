@@ -32,7 +32,9 @@ export function sameOriginGuard(options: { trustProxy: boolean }): MiddlewareHan
 /**
  * Client address used to key the login rate limiter.
  * Behind a trusted proxy the right-most X-Forwarded-For entry is the one the
- * proxy itself appended; anything to its left is client-controlled.
+ * proxy itself appended; anything to its left is client-controlled. This assumes exactly one trusted
+ * proxy hop in front of the app (Caddy on the same host): with more hops, the right-most entry would be
+ * the inner proxy, not the client.
  */
 export function clientKey(c: Context, trustProxy: boolean): string {
   if (trustProxy) {

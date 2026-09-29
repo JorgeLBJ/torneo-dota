@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import heroData from './heroes.json' with { type: 'json' };
 
 export type HeroAttr = 'str' | 'agi' | 'int' | 'all';
 
@@ -8,9 +8,8 @@ export interface Hero {
   attr: HeroAttr;
 }
 
-export const HEROES: readonly Hero[] = JSON.parse(
-  readFileSync(new URL('./heroes.json', import.meta.url), 'utf8'),
-) as Hero[];
+// Bundled with the code (a static import), so it resolves the same from any working directory.
+export const HEROES: readonly Hero[] = heroData as Hero[];
 
 const BY_SLUG = new Map(HEROES.map((h) => [h.slug, h]));
 

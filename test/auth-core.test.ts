@@ -51,6 +51,20 @@ describe('LoginRateLimiter', () => {
     expect(limiter.consume('ip')).toBe(true);
   });
 
+  it('never evicts a key that is currently blocked while an unblocked one can go', () => {
+    let now = 0;
+    const limiter = new LoginRateLimiter({ maxFailures: 2, windowMs: 60_000, maxKeys: 2, now: () => now });
+    limiter.consume('attacker');
+    limiter.consume('attacker');
+    expect(limiter.consume('attacker')).toBe(false); // blocked
+    now += 1;
+    limiter.consume('a');
+    now += 1;
+    limiter.consume('b'); // over capacity: 'a' (not blocked) goes, 'attacker' stays
+    expect(limiter.size).toBe(2);
+    expect(limiter.consume('attacker')).toBe(false);
+  });
+
   it('stays bounded: expired keys are evicted first, then the oldest key', () => {
     let now = 0;
     const limiter = new LoginRateLimiter({ maxFailures: 5, windowMs: 1_000, maxKeys: 3, now: () => now });

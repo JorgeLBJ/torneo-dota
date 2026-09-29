@@ -65,6 +65,16 @@ export function isValidTime(value: string): boolean {
   return TIME_PATTERN.test(value);
 }
 
+/**
+ * Whether an end time is a believable end for a start time on the same slot: later the same day, or
+ * (for a slot running past midnight) earlier on the clock but at most 12 hours after the start.
+ */
+export function isPlausibleSlot(start: string, end: string): boolean {
+  const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+  const span = (minutes(end) - minutes(start) + 1440) % 1440;
+  return span > 0 && (minutes(end) > minutes(start) || span <= 12 * 60);
+}
+
 export function addMinutes(time: string, minutes: number): string {
   if (!isValidTime(time)) throw new Error(`Invalid time "${time}": expected HH:MM`);
   if (!Number.isInteger(minutes) || minutes <= 0) throw new Error(`Invalid slot minutes: ${minutes}`);

@@ -70,7 +70,7 @@ export function computeStandings(
 ): StandingRow[] {
   const { pointsWin = 1, pointsLoss = 0, tiebreakers = ['kd', 'kills'] } = rules;
   // Stored values are not trusted: unknown or repeated criteria are skipped.
-  const criteria = [...new Set(tiebreakers)].flatMap((name) => (name in CRITERION_VALUE ? [CRITERION_VALUE[name]] : []));
+  const criteria = [...new Set(tiebreakers)].flatMap((name) => (Object.hasOwn(CRITERION_VALUE, name) ? [CRITERION_VALUE[name]] : []));
   const acc = new Map<number, Acc>();
   for (const t of teams) {
     acc.set(t.id, {

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Match } from '../../db/repository.js';
-import { addMinutes, describeRoundRobin, isValidTime } from '../../domain/fixture.js';
+import { addMinutes, describeRoundRobin, isPlausibleSlot, isValidTime } from '../../domain/fixture.js';
 import {
   FixtureError,
   addBlankMatch,
@@ -104,7 +104,7 @@ export function fixtureRoutes(deps: Deps) {
     }
     // A schedule is an instant: a date needs a start time (and an end needs one too).
     if ((date !== '' || end !== '') && start === '') return error('Indica también la hora de inicio.');
-    if (end !== '' && end <= start) return error('La hora de fin debe ser posterior a la de inicio.');
+    if (end !== '' && !isPlausibleSlot(start, end)) return error('La hora de fin debe ser posterior a la de inicio.');
     if (start !== '' && end === '') end = addMinutes(start, 60);
 
     const validIds = new Set(repo.listTeams(tournament.id).map((t) => t.id));

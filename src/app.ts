@@ -3,7 +3,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import type Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
-import { PUBLIC_DIR } from './assets.js';
+import { PUBLIC_DIR, assetUrl } from './assets.js';
 import { adminApp } from './admin/index.js';
 import { LoginRateLimiter } from './auth/rate-limit.js';
 import type { AppConfig } from './config.js';
@@ -34,10 +34,13 @@ export function createApp({ db, config }: CreateAppOptions) {
   );
 
   // Static files (CSS, JS, self-hosted hero portraits) are served from ./public under /assets.
-  // Asset URLs are fingerprinted (see assetUrl), so they can be cached for a year.
+  // Only URLs carrying the file's current fingerprint (see assetUrl) are immutable; portraits and the
+  // hero background keep plain URLs, so they get a day and are revalidated after that.
   app.use('/assets/*', async (c, next) => {
     await next();
-    if (c.res.ok) c.res.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+    if (!c.res.ok) return;
+    const fingerprinted = assetUrl(c.req.path.slice('/assets/'.length)) === `${c.req.path}?v=${c.req.query('v')}`;
+    c.res.headers.set('Cache-Control', fingerprinted ? 'public, max-age=31536000, immutable' : 'public, max-age=86400');
   });
   app.use(
     '/assets/*',

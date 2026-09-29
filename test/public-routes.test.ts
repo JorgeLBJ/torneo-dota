@@ -234,9 +234,9 @@ describe('partial', () => {
 });
 
 describe('static assets', () => {
-  it('serves the self-hosted portraits with a long cache', async () => {
+  it('serves the self-hosted portraits with a day of caching (their URLs are not fingerprinted)', async () => {
     const res = await t.get('/assets/heroes/axe.png');
     expect(res.status).toBe(200);
-    expect(res.headers.get('cache-control')).toContain('immutable');
+    expect(res.headers.get('cache-control')).toBe('public, max-age=86400');
   });
 });

@@ -5,6 +5,8 @@ export interface AppConfig {
   trustProxy: boolean;
   /** Interval between SSE heartbeats (ms). Defaults to 25 s, under typical proxy idle timeouts. */
   heartbeatMs?: number;
+  /** Caps on concurrent SSE connections: in total and per client address. */
+  sseLimits?: { global: number; perIp: number };
   /** Clock override for tests. */
   now?: () => Date;
 }

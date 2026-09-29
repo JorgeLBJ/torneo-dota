@@ -1,7 +1,7 @@
 import { request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { serve } from '@hono/node-server';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Tournament } from '../src/db/repository.js';
 import { makeApp, type TestApp } from './helpers/app.js';
 
@@ -125,6 +125,64 @@ describe('root stream (follows the active tournament)', () => {
     await reader.cancel();
     await settle();
     expect(listeners()).toBe(0);
+  });
+});
+
+describe('connection limits', () => {
+  const from = (ip: string) => ({ headers: { 'x-forwarded-for': ip } });
+  const openFrom = async (app: TestApp, ip: string) => {
+    const res = await app.send('GET', '/t/torneo-oct/events', from(ip));
+    return { res, reader: res.body?.getReader() };
+  };
+
+  it('answers 503 with Retry-After beyond the per-client limit, and frees the slot on disconnect', async () => {
+    const limited = await makeApp({ trustProxy: true, sseLimits: { global: 100, perIp: 2 } });
+    limited.repo.createTournament({ name: 'Torneo Oct', slug: 'torneo-oct' });
+    const a = await openFrom(limited, '9.9.9.9');
+    const b = await openFrom(limited, '9.9.9.9');
+    const c = await openFrom(limited, '9.9.9.9');
+    expect([a.res.status, b.res.status, c.res.status]).toEqual([200, 200, 503]);
+    expect(c.res.headers.get('retry-after')).toBe('30');
+    expect((await openFrom(limited, '8.8.8.8')).res.status).toBe(200);
+    await a.reader!.cancel();
+    await settle();
+    expect((await openFrom(limited, '9.9.9.9')).res.status).toBe(200);
+    limited.db.close();
+  });
+
+  it('answers 503 beyond the global limit', async () => {
+    const limited = await makeApp({ trustProxy: true, sseLimits: { global: 2, perIp: 10 } });
+    limited.repo.createTournament({ name: 'Torneo Oct', slug: 'torneo-oct' });
+    expect((await openFrom(limited, '1.1.1.1')).res.status).toBe(200);
+    expect((await openFrom(limited, '2.2.2.2')).res.status).toBe(200);
+    const over = await limited.send('GET', '/t/torneo-oct/events', from('3.3.3.3'));
+    expect(over.status).toBe(503);
+    expect(await over.text()).toContain('Demasiadas conexiones');
+    limited.db.close();
+  });
+
+  it('does not count refused connections or plain page loads', async () => {
+    const limited = await makeApp({ trustProxy: true, sseLimits: { global: 1, perIp: 1 } });
+    limited.repo.createTournament({ name: 'Torneo Oct', slug: 'torneo-oct' });
+    expect((await limited.send('GET', '/t/torneo-oct', from('5.5.5.5'))).status).toBe(200);
+    expect((await openFrom(limited, '5.5.5.5')).res.status).toBe(200);
+    expect((await openFrom(limited, '5.5.5.5')).res.status).toBe(503);
+    limited.db.close();
+  });
+});
+
+describe('root stream fan-out', () => {
+  it('looks up the active tournament once per event, however many clients listen', async () => {
+    const readers = await Promise.all([1, 2, 3, 4, 5].map(() => open('/events')));
+    for (const { reader } of readers) await nextChunk(reader);
+    const spy = vi.spyOn(t.repo, 'getActiveTournament');
+    t.events.tournamentChanged(tournament.id);
+    for (const { reader } of readers) expect(await nextChunk(reader)).toContain('event: change');
+    expect(spy).toHaveBeenCalledTimes(1);
+    for (const { reader } of readers) await reader.cancel();
+    await settle();
+    expect(t.events.emitter.listenerCount('tournament:any:changed')).toBe(0);
+    spy.mockRestore();
   });
 });
 

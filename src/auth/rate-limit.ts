@@ -42,7 +42,7 @@ export class LoginRateLimiter {
     // Re-insert so Map order tracks recency of use (oldest key first).
     this.attempts.delete(key);
     this.attempts.set(key, recent);
-    this.evict(cutoff);
+    this.evict(cutoff, key);
     return true;
   }
 
@@ -51,14 +51,23 @@ export class LoginRateLimiter {
     this.attempts.delete(key);
   }
 
-  private evict(cutoff: number): void {
+  /**
+   * Keeps the map within `maxKeys`. Drops, in order: keys with no attempt left in the window, then the
+   * oldest keys that are not blocked, and only when every key is blocked the oldest of those. A blocked
+   * key is the one that must not be forgotten, and the key just used is never the victim.
+   */
+  private evict(cutoff: number, current: string): void {
     if (this.attempts.size <= this.maxKeys) return;
     for (const [key, times] of this.attempts) {
-      if (times.every((t) => t <= cutoff)) this.attempts.delete(key);
+      if (key !== current && times.every((t) => t <= cutoff)) this.attempts.delete(key);
     }
-    for (const key of this.attempts.keys()) {
-      if (this.attempts.size <= this.maxKeys) break;
-      this.attempts.delete(key);
-    }
+    const dropOldest = (shouldDrop: (times: number[]) => boolean) => {
+      for (const [key, times] of this.attempts) {
+        if (this.attempts.size <= this.maxKeys) return;
+        if (key !== current && shouldDrop(times)) this.attempts.delete(key);
+      }
+    };
+    dropOldest((times) => times.filter((t) => t > cutoff).length < this.maxFailures);
+    dropOldest(() => true);
   }
 }
