@@ -2,7 +2,7 @@ import type { FC } from 'hono/jsx';
 import type { Match, Team, Tournament } from '../../db/repository.js';
 import type { RoundRobinSummary } from '../../domain/fixture.js';
 import { TeamBadge } from './layout.js';
-import { PageHead } from './parts.js';
+import { PageHead, Select } from './parts.js';
 import { scheduleLabel } from './results.js';
 
 export interface FixtureViewProps {
@@ -124,14 +124,14 @@ export const MatchEditView: FC<{ tournament: Tournament; teams: Team[]; match: M
   const teamSelect = (name: string, selected: number | null, label: string) => (
     <label class="f">
       {label}
-      <select name={name}>
+      <Select name={name}>
         <option value="">Por definir</option>
         {teams.map((t) => (
           <option value={String(t.id)} selected={t.id === selected}>
             {t.code} · {t.name}
           </option>
         ))}
-      </select>
+      </Select>
     </label>
   );
   return (

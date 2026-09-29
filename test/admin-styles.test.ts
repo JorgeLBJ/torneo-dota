@@ -47,7 +47,10 @@ describe('admin stylesheet', () => {
     expect(select).toContain('background-position:right 12px center');
     expect(select).toContain('text-overflow:ellipsis');
     expect(css).toMatch(/@supports \(appearance: base-select\)\{[\s\S]*::picker\(select\)\{[^}]*border-radius:10px/);
-    // Only one chevron: the built-in picker icon is hidden when the custom one is in use.
-    expect(css).toContain('select::picker-icon{display:none}');
+    // One chevron only: with base-select the SVG background is dropped and the picker icon is the chevron,
+    // on the same centred line as the text.
+    expect(css).toMatch(/@supports \(appearance: base-select\)\{[\s\S]*select\{display:inline-flex;align-items:center;[^}]*height:var\(--control-h\)[^}]*background-image:none\}/);
+    expect(css).toMatch(/select::picker-icon\{display:block;[^}]*margin-left:auto/);
+    expect(css).not.toContain('select::picker-icon{display:none}');
   });
 });

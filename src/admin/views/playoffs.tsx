@@ -2,7 +2,7 @@ import type { FC } from 'hono/jsx';
 import type { Match, Schedule, Team, Tournament } from '../../db/repository.js';
 import type { BracketSlot } from '../../domain/playoffs.js';
 import type { TournamentState } from '../../services/state.js';
-import { PageHead } from './parts.js';
+import { PageHead, Select } from './parts.js';
 import { ResultCard, scheduleLabel } from './results.js';
 
 interface PlayoffsViewProps {
@@ -92,14 +92,14 @@ export const PlayoffsView: FC<PlayoffsViewProps> = ({ tournament, state, slots }
             ).map(([name, label, selected]) => (
               <label class="f">
                 {label}
-                <select name={name}>
+                <Select name={name}>
                   <option value="">Elegir…</option>
                   {teams.map((t) => (
                     <option value={String(t.id)} selected={t.id === selected}>
                       {t.code} · {t.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
             ))}
           </div>

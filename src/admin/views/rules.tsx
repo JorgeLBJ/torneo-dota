@@ -1,6 +1,6 @@
 import type { FC } from 'hono/jsx';
 import type { TiebreakerKey, Tournament } from '../../db/repository.js';
-import { PageHead, Rulebook } from './parts.js';
+import { PageHead, Rulebook, Select } from './parts.js';
 
 export const TIEBREAKER_LABELS: Record<TiebreakerKey, string> = {
   kd: 'Diferencia K − D',
@@ -75,20 +75,20 @@ export const RulesView: FC<{ tournament: Tournament }> = ({ tournament }) => {
           <h2>Formato</h2>
           <label class="f">
             Fase de grupos
-            <select name="group_legs">
+            <Select name="group_legs">
               <option value="1" selected={tournament.groupLegs === 1}>
                 Todos contra todos · una vuelta
               </option>
               <option value="2" selected={tournament.groupLegs === 2}>
                 Todos contra todos · ida y vuelta
               </option>
-            </select>
+            </Select>
           </label>
           <label class="f">
             Clasifican a playoffs
-            <select disabled>
+            <Select disabled>
               <option>4 (semis 1v4 · 2v3 + final)</option>
-            </select>
+            </Select>
           </label>
           <p class="muted" style="margin:0;font-size:12px">
             Por ahora los playoffs son siempre de 4 equipos, al mejor de 1.

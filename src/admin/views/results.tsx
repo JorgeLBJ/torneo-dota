@@ -3,7 +3,7 @@ import type { Match, Team, Tournament } from '../../db/repository.js';
 import type { StandingRow } from '../../domain/standings.js';
 import { formatDate, formatLocalDateTime } from '../../format/datetime.js';
 import { TeamBadge } from './layout.js';
-import { PageHead } from './parts.js';
+import { PageHead, Select } from './parts.js';
 
 /** "03/10/2026 14:00:00" (date and/or time of a scheduled match). */
 export const scheduleLabel = (m: Pick<Match, 'scheduledDate' | 'startTime'>): string =>
@@ -159,7 +159,7 @@ export const ResultsView: FC<ResultsViewProps> = ({ tournament, cards, dates, ha
       sub="Toca el equipo ganador, carga kills y deaths, guarda. La página pública se actualiza al instante."
     >
       <form method="get" class="actions">
-        <select name="fecha" data-autosubmit aria-label="Filtrar por fecha" style="width:auto">
+        <Select name="fecha" data-autosubmit aria-label="Filtrar por fecha" style="width:auto">
           {dates.map((d) => (
             <option value={d} selected={filter === d}>
               {formatDate(d)}
@@ -173,7 +173,7 @@ export const ResultsView: FC<ResultsViewProps> = ({ tournament, cards, dates, ha
           <option value="todos" selected={filter === 'todos'}>
             Todos
           </option>
-        </select>
+        </Select>
         <noscript>
           <button class="btn sm" type="submit">
             Ver

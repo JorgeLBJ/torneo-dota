@@ -1,7 +1,7 @@
 import type { FC } from 'hono/jsx';
 import type { ScheduleDay, Tournament } from '../../db/repository.js';
 import { TIMEZONE_CHOICES } from '../../format/timezone.js';
-import { PageHead } from './parts.js';
+import { PageHead, Select } from './parts.js';
 
 export const PHASE_LABELS: Record<ScheduleDay['phase'], string> = {
   group: 'Grupos',
@@ -36,13 +36,13 @@ export const ConfigView: FC<{ tournament: Tournament; days: ScheduleDay[] }> = (
       </label>
       <label class="f">
         Zona horaria
-        <select name="timezone">
+        <Select name="timezone">
           {(TIMEZONE_CHOICES.includes(tournament.timezone) ? TIMEZONE_CHOICES : [tournament.timezone, ...TIMEZONE_CHOICES]).map((zone) => (
             <option value={zone} selected={zone === tournament.timezone}>
               {zone}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
       <p class="muted" style="margin:0;font-size:12px;grid-column:1 / -1">
         Las horas del calendario y de los partidos se escriben en esta zona. La web pública las muestra en la hora
@@ -77,13 +77,13 @@ export const ConfigView: FC<{ tournament: Tournament; days: ScheduleDay[] }> = (
             {days.map((d, i) => (
               <tr>
                 <td data-label="Fase">
-                  <select name="day_phase" aria-label="Fase">
+                  <Select name="day_phase" aria-label="Fase">
                     {(Object.keys(PHASE_LABELS) as ScheduleDay['phase'][]).map((p) => (
                       <option value={p} selected={p === d.phase}>
                         {PHASE_LABELS[p]}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </td>
                 <td data-label="Fecha">
                   <input type="date" name="day_date" value={d.date} aria-label="Fecha" />

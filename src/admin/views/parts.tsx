@@ -1,4 +1,5 @@
-import type { Child, FC, PropsWithChildren } from 'hono/jsx';
+import { raw } from 'hono/html';
+import type { Child, FC, JSX, PropsWithChildren } from 'hono/jsx';
 import { renderRulebook } from '../../markdown.js';
 
 export const PageHead: FC<PropsWithChildren<{ title: string; sub?: Child }>> = ({ title, sub, children }) => (
@@ -31,3 +32,14 @@ export const Rulebook: FC<{ text: string }> = ({ text }) => (
 );
 
 export const heroImage = (slug: string): string => `/assets/heroes/${slug}.png`;
+
+// Where the browser supports customizable selects, this button + selectedcontent is what the closed select
+// shows (text with ellipsis, then the chevron). Other browsers ignore it. Every admin select goes through here.
+const SELECT_FACE = raw('<button><selectedcontent></selectedcontent></button>');
+
+export const Select: FC<JSX.IntrinsicElements['select']> = ({ children, ...props }) => (
+  <select {...props}>
+    {SELECT_FACE}
+    {children}
+  </select>
+);

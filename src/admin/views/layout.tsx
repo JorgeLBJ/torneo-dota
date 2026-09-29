@@ -1,3 +1,4 @@
+import { Select } from './parts.js';
 import type { FC, PropsWithChildren } from 'hono/jsx';
 import { raw } from 'hono/html';
 import { assetUrl } from '../../assets.js';
@@ -85,16 +86,19 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, active, admi
             Torneos <em>Admin</em>
           </div>
           <div class="tsel">
-            <small>Torneo</small>
-            <select data-nav-select aria-label="Torneo">
+            <small>
+              Torneo
+              {current?.isActive ? <span class="pill next">Activo</span> : null}
+            </small>
+            <Select data-nav-select aria-label="Torneo">
               {nav.tournaments.map((t) => (
                 <option value={`/admin/t/${t.id}/${section}`} selected={t.id === current?.id}>
+                  {t.isActive ? '● ' : ''}
                   {t.name}
-                  {t.isActive ? ' (activo)' : ''}
                 </option>
               ))}
               <option value="/admin/torneos">+ Nuevo torneo…</option>
-            </select>
+            </Select>
           </div>
           <nav class="side" aria-label="Secciones">
             <span class="navlbl">Gestión</span>
@@ -122,13 +126,13 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, active, admi
           <div class="side-foot">
             <form method="post" action="/admin/logout" class="stack">
               <small class="muted">Sesión: {admin.username}</small>
-              <button class="btn logout" type="submit" data-logout-open>
+              <button class="btn logout" type="submit" data-logout-open aria-label="Cerrar sesión">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                   <path d="m16 17 5-5-5-5" />
                   <path d="M21 12H9" />
                 </svg>
-                Cerrar sesión
+                <span class="logout-text">Cerrar sesión</span>
               </button>
               <dialog id="logoutDialog" class="confirm-modal" aria-labelledby="logoutTitle">
                 <h2 id="logoutTitle">¿Cerrar sesión?</h2>

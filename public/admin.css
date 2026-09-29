@@ -201,12 +201,18 @@ aside .btn{width:100%}
 select{appearance:none;-webkit-appearance:none;padding-right:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23e6b65f' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:12px 8px}
 @supports (appearance: base-select){
   select,::picker(select){appearance:base-select}
-  select::picker-icon{display:none}
+  /* The closed select becomes a flex box (button + selectedcontent + ::picker-icon): keep text and chevron on one centred line. */
+  select{display:inline-flex;align-items:center;gap:8px;height:var(--control-h);padding:0 12px;background-image:none}
+  select>button{display:flex;align-items:center;flex:1;min-width:0;height:100%;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left}
+  selectedcontent{display:block;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  select::picker-icon{display:block;flex:none;margin-left:auto;color:var(--gold);font-size:11px;line-height:1;transition:rotate .2s}
+  select:open::picker-icon{rotate:180deg}
   ::picker(select){background:var(--panel-2);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.5);padding:6px;margin-top:4px}
   select option{padding:8px 12px;border-radius:6px;color:var(--fg)}
   select option:hover,select option:focus{background:var(--gold-soft)}
   select option:checked{color:var(--gold)}
   select option::checkmark{color:var(--gold)}
+}
 }
 
 /* Sidebar footer: the session and logout stay pinned to the bottom. */
@@ -219,7 +225,12 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;overflow:hidde
 .confirm-modal .actions{justify-content:flex-end}
 .confirm-modal .btn{width:auto}
 @media (max-width:760px){
-  .side-foot{margin-top:0;padding-top:10px}
-  .side-foot .stack{grid-template-columns:1fr auto;align-items:center}
-  .side-foot .stack small{grid-column:1 / -1}
+  /* Compact top bar: the logout becomes an icon-only button beside the title, the session text is hidden. */
+  aside{position:relative}
+  .brand{padding-right:56px}
+  .side-foot{position:absolute;top:8px;right:14px;margin:0;padding:0;border:0}
+  .side-foot small,.side-foot .logout-text{display:none}
+  aside .side-foot .btn.logout{width:auto;padding:0 10px}
 }
+
+.tsel small{display:flex;align-items:center;gap:8px}
