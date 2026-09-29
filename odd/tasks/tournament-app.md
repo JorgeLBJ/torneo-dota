@@ -35,7 +35,7 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
 - [x] T3 Standings calculation + qualification + unresolved-tie flag (TDD) — route: delegated writer
 - [x] T4 Playoff bracket (seeding, winners, champion) (TDD) — route: delegated writer
 - [x] T5 Repository module (SQL) with in-memory DB tests — route: delegated writer
-- [ ] T6 Backoffice: auth, tournaments, teams, fixture, results, playoffs — route: delegated writer
+- [x] T6 Backoffice: auth, tournaments, teams, fixture, results, playoffs — route: delegated writer
 - [ ] T7 Public site `/t/:slug` + SSE live updates, mockup design — route: delegated writer
 - [ ] T8 Seed script for the current tournament (7 teams, sheet fixture, Oct 3/10/11/17) — route: delegated writer
 - [ ] T9 Dockerfile + docker-compose (+ Caddy once domain known) — route: delegated writer
@@ -47,6 +47,10 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
 - Admin model: single role; extra admin users allowed, all with the same role. Confirmed by user.
 - Proposed in mockup, NOT yet confirmed: BO1/BO3 series, 2/8 qualifiers, allow draws.
 - Public site style: Dota 2 look (Cinzel + Barlow, black/gold, Radiant green vs Dire red). Valve CDN images to be self-hosted in production.
+
+## Routing and active tournament (confirmed by user, 2026-09-29)
+- Exactly ONE active tournament at a time (`tournaments.is_active`, partial unique index). `/` renders the ACTIVE tournament's public page, `/t/<slug>` any tournament (archive), `/admin` the backoffice (opens the active tournament by default). Admin "Ver página pública" links to `/` for the active tournament and `/t/<slug>` otherwise. The public site itself is T7.
+- Production domain: torneo-dota.jpsolutions.com behind HTTPS (`COOKIE_SECURE=1` flag; `TRUST_PROXY=1` behind the proxy).
 
 ## Acceptance criteria
 - Standings and playoffs derive only from match results (no stored points).
@@ -72,5 +76,8 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
 - T5 (737e6c9): route delegated writer. RED: repository.test.ts failed on missing module; GREEN 94 total (6 files). 15 tests.
 - Assumptions: playoff auto-seeding also requires no unresolved tie inside the top 4 (seed order ambiguous); admin can assign semifinal teams manually and stored teams take precedence. Standings `unresolvedTie` only among teams with played > 0. `last5` is chronological (oldest first). Deleting a team referenced by matches fails on FK (no cascade).
 
+- T6 (66992c7, 25533b7, 0aa2783, 4a2d13e, ebcfe49): route delegated writer, 5 work-unit commits. RED then GREEN per unit: migration 002 + winner triggers (8 failing schema tests), domain (10 failing: double round-robin, per-day slot minutes, time validation, semifinal winner validation, configurable points/tiebreakers), repository (10 failing), heroes, auth core (missing module), admin auth/users/tournaments/active tournament (missing module), config/rules/teams (16 failing), services (missing module), fixture/results/playoffs routes (30 failing). Total 244 tests in 19 files; `tsc --noEmit` clean. Smoke test with a temp DB: login page 200, unauthenticated /admin 303 to login, login POST sets HttpOnly SameSite=Lax cookie, POST without Origin 403, torneos/config/reglas/equipos/fixture/resultados/playoffs/usuarios all 200, server refuses to start without ADMIN_PASSWORD on an empty DB. Review findings folded in: winner triggers in 002 (NULL-team bypass), semifinal/final winner validation, addMinutes validation. Layout was not checked visually in a browser (CSS is the mockup's).
+- T6 assumptions: migration 002 was edited in place to add `is_active` (unreleased, never applied outside tests); the first created tournament becomes active automatically; a tiebreak match is a normal group-phase match (its result counts in the standings); regenerating the fixture also deletes semifinal/final matches; playoff matches are created lazily (first result or manual pick) and store the bracket's teams at that moment; qualifiers stay fixed at 4 and BO3 / draws / 2-or-8 qualifiers were left out (not confirmed); tsx moved to dependencies so `npm start` works in production; 127 hero portraits (8.7 MB) committed under public/heroes; fonts still load from Google Fonts.
+
 ## Next step
-T6.
+T7 (public site: `/` = active tournament, `/t/:slug`, SSE on `tournament:<id>:changed` from src/events.ts; reuse `renderRulebook`, `StandingsTable` pieces and `/assets/*` static serving).
