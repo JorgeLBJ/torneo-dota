@@ -95,4 +95,34 @@ describe('stream card in Configuración', () => {
     expect((await t.post(url, { action: 'clear' })).status).toBe(303);
     expect((await t.send('POST', url, { form: { action: 'clear' }, cookie, headers: { origin: 'http://evil.example' } })).status).toBe(403);
   });
+
+  it('lets the admin clear a stored link that no longer parses, with a warning instead of a preview', async () => {
+    t.db.prepare("UPDATE tournaments SET stream_url = 'https://vimeo.com/999' WHERE id = ?").run(tournament.id);
+    const html = await config();
+    expect(html).toContain('El link guardado ya no es válido');
+    expect(html).toContain('value="https://vimeo.com/999"');
+    expect(html).not.toContain('<iframe');
+    expect(html).toContain('Quitar stream');
+    expect(html).toContain('id="streamClearDialog"');
+    const res = await t.post(url, { action: 'clear' }, cookie);
+    expect(await flashText(t, res, cookie)).toContain('Transmisión quitada');
+    expect(t.repo.getTournamentById(tournament.id)!.streamUrl).toBeNull();
+  });
+
+  it('does not warn when the stored link is fine, or when there is none', async () => {
+    expect(await config()).not.toContain('El link guardado ya no es válido');
+    t.repo.updateTournament(tournament.id, { streamUrl: 'https://kick.com/mychannel' });
+    expect(await config()).not.toContain('El link guardado ya no es válido');
+  });
+
+  it('caps the link at 300 characters, in the form and on the server', async () => {
+    expect(await config()).toContain('maxlength="300"');
+    const long = `https://kick.com/${'a'.repeat(300)}`;
+    const res = await t.post(url, { action: 'save', stream_url: long }, cookie);
+    expect(await flashText(t, res, cookie)).toContain('demasiado largo');
+    expect(t.repo.getTournamentById(tournament.id)!.streamUrl).toBeNull();
+    const edge = `https://kick.com/${'a'.repeat(25)}`;
+    await t.post(url, { action: 'save', stream_url: edge }, cookie);
+    expect(t.repo.getTournamentById(tournament.id)!.streamUrl).toBe(edge);
+  });
 });

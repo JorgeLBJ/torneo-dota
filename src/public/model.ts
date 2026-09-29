@@ -125,6 +125,8 @@ export interface PublicModel {
   /** IANA zone the server-rendered times are shown in (visitors' browsers re-render in their own). */
   timezone: string;
   kicker: string;
+  /** The server's clock when this was built (ISO), so browsers can correct for their own clock skew. */
+  serverNow: string;
   /** The tournament's live stream, ready to embed, or null. */
   stream: StreamView | null;
   phases: PublicPhase[];
@@ -369,7 +371,8 @@ function buildRules(state: TournamentState): PublicModel['rules'] {
 
 export function buildPublicModel(state: TournamentState, scheduleDays: ScheduleDay[], options: { now?: Date; parentHosts?: readonly string[] } = {}): PublicModel {
   const { tournament, groupMatches } = state;
-  const { live, next: nextRound } = liveAndNext(groupMatches, options.now ?? new Date());
+  const now = options.now ?? new Date();
+  const { live, next: nextRound } = liveAndNext(groupMatches, now);
   const played = groupMatches.length - state.pendingGroup;
   const first = scheduleDays.map((d) => d.date).sort()[0];
   const kicker = first
@@ -381,6 +384,7 @@ export function buildPublicModel(state: TournamentState, scheduleDays: ScheduleD
     slug: tournament.slug,
     timezone: tournament.timezone,
     kicker,
+    serverNow: now.toISOString(),
     stream: describeStream(tournament.streamUrl, options.parentHosts ?? ['sites.google.com']),
     phases: buildPhases(state, scheduleDays),
     progress: {

@@ -286,6 +286,18 @@ describe('live stream tab', () => {
   });
 });
 
+describe('server clock for the browser', () => {
+  it('sends the server time in the page and in the live fragment, from the injected clock', async () => {
+    const fixed = await makeApp({ now: () => new Date('2026-10-03T19:30:00.000Z') });
+    const cup = fixed.repo.createTournament({ name: 'Cup', slug: 'cup' });
+    fixed.repo.setActiveTournament(cup.id);
+    for (const path of ['/', '/partial', '/t/cup', '/t/cup/partial']) {
+      expect(await (await fixed.get(path)).text()).toMatch(/<span hidden(="")? data-server-now="2026-10-03T19:30:00\.000Z"><\/span>/);
+    }
+    fixed.db.close();
+  });
+});
+
 describe('partial', () => {
   it('returns the content fragment without a document shell', async () => {
     const body = await html('/t/torneo-oct/partial');

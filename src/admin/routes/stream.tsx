@@ -4,6 +4,9 @@ import type { AdminEnv, Deps } from '../context.js';
 import { readBody, str } from '../form.js';
 import { setFlash } from '../flash.js';
 
+/** Longest accepted link; the form input carries the same limit. */
+export const MAX_STREAM_URL = 300;
+
 export function streamRoutes(deps: Deps) {
   const app = new Hono<AdminEnv>();
 
@@ -20,6 +23,10 @@ export function streamRoutes(deps: Deps) {
     }
 
     const input = str(body, 'stream_url');
+    if (input.length > MAX_STREAM_URL) {
+      setFlash(c, 'error', `El enlace es demasiado largo (máximo ${MAX_STREAM_URL} caracteres).`);
+      return c.redirect(back, 303);
+    }
     const parsed = parseStream(input);
     if (!parsed.ok) {
       setFlash(c, 'error', parsed.error);

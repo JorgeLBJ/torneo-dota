@@ -152,7 +152,10 @@
     each('.days > .round .when', function (el) {
       instants.push(el.getAttribute('data-start'), el.getAttribute('data-end'));
     });
-    var wait = window.SiteCore.msUntilNextBoundary(instants, Date.now());
+    // Compare against the server's clock: a visitor whose own clock is off would otherwise flip the tags at the wrong time.
+    var stamp = app.querySelector('[data-server-now]');
+    var offset = window.SiteCore.clockOffset(stamp && stamp.getAttribute('data-server-now'), Date.now());
+    var wait = window.SiteCore.msUntilNextBoundary(instants, Date.now() + offset);
     if (wait === null) return;
     boundaryTimer = setTimeout(function () {
       live.refreshSoon();
@@ -166,35 +169,58 @@
   var eventsUrl = app.getAttribute('data-events');
   var partialUrl = app.getAttribute('data-partial');
 
-  // When the stream is unchanged, everything around its player is replaced but the player itself stays
-  // in place: moving or re-creating an iframe would restart the video on every result update.
-  function patchKeepingPlayer(html) {
+  function panelShape(panel) {
+    if (!panel) return null;
+    var frames = panel.querySelectorAll('[data-stream-frame]');
+    var frame = frames[0];
+    return {
+      frames: frames.length,
+      frameIsDirectChild: !!frame && frame.parentNode === panel,
+      embed: frame ? frame.getAttribute('data-embed') : null,
+    };
+  }
+
+  // Regions are replaced one by one. The stream panel is only patched around its player when the stream is
+  // unchanged (moving or re-creating an iframe would restart the video); if the stream changed or the
+  // structure is not the expected one, just that panel is replaced. If the page skeleton itself differs
+  // (for example "Próximamente" becoming a tournament), everything is replaced.
+  function patchRegions(html) {
     var next = document.createElement('div');
     next.innerHTML = html;
-    var oldPanel = app.querySelector('.panel[data-panel="envivo"]');
-    var newPanel = next.querySelector('.panel[data-panel="envivo"]');
-    var oldFrame = oldPanel && oldPanel.querySelector('[data-stream-frame]');
-    var newFrame = newPanel && newPanel.querySelector('[data-stream-frame]');
-    if (!oldFrame || !newFrame || oldFrame.parentNode !== oldPanel || newFrame.parentNode !== newPanel) return false;
-    if (oldFrame.getAttribute('data-embed') !== newFrame.getAttribute('data-embed')) return false;
     var oldMain = app.querySelector('main');
     var newMain = next.querySelector('main');
     var oldHero = app.querySelector('.hero');
     var newHero = next.querySelector('.hero');
     var oldBar = app.querySelector('.tabs-bar');
     var newBar = next.querySelector('.tabs-bar');
-    if (!oldMain || !newMain || !oldHero || !newHero || !oldBar || !newBar) return false;
+    var oldStamp = app.querySelector('[data-server-now]');
+    var newStamp = next.querySelector('[data-server-now]');
+    if (!oldMain || !newMain || !oldHero || !newHero || !oldBar || !newBar || !oldStamp || !newStamp) return false;
+    var samePanels = ['partidos', 'envivo', 'posiciones', 'playoffs', 'reglas'].every(function (key) {
+      return oldMain.querySelector('.panel[data-panel="' + key + '"]') && newMain.querySelector('.panel[data-panel="' + key + '"]');
+    });
+    if (!samePanels) return false;
 
+    oldStamp.parentNode.replaceChild(newStamp, oldStamp);
     oldHero.parentNode.replaceChild(newHero, oldHero);
     oldBar.parentNode.replaceChild(newBar, oldBar);
     Array.prototype.slice.call(newMain.querySelectorAll('.panel')).forEach(function (panel) {
       var key = panel.getAttribute('data-panel');
       var current = oldMain.querySelector('.panel[data-panel="' + key + '"]');
-      if (key === 'envivo' || !current) return;
-      current.parentNode.replaceChild(panel, current);
+      if (key === 'envivo' && window.SiteCore.streamPatchMode(panelShape(current), panelShape(panel)) === 'keep') {
+        keepPlayer(current, panel);
+      } else {
+        current.parentNode.replaceChild(panel, current);
+      }
     });
+    return true;
+  }
+
+  // Replaces everything in the panel except the player node, which stays exactly where it is.
+  function keepPlayer(oldPanel, newPanel) {
+    var oldFrame = oldPanel.querySelector('[data-stream-frame]');
     var around = Array.prototype.slice.call(newPanel.children);
-    var at = around.indexOf(newFrame);
+    var at = around.indexOf(newPanel.querySelector('[data-stream-frame]'));
     Array.prototype.slice.call(oldPanel.children).forEach(function (child) {
       if (child !== oldFrame) oldPanel.removeChild(child);
     });
@@ -202,13 +228,12 @@
       if (i < at) oldPanel.insertBefore(child, oldFrame);
       else if (i > at) oldPanel.appendChild(child);
     });
-    return true;
   }
 
   function swap(html) {
     var x = window.scrollX;
     var y = window.scrollY;
-    if (!patchKeepingPlayer(html)) app.innerHTML = html;
+    if (!(window.SiteCore && patchRegions(html))) app.innerHTML = html;
     apply();
     var heading = app.querySelector('h1');
     if (heading) document.title = heading.textContent;

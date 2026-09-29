@@ -90,6 +90,24 @@
     return groups;
   }
 
+  /** How far the server clock is ahead of this visitor's clock (0 when the server time is unusable). */
+  function clockOffset(serverIso, clientNowMs) {
+    return isInstant(serverIso) ? Date.parse(serverIso) - clientNowMs : 0;
+  }
+
+  /**
+   * Whether a live refresh may keep the existing player node. Panels are described as
+   * { frames: how many players, frameIsDirectChild, embed: the player's embed URL }.
+   * Only one direct player in each, with the same embed URL, is safe to keep; anything else replaces the panel.
+   */
+  function streamPatchMode(oldPanel, nextPanel) {
+    if (!oldPanel || !nextPanel) return 'replace';
+    if (oldPanel.frames !== 1 || nextPanel.frames !== 1) return 'replace';
+    if (!oldPanel.frameIsDirectChild || !nextPanel.frameIsDirectChild) return 'replace';
+    if (!oldPanel.embed || oldPanel.embed !== nextPanel.embed) return 'replace';
+    return 'keep';
+  }
+
   // ---- Live updates -----------------------------------------------------------------------------
 
   var CLOSED = 2; // EventSource.CLOSED
@@ -197,6 +215,8 @@
     groupDays: groupDays,
     isInstant: isInstant,
     msUntilNextBoundary: msUntilNextBoundary,
+    clockOffset: clockOffset,
+    streamPatchMode: streamPatchMode,
     backoffDelay: backoffDelay,
     createLive: createLive,
   };

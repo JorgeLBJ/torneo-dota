@@ -515,6 +515,7 @@ const RulesPanel: FC<{ model: PublicModel }> = ({ model }) => (
 /** Everything inside #app; also served on its own as the live-update fragment. */
 export const PublicContent: FC<{ model: PublicModel }> = ({ model }) => (
   <>
+    <span hidden data-server-now={model.serverNow}></span>
     <Hero model={model} />
     <div class="tabs-bar">
       <nav class="tabs" role="tablist" aria-label="Secciones">

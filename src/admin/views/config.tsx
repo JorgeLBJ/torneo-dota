@@ -138,7 +138,7 @@ export const ConfigView: FC<{ tournament: Tournament; days: ScheduleDay[]; strea
         <button class="btn pri" type="submit" name="action" value="save">
           Guardar
         </button>
-        {stream ? (
+        {tournament.streamUrl !== null ? (
           <button class="btn danger" type="submit" name="action" value="clear" data-confirm-open="streamClearDialog">
             Quitar stream
           </button>
@@ -165,7 +165,12 @@ export const ConfigView: FC<{ tournament: Tournament; days: ScheduleDay[]; strea
         </div>
       </div>
     ) : null}
-    {stream ? (
+    {tournament.streamUrl !== null && !stream ? (
+      <div class="note" role="alert">
+        El link guardado ya no es válido: ya no se muestra en la web. Corrígelo o quítalo.
+      </div>
+    ) : null}
+    {tournament.streamUrl !== null ? (
       <dialog id="streamClearDialog" class="confirm-modal" aria-labelledby="streamClearTitle">
         <h2 id="streamClearTitle">¿Quitar la transmisión?</h2>
         <p>La pestaña "En vivo" de la web volverá a mostrar "Transmisión no disponible".</p>

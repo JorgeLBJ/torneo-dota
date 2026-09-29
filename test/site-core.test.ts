@@ -10,6 +10,13 @@ interface Core {
   groupDays(isos: (string | null)[], tz: string): { index: number; key: string | null; label: string }[];
   isInstant(value: unknown): boolean;
   msUntilNextBoundary(isos: (string | null)[], nowMs: number): number | null;
+  clockOffset(serverIso: unknown, clientNowMs: number): number;
+  streamPatchMode(oldPanel: PanelShape | null, nextPanel: PanelShape | null): 'keep' | 'replace';
+}
+interface PanelShape {
+  frames: number;
+  frameIsDirectChild: boolean;
+  embed: string | null;
 }
 
 /** Loads the browser file the way a browser would: as a plain script with no module system. */
@@ -96,5 +103,49 @@ describe('msUntilNextBoundary', () => {
   it('ignores the past, nulls and garbage, and is null when nothing is ahead', () => {
     expect(core.msUntilNextBoundary(['2026-10-03T19:00:00Z', null, 'garbage'], now)).toBeNull();
     expect(core.msUntilNextBoundary([], now)).toBeNull();
+  });
+});
+
+describe('clockOffset', () => {
+  it('is how far the server clock is ahead of the visitor clock', () => {
+    const client = Date.parse('2026-10-03T19:00:00Z');
+    expect(core.clockOffset('2026-10-03T19:05:00.000Z', client)).toBe(5 * 60_000);
+    expect(core.clockOffset('2026-10-03T18:50:00.000Z', client)).toBe(-10 * 60_000);
+  });
+  it('is zero when the server time is missing or unreadable', () => {
+    for (const bad of [null, undefined, '', 'garbage', 7]) expect(core.clockOffset(bad, 123)).toBe(0);
+  });
+  it('makes boundaries follow the server clock, not a skewed visitor clock', () => {
+    const start = '2026-10-03T19:00:00Z';
+    const server = Date.parse('2026-10-03T18:59:00Z');
+    const clientSkewed = server + 2 * 3600_000; // visitor clock two hours fast
+    expect(core.msUntilNextBoundary([start], clientSkewed)).toBeNull();
+    const offset = core.clockOffset(new Date(server).toISOString(), clientSkewed);
+    expect(core.msUntilNextBoundary([start], clientSkewed + offset)).toBe(60_000);
+  });
+});
+
+describe('streamPatchMode: when the live refresh may keep the player node', () => {
+  const panel = (over: Partial<PanelShape> = {}): PanelShape => ({ frames: 1, frameIsDirectChild: true, embed: 'https://player.kick.com/a', ...over });
+
+  it('keeps it when both panels have exactly one direct player with the same embed URL', () => {
+    expect(core.streamPatchMode(panel(), panel())).toBe('keep');
+  });
+  it('replaces the panel when the stream changed', () => {
+    expect(core.streamPatchMode(panel(), panel({ embed: 'https://player.kick.com/b' }))).toBe('replace');
+  });
+  it('replaces the panel when the stream was added or removed', () => {
+    expect(core.streamPatchMode(panel({ frames: 0, embed: null, frameIsDirectChild: false }), panel())).toBe('replace');
+    expect(core.streamPatchMode(panel(), panel({ frames: 0, embed: null, frameIsDirectChild: false }))).toBe('replace');
+  });
+  it('replaces the panel when the structure is not the expected one', () => {
+    expect(core.streamPatchMode(panel({ frameIsDirectChild: false }), panel())).toBe('replace');
+    expect(core.streamPatchMode(panel(), panel({ frameIsDirectChild: false }))).toBe('replace');
+    expect(core.streamPatchMode(panel({ frames: 2 }), panel())).toBe('replace');
+    expect(core.streamPatchMode(panel(), panel({ frames: 2 }))).toBe('replace');
+  });
+  it('replaces when a panel is missing', () => {
+    expect(core.streamPatchMode(null, panel())).toBe('replace');
+    expect(core.streamPatchMode(panel(), null)).toBe('replace');
   });
 });
