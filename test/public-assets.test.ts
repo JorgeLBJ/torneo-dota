@@ -21,12 +21,15 @@ describe('public site assets', () => {
     expect(Number(bg.headers.get('content-length') ?? (await bg.arrayBuffer()).byteLength)).toBeLessThan(400 * 1024);
   });
 
-  it('ships a client that reconnects via EventSource, swaps fragments and tracks the live pill', async () => {
+  it('wires the tested live controller to EventSource, fetch and the live pill', async () => {
     const js = await (await t.get('/assets/site.js')).text();
-    expect(js).toContain('new EventSource(eventsUrl)');
+    expect(js).toContain('SiteCore.createLive');
+    expect(js).toContain('new EventSource(url)');
     expect(js).toContain("fetch(partialUrl, { cache: 'no-store'");
     expect(js).toContain("setAttribute('data-live'");
     expect(js).toContain('history.replaceState');
     expect(js).toContain('hashchange');
+    const core = await (await t.get('/assets/site-core.js')).text();
+    expect(core).toContain('function createLive');
   });
 });

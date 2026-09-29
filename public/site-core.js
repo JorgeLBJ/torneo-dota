@@ -65,11 +65,111 @@
     return groups;
   }
 
+  // ---- Live updates -----------------------------------------------------------------------------
+
+  var CLOSED = 2; // EventSource.CLOSED
+  var BACKOFF_BASE_MS = 1000;
+  var BACKOFF_CAP_MS = 30000;
+  var REFRESH_JITTER_MS = 500;
+
+  /** Reconnect delay: exponential from 1 s, capped at 30 s, with "equal jitter" (half fixed, half random). */
+  function backoffDelay(attempt, random) {
+    var step = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * Math.pow(2, attempt));
+    return Math.round(step / 2 + (random() * step) / 2);
+  }
+
+  /**
+   * Keeps a page in sync with the server. All browser access is injected (`deps`), so it runs under test:
+   * connect(url) -> EventSource-like, fetchFragment() -> Promise<html|null>, swap(html), setLive(bool),
+   * setTimeout/clearTimeout, random().
+   * - "change" events schedule one refresh after a random 0-500 ms, so a crowd of visitors does not
+   *   fetch in the same instant; bursts collapse into one fetch and fetches never overlap.
+   * - When the browser gives up on the connection (an HTTP error closes an EventSource for good), it is
+   *   reopened by hand with capped exponential backoff. While the browser is still retrying, it is left alone.
+   * - A reconnect refreshes once, in case changes were missed while disconnected.
+   */
+  function createLive(deps) {
+    var source = null;
+    var attempt = 0;
+    var connectedBefore = false;
+    var stopped = false;
+    var refreshTimer = null;
+    var reconnectTimer = null;
+    var fetching = false;
+    var again = false;
+
+    function refresh() {
+      if (fetching) {
+        again = true;
+        return;
+      }
+      fetching = true;
+      Promise.resolve()
+        .then(function () {
+          return deps.fetchFragment();
+        })
+        .then(function (html) {
+          if (html && !stopped) deps.swap(html);
+        })
+        .catch(function () {
+          /* offline or restarting: the next event or reconnect retries */
+        })
+        .then(function () {
+          fetching = false;
+          if (again && !stopped) {
+            again = false;
+            refresh();
+          }
+        });
+    }
+
+    function schedule() {
+      if (refreshTimer !== null || stopped) return;
+      refreshTimer = deps.setTimeout(function () {
+        refreshTimer = null;
+        refresh();
+      }, Math.floor(deps.random() * REFRESH_JITTER_MS));
+    }
+
+    function open() {
+      reconnectTimer = null;
+      if (stopped) return;
+      var current = deps.connect(deps.eventsUrl);
+      source = current;
+      current.addEventListener('hello', function () {
+        attempt = 0;
+        deps.setLive(true);
+        if (connectedBefore) schedule();
+        connectedBefore = true;
+      });
+      current.addEventListener('change', schedule);
+      current.onerror = function () {
+        deps.setLive(false);
+        if (current.readyState === CLOSED && !stopped) {
+          current.close();
+          reconnectTimer = deps.setTimeout(open, backoffDelay(attempt++, deps.random));
+        }
+      };
+    }
+
+    function close() {
+      stopped = true;
+      if (refreshTimer !== null) deps.clearTimeout(refreshTimer);
+      if (reconnectTimer !== null) deps.clearTimeout(reconnectTimer);
+      refreshTimer = reconnectTimer = null;
+      if (source) source.close();
+    }
+
+    return { open: open, close: close };
+  }
+
   root.SiteCore = {
     dayKey: dayKey,
     formatTime: formatTime,
     formatShort: formatShort,
     dayLabel: dayLabel,
     groupDays: groupDays,
+    backoffDelay: backoffDelay,
+    createLive: createLive,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

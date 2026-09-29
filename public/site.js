@@ -123,17 +123,10 @@
 
   // ---- Live updates -------------------------------------------------------------------------
   // The server pushes a bare "change" event; we re-fetch the rendered fragment and swap it in,
-  // then re-apply the tab and filter so the view the visitor chose stays put.
+  // then re-apply localization, tab and filter so the view the visitor chose stays put.
+  // The connection logic lives in site-core.js (unit-tested); this only wires it to the page.
   var eventsUrl = app.getAttribute('data-events');
   var partialUrl = app.getAttribute('data-partial');
-  var root = document.documentElement;
-  var timer = null;
-  var fetching = false;
-  var again = false;
-
-  function setLive(on) {
-    root.setAttribute('data-live', on ? 'on' : 'off');
-  }
 
   function swap(html) {
     var x = window.scrollX;
@@ -145,50 +138,28 @@
     window.scrollTo(x, y);
   }
 
-  function refresh() {
-    if (fetching) {
-      again = true;
-      return;
-    }
-    fetching = true;
-    fetch(partialUrl, { cache: 'no-store', headers: { Accept: 'text/html' } })
-      .then(function (res) {
-        return res.ok ? res.text() : null;
-      })
-      .then(function (html) {
-        if (html) swap(html);
-      })
-      .catch(function () {
-        /* offline or server restarting: the next event (or reconnect) retries */
-      })
-      .then(function () {
-        fetching = false;
-        if (again) {
-          again = false;
-          refresh();
-        }
-      });
-  }
-
-  // Several changes in a burst (e.g. a whole round saved) cost a single fetch.
-  function schedule() {
-    clearTimeout(timer);
-    timer = setTimeout(refresh, 150);
-  }
-
-  if (eventsUrl && partialUrl && window.EventSource) {
-    var connectedBefore = false;
-    var source = new EventSource(eventsUrl);
-    source.addEventListener('hello', function () {
-      setLive(true);
-      // A reconnect may have missed changes while the connection was down.
-      if (connectedBefore) schedule();
-      connectedBefore = true;
-    });
-    source.addEventListener('change', schedule);
-    // EventSource reconnects on its own; the pill just tracks whether we are connected.
-    source.onerror = function () {
-      setLive(false);
-    };
+  if (eventsUrl && partialUrl && window.EventSource && window.SiteCore) {
+    window.SiteCore.createLive({
+      eventsUrl: eventsUrl,
+      connect: function (url) {
+        return new EventSource(url);
+      },
+      fetchFragment: function () {
+        return fetch(partialUrl, { cache: 'no-store', headers: { Accept: 'text/html' } }).then(function (res) {
+          return res.ok ? res.text() : null;
+        });
+      },
+      swap: swap,
+      setLive: function (on) {
+        document.documentElement.setAttribute('data-live', on ? 'on' : 'off');
+      },
+      setTimeout: function (fn, ms) {
+        return window.setTimeout(fn, ms);
+      },
+      clearTimeout: function (id) {
+        window.clearTimeout(id);
+      },
+      random: Math.random,
+    }).open();
   }
 })();
