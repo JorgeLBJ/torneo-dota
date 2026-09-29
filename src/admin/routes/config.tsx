@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Phase, ScheduleDay } from '../../db/repository.js';
 import { isValidTime } from '../../domain/fixture.js';
+import { isValidTimeZone } from '../../format/timezone.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { isDate, positiveInt, readBody, str, strList, type Body } from '../form.js';
 import { setFlash } from '../flash.js';
@@ -80,6 +81,9 @@ export function configRoutes(deps: Deps) {
     const game = str(body, 'game');
     if (game.length < 1 || game.length > 60) return error('Escribe el juego del torneo (hasta 60 caracteres).');
 
+    const timezone = str(body, 'timezone') || tournament.timezone;
+    if (!isValidTimeZone(timezone)) return error('Elige una zona horaria válida (por ejemplo America/Lima).');
+
     const action = str(body, 'action');
     const removeAt = action.startsWith('remove:') ? Number(action.slice('remove:'.length)) : -1;
     const rows = readRawDays(body).filter((_, i) => i !== removeAt);
@@ -100,7 +104,7 @@ export function configRoutes(deps: Deps) {
       });
     }
 
-    repo.updateTournament(tournament.id, { name: name.value, slug: slug.value, game });
+    repo.updateTournament(tournament.id, { name: name.value, slug: slug.value, game, timezone });
     repo.replaceScheduleDays(tournament.id, days);
     deps.events.tournamentChanged(tournament.id);
     setFlash(c, 'ok', 'Configuración guardada.');

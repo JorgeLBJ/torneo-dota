@@ -47,6 +47,7 @@ describe('seedOctober2026', () => {
       tiebreakers: ['kd', 'kills'],
       groupLegs: 1,
       qualifiers: 4,
+      timezone: 'America/Lima',
       isActive: true,
     });
     expect(repo.getActiveTournament()!.id).toBe(tournament.id);
@@ -80,6 +81,13 @@ describe('seedOctober2026', () => {
       return pairs.map((pair) => [round, date, start, end, pair]);
     });
     expect(actual).toEqual(expected);
+  });
+
+  it('stores the schedule as UTC instants (Lima is UTC-5)', () => {
+    const { matches } = seeded();
+    expect(matches[0]).toMatchObject({ startsAt: '2026-10-03T19:00:00Z', endsAt: '2026-10-03T20:00:00Z' });
+    expect(matches[9]).toMatchObject({ startsAt: '2026-10-03T22:00:00Z' });
+    expect(matches[20]).toMatchObject({ startsAt: '2026-10-10T21:00:00Z', endsAt: '2026-10-10T22:00:00Z' });
   });
 
   it('has every pair exactly once and exactly one bye per team', () => {

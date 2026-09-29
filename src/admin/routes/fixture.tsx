@@ -102,7 +102,8 @@ export function fixtureRoutes(deps: Deps) {
     if ((start !== '' && !isValidTime(start)) || (end !== '' && !isValidTime(end))) {
       return error('La hora no es válida (usa HH:MM).');
     }
-    if (end !== '' && start === '') return error('Indica también la hora de inicio.');
+    // A schedule is an instant: a date needs a start time (and an end needs one too).
+    if ((date !== '' || end !== '') && start === '') return error('Indica también la hora de inicio.');
     if (end !== '' && end <= start) return error('La hora de fin debe ser posterior a la de inicio.');
     if (start !== '' && end === '') end = addMinutes(start, 60);
 

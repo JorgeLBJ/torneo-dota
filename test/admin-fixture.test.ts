@@ -122,6 +122,7 @@ describe('match editing', () => {
       [{ ...ok, date: '2026-99-99' }, 'fecha'],
       [{ ...ok, start_time: '99:00' }, 'hora'],
       [{ ...ok, round: '1000' }, 'ronda'],
+      [{ ...ok, start_time: '', end_time: '' }, 'hora de inicio'],
       [{ ...ok, start_time: '18:00', end_time: '17:00' }, 'posterior'],
       [{ ...ok, start_time: '18:00', end_time: '18:00' }, 'posterior'],
       [{ ...ok, team2: ok.team1 }, 'distintos'],

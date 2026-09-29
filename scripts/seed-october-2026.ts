@@ -40,6 +40,8 @@ export function seedOctober2026(repo: Repository): SeedResult {
       pointsLoss: 0,
       tiebreakers: ['kd', 'kills'],
       groupLegs: 1,
+      // The sheet's 14:00-17:00 slots are Lima time; they are stored as UTC instants.
+      timezone: 'America/Lima',
     });
 
     const teams = new Map(

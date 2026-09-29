@@ -1,5 +1,6 @@
 import type { FC } from 'hono/jsx';
 import type { ScheduleDay, Tournament } from '../../db/repository.js';
+import { TIMEZONE_CHOICES } from '../../format/timezone.js';
 import { PageHead } from './parts.js';
 
 export const PHASE_LABELS: Record<ScheduleDay['phase'], string> = {
@@ -33,6 +34,20 @@ export const ConfigView: FC<{ tournament: Tournament; days: ScheduleDay[] }> = (
         Juego
         <input name="game" value={tournament.game} required maxlength={60} />
       </label>
+      <label class="f">
+        Zona horaria
+        <select name="timezone">
+          {(TIMEZONE_CHOICES.includes(tournament.timezone) ? TIMEZONE_CHOICES : [tournament.timezone, ...TIMEZONE_CHOICES]).map((zone) => (
+            <option value={zone} selected={zone === tournament.timezone}>
+              {zone}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p class="muted" style="margin:0;font-size:12px;grid-column:1 / -1">
+        Las horas del calendario y de los partidos se escriben en esta zona. La web pública las muestra en la hora
+        local de cada visitante. Cambiarla no mueve los partidos ya creados en el tiempo.
+      </p>
       <p class="muted" style="margin:0;font-size:12px">
         Puntos, desempates, playoffs y reglamento se editan en{' '}
         <a href={`/admin/t/${tournament.id}/reglas`}>Reglas</a>.
