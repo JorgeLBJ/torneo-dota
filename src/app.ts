@@ -43,7 +43,7 @@ export function createApp({ db, config }: CreateAppOptions) {
     serveStatic({ root: relative(process.cwd(), PUBLIC_DIR) || '.', rewriteRequestPath: (p) => p.replace(/^\/assets/, '') }),
   );
   app.route('/admin', adminApp({ repo, events, config, limiter }));
-  app.route('/', publicApp({ repo }));
+  app.route('/', publicApp({ repo, events, config }));
 
   return { app, repo, events };
 }

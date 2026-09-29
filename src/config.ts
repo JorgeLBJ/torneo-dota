@@ -3,6 +3,8 @@ export interface AppConfig {
   secureCookies: boolean;
   /** Trust X-Forwarded-* headers from a reverse proxy. */
   trustProxy: boolean;
+  /** Interval between SSE heartbeats (ms). Defaults to 25 s, under typical proxy idle timeouts. */
+  heartbeatMs?: number;
   /** Clock override for tests. */
   now?: () => Date;
 }
