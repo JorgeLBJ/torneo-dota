@@ -43,12 +43,58 @@
       var shows = state.filter === '' || round.getAttribute('data-bye') === state.filter || !!round.querySelector('.match:not([hidden])');
       round.hidden = !shows;
     });
-    each('.day', function (day) {
-      day.hidden = !day.querySelector('.round:not([hidden])') && state.filter !== '';
+    // A day heading stays only while at least one round after it (up to the next heading) is visible.
+    each('.day-head', function (head) {
+      var visible = false;
+      for (var el = head.nextElementSibling; el && !el.classList.contains('day-head'); el = el.nextElementSibling) {
+        if (el.classList.contains('round') && !el.hidden) visible = true;
+      }
+      head.hidden = state.filter !== '' && !visible;
+    });
+  }
+
+  // Times come from the server as UTC instants and are shown in the visitor's own time zone; days are
+  // regrouped by the visitor's calendar day. Without JavaScript the server's (tournament zone) text stays.
+  function localize() {
+    var core = window.SiteCore;
+    if (!core || !window.Intl) return;
+    var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!tz) return;
+
+    each('.day-head', function (head) {
+      head.parentNode.removeChild(head);
+    });
+    var rounds = Array.prototype.slice.call(app.querySelectorAll('.days > .round'));
+    core.groupDays(rounds.map(function (r) { return r.getAttribute('data-start'); }), tz).forEach(function (group) {
+      var head = document.createElement('div');
+      head.className = 'sec day-head';
+      var title = document.createElement('h2');
+      title.textContent = group.label;
+      var sub = document.createElement('span');
+      sub.textContent = 'Fase de grupos';
+      head.appendChild(title);
+      head.appendChild(sub);
+      rounds[group.index].parentNode.insertBefore(head, rounds[group.index]);
+    });
+
+    each('.match .time[data-start]', function (el) {
+      el.textContent = core.formatTime(el.getAttribute('data-start'), tz);
+    });
+    each('.when[data-start]', function (el) {
+      var end = el.getAttribute('data-end');
+      var start = core.formatTime(el.getAttribute('data-start'), tz);
+      el.textContent = end ? start + ' – ' + core.formatTime(end, tz) : start;
+    });
+    each('[data-format="short"][data-start]', function (el) {
+      el.textContent = core.formatShort(el.getAttribute('data-start'), tz);
+    });
+    each('[data-tz-note]', function (el) {
+      el.textContent = 'Horarios en tu hora local (' + tz + ')';
     });
   }
 
   function apply() {
+    localize();
     applyTabs();
     applyFilter();
   }

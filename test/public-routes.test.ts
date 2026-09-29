@@ -187,6 +187,36 @@ describe('playoffs and rules tabs', () => {
   });
 });
 
+describe('times for visitors in any zone', () => {
+  it('ships UTC instants in data attributes and a server-side fallback in the tournament zone', async () => {
+    const body = await html('/');
+    expect(body).toContain('data-start="2026-10-03T19:00:00Z"');
+    expect(body).toContain('data-end="2026-10-03T20:00:00Z"');
+    expect(body).toContain('14:00 – 15:00');
+    expect(body).toContain('data-tz-note');
+    expect(body).toContain('Horarios en hora de America/Lima');
+    expect(body).toMatch(/src="\/assets\/site-core\.js\?v=[0-9a-f]{10}"/);
+  });
+
+  it('lists the bracket instants for the browser to localize', async () => {
+    const body = await html('/');
+    expect(body).toContain('data-start="2026-10-11T19:00:00Z" data-format="short"');
+  });
+
+  it('tags the round in progress "En juego" using the configured clock', async () => {
+    const live = await makeApp({ now: () => new Date('2026-10-03T19:30:00Z') });
+    const cup = live.repo.createTournament({ name: 'Cup', slug: 'cup' });
+    live.repo.setActiveTournament(cup.id);
+    for (const c of ['A', 'B']) live.repo.createTeam(cup.id, { code: c, name: c });
+    live.repo.replaceScheduleDays(cup.id, [{ date: '2026-10-03', phase: 'group', startTimes: ['14:00'], slotMinutes: 60 }]);
+    regenerateFixture(live.repo, cup);
+    const body = await (await live.get('/')).text();
+    expect(body).toContain('En juego');
+    expect(body).toContain('is-live');
+    live.db.close();
+  });
+});
+
 describe('partial', () => {
   it('returns the content fragment without a document shell', async () => {
     const body = await html('/t/torneo-oct/partial');

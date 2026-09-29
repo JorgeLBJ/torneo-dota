@@ -17,7 +17,7 @@ import {
 export interface PublicDeps {
   repo: Repository;
   events: Events;
-  config: Pick<AppConfig, 'heartbeatMs'>;
+  config: Pick<AppConfig, 'heartbeatMs' | 'now'>;
 }
 
 export const DEFAULT_HEARTBEAT_MS = 25_000;
@@ -34,7 +34,9 @@ export function publicApp({ repo, events, config }: PublicDeps) {
   const app = new Hono();
 
   const content = (tournament: Tournament) => {
-    const model = buildPublicModel(loadState(repo, tournament), repo.listScheduleDays(tournament.id));
+    const model = buildPublicModel(loadState(repo, tournament), repo.listScheduleDays(tournament.id), {
+      now: config.now?.() ?? new Date(),
+    });
     return { model, node: <PublicContent model={model} /> };
   };
 

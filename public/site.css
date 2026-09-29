@@ -124,14 +124,18 @@ footer { text-align: center; padding: 26px 16px 40px; font: 500 12px/1.5 var(--f
 .chip[aria-pressed="true"] { border-color: var(--gold); color: var(--gold-hi); background: linear-gradient(180deg, rgba(200,170,110,.14), rgba(200,170,110,.03)); }
 
 /* ---------- Rounds & matches ---------- */
-.day { display: grid; gap: 22px; }
-.day + .day { margin-top: 18px; }
+.days { display: grid; gap: 22px; }
+.day-head { margin-top: 18px; }
+.day-head:first-child { margin-top: 0; }
+.tznote { margin: 0; text-align: center; color: var(--muted); font: 500 13px/1.3 var(--fl); letter-spacing: .08em; text-transform: uppercase; }
 .round { display: grid; gap: 10px; }
 .round-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font: 600 13px/1 var(--fl); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
 .round-head b { font: 700 17px/1 var(--fd); color: var(--fg); letter-spacing: .1em; }
 .tag { padding: 4px 9px; font: 700 11px/1 var(--fl); letter-spacing: .18em; text-transform: uppercase; border: 1px solid var(--line); }
 .tag.next { color: var(--gold-hi); border-color: var(--gold); background: rgba(200,170,110,.1); }
 .tag.done { color: var(--muted); }
+.tag.live { color: #fff; border-color: var(--crimson); background: rgba(194,60,42,.35); }
+.match.is-live { border-color: var(--crimson); box-shadow: 0 0 0 1px rgba(194,60,42,.35); }
 .rest { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
 
 .matches { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }

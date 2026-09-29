@@ -54,6 +54,7 @@ export const PublicDocument: FC<PropsWithChildren<{ title: string; links?: PageL
           {children}
         </div>
         <footer>Resultados oficiales del torneo · Dota 2 es una marca de Valve Corporation</footer>
+        <script src={assetUrl('site-core.js')} defer></script>
         <script src={assetUrl('site.js')} defer></script>
       </body>
     </html>
@@ -136,11 +137,11 @@ const MatchSide: FC<{ team: Team | null; side: 'a' | 'b'; match: PublicMatch; in
   );
 };
 
-const MatchCard: FC<{ match: PublicMatch; time: string | null }> = ({ match, time }) => {
+const MatchCard: FC<{ match: PublicMatch; time: string | null; live: boolean }> = ({ match, time, live }) => {
   const aWon = match.winnerId !== null && match.winnerId === match.teamA?.id;
   const teamIds = [match.teamA?.id, match.teamB?.id].filter((id) => id !== undefined).join(' ');
   return (
-    <article class={`match ${match.isNext ? 'is-next' : ''}`} data-teams={teamIds}>
+    <article class={`match ${match.isNext ? 'is-next' : ''} ${live ? 'is-live' : ''}`} data-teams={teamIds}>
       <MatchSide team={match.teamA} side="a" match={match} index={0} />
       {match.played ? (
         <div class="mid">
@@ -154,7 +155,11 @@ const MatchCard: FC<{ match: PublicMatch; time: string | null }> = ({ match, tim
       ) : (
         <div class="mid">
           <span class="vs">VS</span>
-          {time ? <span class="time">{time}</span> : null}
+          {time ? (
+            <span class="time" data-start={match.startsAt ?? undefined}>
+              {time}
+            </span>
+          ) : null}
           <small>Partido {match.number}</small>
         </div>
       )}
@@ -164,10 +169,15 @@ const MatchCard: FC<{ match: PublicMatch; time: string | null }> = ({ match, tim
 };
 
 const RoundBlock: FC<{ round: PublicRound }> = ({ round }) => (
-  <div class="round" data-bye={round.bye?.id}>
+  <div class="round" data-bye={round.bye?.id} data-start={round.startsAt ?? undefined}>
     <div class="round-head">
       <b>Ronda {round.number}</b>
-      {round.startTime ? <span>{round.endTime ? `${round.startTime} – ${round.endTime}` : round.startTime}</span> : null}
+      {round.startTime ? (
+        <span class="when" data-start={round.startsAt ?? undefined} data-end={round.endsAt ?? undefined}>
+          {round.endTime ? `${round.startTime} – ${round.endTime}` : round.startTime}
+        </span>
+      ) : null}
+      {round.status === 'live' ? <span class="tag live">En juego</span> : null}
       {round.status === 'next' ? <span class="tag next">Siguiente</span> : null}
       {round.status === 'done' ? <span class="tag done">Finalizada</span> : null}
       {round.bye ? (
@@ -178,19 +188,31 @@ const RoundBlock: FC<{ round: PublicRound }> = ({ round }) => (
     </div>
     <div class="matches">
       {round.matches.map((match) => (
-        <MatchCard match={match} time={round.startTime} />
+        <MatchCard match={match} time={round.startTime} live={round.status === 'live'} />
       ))}
     </div>
   </div>
 );
 
-const DayBlock: FC<{ day: PublicDay }> = ({ day }) => (
-  <div class="day">
-    <Section title={day.label} sub="Fase de grupos" />
-    {day.rounds.map((round) => (
-      <RoundBlock round={round} />
+/**
+ * Rounds and their day headings form one flat, chronological list: the browser regroups it by the
+ * visitor's own calendar day (a late match can fall on the next day elsewhere), the server groups by the
+ * tournament's zone as the no-JavaScript fallback.
+ */
+const DayList: FC<{ days: PublicDay[] }> = ({ days }) => (
+  <>
+    {days.map((day) => (
+      <>
+        <div class="sec day-head" data-day={day.date ?? undefined}>
+          <h2>{day.label}</h2>
+          <span>Fase de grupos</span>
+        </div>
+        {day.rounds.map((round) => (
+          <RoundBlock round={round} />
+        ))}
+      </>
     ))}
-  </div>
+  </>
 );
 
 const MatchesPanel: FC<{ model: PublicModel }> = ({ model }) => (
@@ -206,11 +228,12 @@ const MatchesPanel: FC<{ model: PublicModel }> = ({ model }) => (
         </button>
       ))}
     </div>
+    <p class="tznote" data-tz-note data-tz={model.timezone}>
+      Horarios en hora de {model.timezone}
+    </p>
     <div class="days">
       {model.days.length === 0 ? <p class="empty">El fixture todavía no está publicado.</p> : null}
-      {model.days.map((day) => (
-        <DayBlock day={day} />
-      ))}
+      <DayList days={model.days} />
     </div>
   </>
 );
@@ -329,7 +352,11 @@ const BracketMatch: FC<{ match: BracketMatchView }> = ({ match }) => (
   <div class="bm">
     <header>
       <span>{match.title}</span>
-      {match.when ? <b>{match.when}</b> : null}
+      {match.when ? (
+        <b data-start={match.startsAt ?? undefined} data-format="short">
+          {match.when}
+        </b>
+      ) : null}
     </header>
     <BracketSlot slot={match.slots[0]} />
     <BracketSlot slot={match.slots[1]} />
