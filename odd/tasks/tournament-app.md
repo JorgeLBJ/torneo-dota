@@ -66,7 +66,7 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
 
 ## Routing and active tournament (confirmed by user, 2026-09-29)
 - Exactly ONE active tournament at a time (`tournaments.is_active`, partial unique index). `/` renders the ACTIVE tournament's public page, `/t/<slug>` any tournament (archive), `/admin` the backoffice (opens the active tournament by default). Admin "Ver página pública" links to `/` for the active tournament and `/t/<slug>` otherwise. The public site itself is T7.
-- Production domain: torneo-dota.jpsolutions.com behind HTTPS (`COOKIE_SECURE=1` flag; `TRUST_PROXY=1` behind the proxy).
+- Production domain: torneo-dota.jpsolutions.app behind HTTPS (`COOKIE_SECURE=1` flag; `TRUST_PROXY=1` behind the proxy).
 
 ## Acceptance criteria
 - Standings and playoffs derive only from match results (no stored points).
@@ -126,3 +126,10 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
 
 ## Next step
 Merge `feat/docker-deploy` to `main` and push, then follow `deploy/README.md` on the VPS (authorization required for anything remote). After deploy, verify Twitch inside the Google Sites iframe and, if needed, add the framing host to `STREAM_PARENT_HOSTS`.
+
+## Production deploy (2026-09-29)
+- Deployed to https://torneo-dota.jpsolutions.app on the VPS (ssh alias `gymsys`), authorized by the user.
+- `~/torneo-dota/compose.yml` (= deploy/compose.yml) + `.env` (600, from .env.example); image built inside Docker from the public GitHub repo (`#main`); volume `torneo-dota_data`; attached to `mbd_edge`; healthy; ~24 MiB RAM.
+- Caddy: `/opt/mbd/caddy-sites/_torneo-dota.caddy` (owned by the user, no sudo needed), `caddy validate` then `caddy reload`; Let's Encrypt certificate obtained.
+- Verified: /healthz 200 over HTTPS, `/` 200, `/admin` → `/admin/setup`, SSE streams through Caddy (hello event), public pages frameable (no XFO), admin denies framing, tasks.jpsolutions.app still 200.
+- Pending (user): first-run setup with the code from `docker logs torneo-dota`; check Twitch embed inside Google Sites (parent hosts).
