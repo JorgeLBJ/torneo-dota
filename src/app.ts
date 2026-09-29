@@ -9,6 +9,7 @@ import { LoginRateLimiter } from './auth/rate-limit.js';
 import type { AppConfig } from './config.js';
 import { createRepository } from './db/repository.js';
 import { createEvents } from './events.js';
+import { publicApp } from './public/routes.js';
 
 export type { AppConfig } from './config.js';
 
@@ -42,6 +43,7 @@ export function createApp({ db, config }: CreateAppOptions) {
     serveStatic({ root: relative(process.cwd(), PUBLIC_DIR) || '.', rewriteRequestPath: (p) => p.replace(/^\/assets/, '') }),
   );
   app.route('/admin', adminApp({ repo, events, config, limiter }));
+  app.route('/', publicApp({ repo }));
 
   return { app, repo, events };
 }
