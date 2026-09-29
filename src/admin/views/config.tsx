@@ -42,7 +42,7 @@ export const ConfigView: FC<{ tournament: Tournament; days: ScheduleDay[] }> = (
       <div class="card stack">
         <h2>Calendario</h2>
         <div class="scroll-x">
-          <table>
+          <table class="cal">
             <thead>
               <tr>
                 <th>Fase</th>
@@ -82,7 +82,6 @@ export const ConfigView: FC<{ tournament: Tournament; days: ScheduleDay[] }> = (
                       name="day_minutes"
                       value={String(d.slotMinutes)}
                       inputmode="numeric"
-                      style="width:70px"
                       aria-label="Minutos por partido"
                     />
                   </td>

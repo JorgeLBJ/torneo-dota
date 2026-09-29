@@ -37,6 +37,16 @@ describe('config screen', () => {
     expect(html).toContain('value="2026-10-03"');
     expect(html).toContain('value="14:00, 15:00"');
     expect(html).toContain('Agregar día');
+    // The calendar table carries the class the stylesheet sizes its columns with.
+    expect(html).toContain('<table class="cal">');
+    expect(html).not.toMatch(/name="day_minutes"[^>]*style=/);
+  });
+
+  it('ships the calendar and mobile-nav rules in the admin stylesheet', async () => {
+    const css = await (await t.get('/assets/admin.css')).text();
+    expect(css).toMatch(/table\.cal\s*\{[^}]*table-layout:fixed/);
+    expect(css).toMatch(/nav\.side::-webkit-scrollbar\s*\{display:none\}/);
+    expect(css).toMatch(/nav\.side\s*\{[^}]*scrollbar-width:none/);
   });
 
   it('links the public page at / for the active tournament and /t/<slug> otherwise', async () => {

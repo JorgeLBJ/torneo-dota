@@ -146,3 +146,23 @@ td .btn,td form{margin:0}
 }
 a.btn{text-decoration:none;color:inherit}
 a.btn.pri{color:#1a1405}
+
+/* Calendar table: fixed column widths so the phase select and the times input stay readable. */
+table.cal{table-layout:fixed;min-width:680px}
+table.cal th:nth-child(1){width:150px}
+table.cal th:nth-child(2){width:170px}
+table.cal th:nth-child(4){width:100px}
+table.cal th:nth-child(5){width:90px}
+table.cal td{vertical-align:middle}
+table.cal select,table.cal input{min-width:0;text-overflow:ellipsis}
+
+/* Mobile: compact header and a section nav that scrolls sideways without a visible scrollbar. */
+@media (max-width:760px){
+  aside{padding:10px 14px;gap:10px}
+  .brand{font-size:18px}
+  .navlbl{display:none}
+  nav.side{overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+  nav.side::-webkit-scrollbar{display:none}
+  nav.side a{flex:none;white-space:nowrap;gap:8px}
+  .scroll-x table.cal{min-width:680px}
+}
