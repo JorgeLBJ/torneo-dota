@@ -36,6 +36,14 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
 - [x] T4 Playoff bracket (seeding, winners, champion) (TDD) — route: delegated writer
 - [x] T5 Repository module (SQL) with in-memory DB tests — route: delegated writer
 - [x] T6 Backoffice: auth, tournaments, teams, fixture, results, playoffs — route: delegated writer
+- [ ] T6.1 Hardening + polish from T6 review and visual check — route: delegated writer
+  - Rate limit keyed on spoofable X-Forwarded-For (src/security.ts:34-36): only trust the proxy-appended hop when TRUST_PROXY=1.
+  - Login limiter: bounded map + eviction (src/auth/rate-limit.ts), check-and-increment without TOCTOU (src/admin/routes/auth.tsx:25-34).
+  - Unbounded request body in form parsing (src/admin/form.ts:5-7): cap body size.
+  - Tiebreakers read from DB not validated (src/domain/standings.ts:71-72); hero slug not enforced at repository level (repository.ts:301).
+  - Tiebreak match ordering (src/admin/routes/fixture.tsx:165-167); end-before-start and unbounded round param (fixture.tsx:97-103, 149-151); tautological tie test (test/services.test.ts:164).
+  - Migration comment says "exactly one" active but index allows zero (002:10-12); labels "URL pública"/"Torneo activo" wording (tournaments.tsx:45-46, layout.tsx:84); tournaments.tsx:47-51 edge case.
+  - Visual: calendar table columns collapse (phase select and times input too narrow); mobile nav shows a raw horizontal scrollbar.
 - [ ] T7 Public site `/t/:slug` + SSE live updates, mockup design — route: delegated writer
 - [ ] T8 Seed script for the current tournament (7 teams, sheet fixture, Oct 3/10/11/17) — route: delegated writer
 - [ ] T9 Dockerfile + docker-compose (+ Caddy once domain known) — route: delegated writer
@@ -67,6 +75,7 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
 
 ## Review log
 - T1–T5 range 4e174f8..022e5ef: risk medium, consent granted, native review APPROVED and acknowledged (lineage review-efbd791797c39cae). Reviewed boundary → 022e5ef. Non-blocking findings folded into T6: winner CHECK bypass when a team is NULL (001_init.sql:34), semifinal winner not validated (playoffs.ts:62-70); suggestions: addMinutes validation (fixture.ts:50-56), bracket ignores qualifiers (playoffs.ts:56-58).
+- T6 range 022e5ef..d9d6609: whole range exceeded the reviewer context budget (lens_context_budget_exceeded, nothing created). Reviewed as commit slices in detached worktrees, all consent granted, all APPROVED and acknowledged: 022e5ef..25533b7 (medium, lineage review-6f211b2f0d34b2c8), 25533b7..0aa2783 (high, 4 lenses, review-970799ae64548f40), 0aa2783..4a2d13e (medium), 4a2d13e..ebcfe49 (medium); ebcfe49..d9d6609 passive (docs). Reviewed boundary → d9d6609. Non-blocking warnings → T6.1.
 
 ## Progress / Evidence
 - T1 (9860a63): route delegated writer. RED: migrate.test.ts failed on missing module `src/db/migrate`; GREEN after implementing. Schema tests (schema.test.ts) written alongside 001_init.sql, so no separate RED observed for them. 15 tests.
