@@ -69,4 +69,27 @@ describe('tournaments screen', () => {
     await t.post(`/admin/t/${a.id}/activar`, {}, cookie);
     expect(fired).toBe(1);
   });
+
+  it('labels the sidebar selector as the current tournament, not the active one', async () => {
+    const tournament = t.repo.createTournament({ name: 'Cup', slug: 'cup' });
+    const html = await (await t.get(`/admin/t/${tournament.id}/config`, cookie)).text();
+    expect(html).toContain('<small>Torneo</small>');
+    expect(html).not.toContain('<small>Torneo activo</small>');
+  });
+
+  it('names the public-link column for what it is', async () => {
+    t.repo.createTournament({ name: 'Cup', slug: 'cup' });
+    const html = await (await t.get('/admin/torneos', cookie)).text();
+    expect(html).toContain('<th>Página pública</th>');
+  });
+
+  it('does not announce a change twice when re-activating the active tournament', async () => {
+    const tournament = t.repo.createTournament({ name: 'Cup', slug: 'cup' });
+    t.repo.setActiveTournament(tournament.id);
+    let changes = 0;
+    t.events.onTournamentChanged(tournament.id, () => changes++);
+    await t.post(`/admin/t/${tournament.id}/activar`, {}, cookie);
+    expect(changes).toBe(1);
+    expect(t.repo.getActiveTournament()!.id).toBe(tournament.id);
+  });
 });

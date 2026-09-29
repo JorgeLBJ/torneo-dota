@@ -81,7 +81,7 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, active, admi
             Torneos <em>Admin</em>
           </div>
           <div class="tsel">
-            <small>Torneo activo</small>
+            <small>Torneo</small>
             <select data-nav-select aria-label="Torneo">
               {nav.tournaments.map((t) => (
                 <option value={`/admin/t/${t.id}/${section}`} selected={t.id === current?.id}>

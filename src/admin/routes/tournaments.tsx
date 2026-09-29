@@ -52,7 +52,7 @@ export function tournamentListRoutes(deps: Deps) {
     const previous = repo.getActiveTournament();
     repo.setActiveTournament(tournament.id);
     deps.events.tournamentChanged(tournament.id);
-    if (previous) deps.events.tournamentChanged(previous.id);
+    if (previous && previous.id !== tournament.id) deps.events.tournamentChanged(previous.id);
     setFlash(c, 'ok', `"${tournament.name}" es ahora el torneo activo (se muestra en la portada).`);
     return c.redirect('/admin/torneos', 303);
   });

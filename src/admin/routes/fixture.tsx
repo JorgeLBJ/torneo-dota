@@ -16,6 +16,9 @@ import { setFlash } from '../flash.js';
 import { renderPage } from '../render.js';
 import { FixtureView, MatchEditView } from '../views/fixture.js';
 
+/** Highest round number accepted from a form or URL. */
+const MAX_ROUND = 999;
+
 export function fixtureRoutes(deps: Deps) {
   const app = new Hono<AdminEnv>();
   const { repo } = deps;
@@ -91,7 +94,7 @@ export function fixtureRoutes(deps: Deps) {
     };
 
     const round = positiveInt(str(body, 'round'));
-    if (round === null || round > 999) return error('La ronda debe ser un número entero mayor que 0.');
+    if (round === null || round > MAX_ROUND) return error('La ronda debe ser un número entero mayor que 0.');
     const date = str(body, 'date');
     if (date !== '' && !isDate(date)) return error('La fecha no es válida.');
     const start = str(body, 'start_time');
@@ -100,6 +103,7 @@ export function fixtureRoutes(deps: Deps) {
       return error('La hora no es válida (usa HH:MM).');
     }
     if (end !== '' && start === '') return error('Indica también la hora de inicio.');
+    if (end !== '' && end <= start) return error('La hora de fin debe ser posterior a la de inicio.');
     if (start !== '' && end === '') end = addMinutes(start, 60);
 
     const validIds = new Set(repo.listTeams(tournament.id).map((t) => t.id));
@@ -147,7 +151,7 @@ export function fixtureRoutes(deps: Deps) {
   app.post('/fixture/rondas/:round/partido', (c) => {
     const tournament = c.get('tournament');
     const round = positiveInt(c.req.param('round'));
-    if (round === null) return c.text('Ronda no encontrada.', 404);
+    if (round === null || round > MAX_ROUND) return c.text('Ronda no encontrada.', 404);
     const match = addBlankMatch(repo, tournament.id, round);
     deps.events.tournamentChanged(tournament.id);
     return c.redirect(`/admin/t/${tournament.id}/fixture/partidos/${match.id}`, 303);
@@ -162,8 +166,9 @@ export function fixtureRoutes(deps: Deps) {
 
   app.post('/fixture/desempate', (c) => {
     const tournament = c.get('tournament');
-    const match = addRound(repo, tournament.id);
+    // Read the tie before adding the blank match: an unplayed match makes the group stage incomplete.
     const tied = tiedTeamIds(loadState(repo, tournament).standings);
+    const match = addRound(repo, tournament.id);
     if (tied) repo.updateMatchTeams(match.id, tied[0], tied[1]);
     deps.events.tournamentChanged(tournament.id);
     setFlash(c, 'ok', 'Partida de desempate creada: completa la fecha y los equipos.');

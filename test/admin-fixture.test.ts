@@ -120,6 +120,9 @@ describe('match editing', () => {
       [{ ...ok, round: '0' }, 'ronda'],
       [{ ...ok, date: '2026-99-99' }, 'fecha'],
       [{ ...ok, start_time: '99:00' }, 'hora'],
+      [{ ...ok, round: '1000' }, 'ronda'],
+      [{ ...ok, start_time: '18:00', end_time: '17:00' }, 'posterior'],
+      [{ ...ok, start_time: '18:00', end_time: '18:00' }, 'posterior'],
       [{ ...ok, team2: ok.team1 }, 'distintos'],
       [{ ...ok, team1: '99999' }, 'equipo'],
     ];
@@ -179,5 +182,29 @@ describe('match editing', () => {
     const tiebreak = await t.post(`${base}/desempate`, {}, cookie);
     expect(tiebreak.status).toBe(303);
     expect(t.repo.maxRound(tournament.id, 'group')).toBe(9);
+  });
+
+  it('pre-fills the tiebreak match with the teams tied at the cutoff', async () => {
+    t.repo.updateTournament(tournament.id, { qualifiers: 1 });
+    for (const team of teams.slice(3)) t.repo.deleteTeam(team.id);
+    generate();
+    const [a, b, c] = teams as [Team, Team, Team];
+    const cycle: [number, number][] = [[a.id, b.id], [b.id, c.id], [c.id, a.id]];
+    t.repo.listMatches(tournament.id, 'group').forEach((m, i) => {
+      const [winner, loser] = cycle[i]!;
+      t.repo.updateMatchTeams(m.id, winner, loser);
+      t.repo.recordResult(m.id, { winnerId: winner, team1Kills: 10, team1Deaths: 10, team2Kills: 10, team2Deaths: 10 });
+    });
+    const res = await t.post(`${base}/desempate`, {}, cookie);
+    const created = t.repo.getMatch(Number(res.headers.get('location')!.split('/').pop()))!;
+    expect([created.team1Id, created.team2Id]).toEqual([a.id, b.id]);
+  });
+
+  it('does not create a match for a round number that is out of range', async () => {
+    generate();
+    const before = t.repo.listMatches(tournament.id, 'group').length;
+    expect((await t.post(`${base}/rondas/1000/partido`, {}, cookie)).status).toBe(404);
+    expect((await t.post(`${base}/rondas/99999999999/partido`, {}, cookie)).status).toBe(404);
+    expect(t.repo.listMatches(tournament.id, 'group')).toHaveLength(before);
   });
 });

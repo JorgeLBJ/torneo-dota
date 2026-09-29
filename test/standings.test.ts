@@ -208,3 +208,11 @@ describe('configurable rules', () => {
     );
   });
 });
+
+describe('unknown tiebreakers', () => {
+  it('ignores criteria it does not know instead of failing', () => {
+    const teams = [{ id: 1, code: 'A', name: 'A' }, { id: 2, code: 'B', name: 'B' }];
+    const rows = computeStandings(teams, [], 1, { tiebreakers: ['bogus' as never, 'kd'] });
+    expect(rows).toHaveLength(2);
+  });
+});

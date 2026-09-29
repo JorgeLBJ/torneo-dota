@@ -145,23 +145,22 @@ describe('manual fixture editing', () => {
   });
 
   it('finds the teams tied at the qualification cutoff', () => {
-    const teams = addTeams(6);
-    regenerateFixture(repo, tournament);
-    expect(tiedTeamIds(loadState(repo, tournament).standings)).toBeNull();
-    // Everyone tied at zero with no results is not a tiebreak.
-    for (const m of repo.listMatches(tournament.id, 'group')) {
-      repo.recordResult(m.id, {
-        winnerId: m.team1Id!,
-        team1Kills: 10,
-        team1Deaths: 10,
-        team2Kills: 10,
-        team2Deaths: 10,
-      });
-    }
-    const state = loadState(repo, tournament);
+    const [a, b, c] = addTeams(3) as unknown as [{ id: number }, { id: number }, { id: number }];
+    repo.updateTournament(tournament.id, { qualifiers: 1 });
+    const current = repo.getTournamentById(tournament.id)!;
+    regenerateFixture(repo, current);
+    // No results yet: everyone tied at zero is not a tiebreak.
+    expect(tiedTeamIds(loadState(repo, current).standings)).toBeNull();
+    // A beats B, B beats C, C beats A with identical kills: a three-way tie across the cutoff.
+    const cycle: [number, number][] = [[a.id, b.id], [b.id, c.id], [c.id, a.id]];
+    repo.listMatches(tournament.id, 'group').forEach((m, i) => {
+      const [winner, loser] = cycle[i]!;
+      repo.updateMatchTeams(m.id, winner, loser);
+      repo.recordResult(m.id, { winnerId: winner, team1Kills: 10, team1Deaths: 10, team2Kills: 10, team2Deaths: 10 });
+    });
+    const state = loadState(repo, current);
     expect(state.groupComplete).toBe(true);
-    const tied = tiedTeamIds(state.standings);
-    expect(tied === null || tied.every((id) => teams.some((t) => t.id === id))).toBe(true);
+    expect(tiedTeamIds(state.standings)).toEqual([a.id, b.id]);
   });
 });
 

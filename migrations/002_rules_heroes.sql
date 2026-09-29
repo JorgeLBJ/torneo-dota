@@ -7,7 +7,7 @@ ALTER TABLE tournaments ADD COLUMN points_loss INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE tournaments ADD COLUMN tiebreakers TEXT NOT NULL DEFAULT 'kd,kills';
 ALTER TABLE tournaments ADD COLUMN group_legs INTEGER NOT NULL DEFAULT 1 CHECK (group_legs IN (1, 2));
 ALTER TABLE tournaments ADD COLUMN rules_text TEXT NOT NULL DEFAULT '';
--- Exactly one tournament is active (shown at the site root); the partial unique index enforces at most one.
+-- At most one tournament is active (shown at the site root); the partial unique index allows zero or one.
 ALTER TABLE tournaments ADD COLUMN is_active INTEGER NOT NULL DEFAULT 0 CHECK (is_active IN (0, 1));
 CREATE UNIQUE INDEX idx_tournaments_active ON tournaments(is_active) WHERE is_active = 1;
 

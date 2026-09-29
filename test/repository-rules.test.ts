@@ -84,6 +84,13 @@ describe('team heroes', () => {
     expect(repo.createTeam(t.id, { code: 'D', name: 'Delta', hero: 'lina' }).hero).toBe('lina');
     expect(repo.createTeam(t.id, { code: 'E', name: 'Echo' }).hero).toBeNull();
   });
+
+  it('refuses a hero that is not in the predefined list', () => {
+    const { t, a } = setup();
+    expect(() => repo.createTeam(t.id, { code: 'D', name: 'Delta', hero: 'not_a_hero' })).toThrow(/hero/i);
+    expect(() => repo.updateTeam(a.id, { hero: '../etc/passwd' })).toThrow(/hero/i);
+    expect(repo.getTeam(a.id)!.hero).toBeNull();
+  });
 });
 
 describe('match editing', () => {
@@ -186,5 +193,13 @@ describe('active tournament', () => {
     repo.setActiveTournament(a.id);
     expect(() => repo.setActiveTournament(999)).toThrow(/not found/);
     expect(repo.getActiveTournament()?.id).toBe(a.id);
+  });
+});
+
+describe('stored tiebreakers', () => {
+  it('drops unknown and repeated criteria when reading a tournament', () => {
+    const { t } = setup();
+    db.prepare('UPDATE tournaments SET tiebreakers = ? WHERE id = ?').run('kd,bogus,kills,kd', t.id);
+    expect(repo.getTournamentById(t.id)!.tiebreakers).toEqual(['kd', 'kills']);
   });
 });

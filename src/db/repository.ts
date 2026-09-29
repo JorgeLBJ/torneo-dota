@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { isHeroSlug } from '../data/heroes.js';
 
 // All SQL of the application lives in this module.
 
@@ -105,6 +106,8 @@ export interface Session {
   expiresAt: string;
 }
 
+export const TIEBREAKER_KEYS = ['kd', 'kills'] as const;
+
 const TOURNAMENT_COLS = `id, name, slug, qualifiers, game, points_win AS pointsWin, points_loss AS pointsLoss,
   tiebreakers, group_legs AS groupLegs, rules_text AS rulesText, is_active AS isActive, created_at AS createdAt`;
 const TEAM_COLS = 'id, tournament_id AS tournamentId, code, name, captain, hero';
@@ -119,8 +122,8 @@ type TournamentRow = Omit<Tournament, 'tiebreakers' | 'isActive'> & { tiebreaker
 type ScheduleDayRow = Omit<ScheduleDay, 'startTimes'> & { startTimes: string };
 
 function toTournament(row: TournamentRow): Tournament {
-  const tiebreakers = row.tiebreakers === '' ? [] : (row.tiebreakers.split(',') as TiebreakerKey[]);
-  return { ...row, tiebreakers, isActive: row.isActive === 1 };
+  const known = row.tiebreakers.split(',').filter((k): k is TiebreakerKey => (TIEBREAKER_KEYS as readonly string[]).includes(k));
+  return { ...row, tiebreakers: [...new Set(known)], isActive: row.isActive === 1 };
 }
 
 export function createRepository(db: Database.Database) {
@@ -217,6 +220,9 @@ export function createRepository(db: Database.Database) {
   };
   const teamById = (id: number) => q.teamById.get(id) as Team | undefined;
   const matchById = (id: number) => q.matchById.get(id) as Match | undefined;
+  const requireHero = (hero: string | null | undefined): void => {
+    if (hero != null && !isHeroSlug(hero)) throw new Error(`Unknown hero "${hero}"`);
+  };
   const requireRow = <T>(row: T | undefined, what: string): T => {
     if (row === undefined) throw new Error(`${what} not found`);
     return row;
@@ -312,12 +318,14 @@ export function createRepository(db: Database.Database) {
       tournamentId: number,
       input: { code: string; name: string; captain?: string | null; hero?: string | null },
     ): Team {
+      requireHero(input.hero);
       const info = q.insertTeam.run({ captain: null, hero: null, ...input, tournamentId });
       return requireRow(teamById(Number(info.lastInsertRowid)), 'Team');
     },
     getTeam: teamById,
     listTeams: (tournamentId: number) => q.listTeams.all(tournamentId) as Team[],
     updateTeam(id: number, patch: Partial<Pick<Team, 'code' | 'name' | 'captain' | 'hero'>>): Team {
+      requireHero(patch.hero);
       const current = requireRow(teamById(id), 'Team');
       q.updateTeam.run({ ...current, ...patch, id });
       return requireRow(teamById(id), 'Team');

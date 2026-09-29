@@ -22,7 +22,7 @@ export const TournamentsView: FC<{ rows: TournamentRow[] }> = ({ rows }) => (
         <thead>
           <tr>
             <th>Nombre</th>
-            <th>URL pública</th>
+            <th>Página pública</th>
             <th>Equipos</th>
             <th>Estado</th>
             <th></th>
