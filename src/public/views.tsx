@@ -269,9 +269,13 @@ const StreamPanel: FC<{ model: PublicModel }> = ({ model }) => {
             ></iframe>
           </div>
           <p class="stream-foot">
-            <a href={stream.openUrl} target="_blank" rel="noopener">
-              Abrir en {stream.label}
-            </a>
+            <span class="stream-hint">
+              ¿No ves la transmisión? Desactiva tu bloqueador de anuncios o ábrela en{' '}
+              <a href={stream.openUrl} target="_blank" rel="noopener">
+                {stream.label}
+              </a>
+              .
+            </span>
           </p>
         </>
       ) : (

@@ -3,6 +3,10 @@ import type { Tournament } from '../src/db/repository.js';
 import { regenerateFixture } from '../src/services/fixture.js';
 import { makeApp, type TestApp } from './helpers/app.js';
 
+import { readFileSync } from 'node:fs';
+
+const siteCss = readFileSync(new URL('../public/site.css', import.meta.url), 'utf8');
+
 let t: TestApp;
 let tournament: Tournament;
 
@@ -242,16 +246,30 @@ describe('live stream tab', () => {
     expect(body).toMatch(/<iframe[^>]* allowfullscreen/);
     expect(body).toContain('data-stream-frame');
     expect(body).toContain('data-embed="https://player.kick.com/mychannel"');
-    expect(body).toMatch(/<a href="https:\/\/kick\.com\/mychannel" target="_blank" rel="noopener">\s*Abrir en Kick\s*<\/a>/);
+    expect(body).toMatch(/ábrela en <a href="https:\/\/kick\.com\/mychannel" target="_blank" rel="noopener">Kick<\/a>\./);
     expect(body).toMatch(/data-tab="envivo">\s*En vivo\s*<span class="tab-dot"/);
     expect(body).not.toContain('Transmisión no disponible');
+  });
+
+  it('tells visitors what to do when the player is blocked, only when there is a stream', async () => {
+    const placeholder = await html('/');
+    expect(placeholder).not.toContain('¿No ves la transmisión?');
+    t.repo.updateTournament(tournament.id, { streamUrl: 'https://www.twitch.tv/some_channel' });
+    const body = await html('/');
+    expect(body).toMatch(
+      /<span class="stream-hint">¿No ves la transmisión\? Desactiva tu bloqueador de anuncios o ábrela en <a href="https:\/\/www\.twitch\.tv\/some_channel" target="_blank" rel="noopener">Twitch<\/a>\.<\/span>/,
+    );
+    // One link to the channel, not two: the hint replaces the separate "Abrir en" link.
+    expect(body.match(/href="https:\/\/www\.twitch\.tv\/some_channel"/g)).toHaveLength(1);
+    expect(body).not.toContain('Abrir en Twitch');
+    expect(siteCss).toMatch(/\.stream-hint \{[^}]*color: var\(--muted\)/);
   });
 
   it('gives Twitch the serving host and Google Sites as parents', async () => {
     t.repo.updateTournament(tournament.id, { streamUrl: 'https://www.twitch.tv/some_channel' });
     const body = await html('/');
     expect(body).toContain('src="https://player.twitch.tv/?channel=some_channel&amp;parent=localhost&amp;parent=sites.google.com&amp;muted=true"');
-    expect(body).toContain('Abrir en Twitch');
+    expect(body).toContain('>Twitch</a>.');
   });
 
   it('honours STREAM_PARENT_HOSTS', async () => {
