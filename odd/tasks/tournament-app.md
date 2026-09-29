@@ -58,7 +58,7 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
 - T2 (e6c4121): route delegated writer. RED: fixture.test.ts failed on missing module; GREEN 55 total. Fixture tests cover n=2..8 plus 7-team schedule (4+3), insufficient slots error.
 - T3 (6b3cea2): route delegated writer. RED: standings.test.ts failed on missing module; GREEN after implementation. One test expectation (last5) was miscalculated in the test and corrected; 15 tests.
 - T4 (12e6832): route delegated writer. RED: playoffs.test.ts failed on missing module; GREEN 79 total. 9 tests.
-- T5 (see git log, `feat: add repository`): route delegated writer. RED: repository.test.ts failed on missing module; GREEN 94 total (6 files). 15 tests.
+- T5 (737e6c9): route delegated writer. RED: repository.test.ts failed on missing module; GREEN 94 total (6 files). 15 tests.
 - Assumptions: playoff auto-seeding also requires no unresolved tie inside the top 4 (seed order ambiguous); admin can assign semifinal teams manually and stored teams take precedence. Standings `unresolvedTie` only among teams with played > 0. `last5` is chronological (oldest first). Deleting a team referenced by matches fails on FK (no cascade).
 
 ## Next step
