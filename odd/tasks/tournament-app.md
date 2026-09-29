@@ -46,6 +46,9 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
   - Visual: calendar table columns collapse (phase select and times input too narrow); mobile nav shows a raw horizontal scrollbar.
 - [x] T7 Public site `/t/:slug` + SSE live updates, mockup design — route: delegated writer
 - [x] T8 Seed script for the current tournament (7 teams, sheet fixture, Oct 3/10/11/17) — route: delegated writer
+- [x] T7.1 Time zones: match times stored as UTC instants, per-tournament zone, visitor-local public times — route: delegated writer
+- [x] T7.2 Hardening from T6.1/T7 reviews (SSE caps, shared root listener, client backoff, cache policy, small fixes) — route: delegated writer
+- [x] T7.3 Visual polish round 2 (phone cards, compact standings, sidebar, favicon, styled selects) — route: delegated writer
 - [ ] T9 Dockerfile + docker-compose (+ Caddy once domain known) — route: delegated writer
 
 ## Stakeholder feedback on mockups (2026-09-29)
@@ -92,6 +95,11 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
 - T7 route delegated writer: view model (`src/public/model.ts`), SSR views/routes, `public/site.css|js`, SSE (`/events`, `/t/:slug/events`, `/partial`), hero bg self-hosted (100 KB). Browser check with Playwright at 390 px: no horizontal overflow, hash tab + team filter work, live swap keeps tab and filter, live pill on.
 - T8 route delegated writer: `npm run seed:oct2026`, idempotent, exact sheet fixture; test asserts 21 unique pairs, one bye per team and the schedule.
 - Totals: 332 tests in 27 files, `tsc --noEmit` clean. Smoke on temp DB (PORT 3098): `/` 200 with name, `/t/torneo-oct-2026` 200, `/t/nope` 404, axe.png 200, public has no X-Frame-Options, `/admin/login` sends DENY + frame-ancestors none, SSE streams hello and a change after saving a result.
+
+- T7.3 (fix(admin) cards/favicon commit and styled selects 6997110): tables become labelled cards under 760 px; public/admin standings show #, Equipo, PJ, Pts, K-D on phones; sidebar buttons equal; playoffs columns top-aligned; General card full width in 3 columns; team code shown once (input with colour accent); results date select autosubmits (Ver only in noscript); users form in one row; favicon.svg (+ /favicon.ico 204); selects use one custom chevron and `appearance: base-select` where supported.
+- T7.1: migration 003 adds `tournaments.timezone` (default America/Lima, validated with Intl) and `matches.starts_at/ends_at` (ISO UTC), backfills from the old local columns (exact for Lima, UTC-5 all year) and DROPS `scheduled_date/start_time/end_time` so there is one source of truth. Repository converts wall-clock input in the tournament zone to UTC on write and derives `scheduledDate/startTime/endTime` on read, so admin code keeps working and shows tournament-zone values. `src/format/timezone.ts` (Intl only, DST-safe: gap moves forward, repeated hour takes the first). Public: server sends `data-start` ISO; `public/site-core.js` (pure, unit-tested) formats in the visitor zone, regroups days by the visitor's calendar day and rewrites the note "Horarios en tu hora local (zona)"; SSR fallback uses the tournament zone. "En juego"/"Siguiente" come from real instants (now vs starts_at). Seed sets America/Lima and yields UTC instants.
+- T7.2: SSE caps 500 global / 10 per client (503 + Retry-After 30), one shared root listener, single cleanup path, named constants; `createLive` in site-core.js (capped exponential backoff with jitter, 0-500 ms refresh jitter, serialized fetches) with unit tests; limiter eviction keeps blocked keys; only fingerprinted asset URLs are immutable (others 1 day); heroes.json imported statically; `Object.hasOwn` in standings; slots may run past midnight (end earlier than start accepted when within 12 h).
+- Totals after these: 401 tests in 34 files, `tsc --noEmit` clean.
 
 ## Next step
 T9: Dockerfile + docker-compose (node:22-slim, SQLite volume, `TRUST_PROXY=1`, `COOKIE_SECURE=1`). The VPS already runs Caddy, so no Caddy in our compose; the Caddy site block needs no special SSE config (text/event-stream is flushed immediately). Nothing runs on the VPS without authorization.
