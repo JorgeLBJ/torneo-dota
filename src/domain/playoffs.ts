@@ -32,12 +32,19 @@ const SEMIFINAL_SEEDS: [number, number][] = [
   [1, 2],
 ];
 
+/** A winner only counts when it is one of the match's two (stored) teams. */
+function validWinner(match: PlayoffMatch | undefined): number | null {
+  const winner = match?.winnerId ?? null;
+  if (winner === null || match?.team1Id == null || match.team2Id == null) return null;
+  return winner === match.team1Id || winner === match.team2Id ? winner : null;
+}
+
 function toSlot(match: PlayoffMatch | undefined): BracketSlot {
   return {
     matchId: match?.id ?? null,
     team1Id: match?.team1Id ?? null,
     team2Id: match?.team2Id ?? null,
-    winnerId: match?.winnerId ?? null,
+    winnerId: validWinner(match),
   };
 }
 

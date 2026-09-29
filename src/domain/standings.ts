@@ -38,20 +38,38 @@ export interface StandingRow {
   status: QualificationStatus;
 }
 
+export type TiebreakCriterion = 'kd' | 'kills';
+
+export interface StandingsRules {
+  pointsWin?: number;
+  pointsLoss?: number;
+  /** Ordered criteria applied after points. */
+  tiebreakers?: TiebreakCriterion[];
+}
+
+const CRITERION_VALUE: Record<TiebreakCriterion, (row: StandingRow) => number> = {
+  kd: (row) => row.diff,
+  kills: (row) => row.kills,
+};
+
 interface Acc extends StandingRow {
   results: { matchNumber: number; result: 'W' | 'L' }[];
 }
 
 /**
  * Standings derived purely from played group matches (winner set).
- * Order: points desc, kill diff desc, kills desc, then team code for a stable
- * display only. Ties on all three are flagged, never broken by name.
+ * Order: points desc, then the configured tiebreakers (default kill diff desc,
+ * kills desc), then team code for a stable display only. Ties on every
+ * criterion are flagged, never broken by name.
  */
 export function computeStandings(
   teams: StandingTeam[],
   groupMatches: GroupMatch[],
   qualifiers: number,
+  rules: StandingsRules = {},
 ): StandingRow[] {
+  const { pointsWin = 1, pointsLoss = 0, tiebreakers = ['kd', 'kills'] } = rules;
+  const criteria = tiebreakers.map((name) => CRITERION_VALUE[name]);
   const acc = new Map<number, Acc>();
   for (const t of teams) {
     acc.set(t.id, {
@@ -87,7 +105,7 @@ export function computeStandings(
       row.played += 1;
       row.wins += won ? 1 : 0;
       row.losses += won ? 0 : 1;
-      row.points += won ? 1 : 0;
+      row.points += won ? pointsWin : pointsLoss;
       row.kills += side.kills ?? 0;
       row.deaths += side.deaths ?? 0;
       row.results.push({ matchNumber: match.matchNumber, result: won ? 'W' : 'L' });
@@ -101,12 +119,18 @@ export function computeStandings(
     row.last5 = row.results.slice(-5).map((r) => r.result);
   }
 
-  rows.sort(
-    (a, b) =>
-      b.points - a.points || b.diff - a.diff || b.kills - a.kills || (a.code < b.code ? -1 : a.code > b.code ? 1 : 0),
-  );
+  const compare = (a: Acc, b: Acc): number => {
+    if (a.points !== b.points) return b.points - a.points;
+    for (const value of criteria) {
+      const delta = value(b) - value(a);
+      if (delta !== 0) return delta;
+    }
+    return 0;
+  };
 
-  const sameKey = (a: Acc, b: Acc) => a.points === b.points && a.diff === b.diff && a.kills === b.kills;
+  rows.sort((a, b) => compare(a, b) || (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
+
+  const sameKey = (a: Acc, b: Acc) => compare(a, b) === 0;
 
   // Group consecutive rows that tie on every criterion.
   const groups: { start: number; end: number }[] = [];

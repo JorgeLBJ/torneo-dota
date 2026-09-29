@@ -11,6 +11,8 @@ export interface DaySlots {
   date: string;
   /** HH:MM start times, in play order. */
   startTimes: string[];
+  /** Optional slot length for this day; falls back to the schedule default. */
+  slotMinutes?: number;
 }
 
 export interface RoundSlot {
@@ -20,8 +22,11 @@ export interface RoundSlot {
   endTime: string;
 }
 
-/** Single round-robin using the circle method. Odd counts get a bye per round. */
-export function generateRoundRobin(teamIds: number[]): Round[] {
+/**
+ * Round-robin using the circle method. Odd counts get a bye per round.
+ * With `legs = 2` the second leg repeats the first with home/away swapped.
+ */
+export function generateRoundRobin(teamIds: number[], legs: 1 | 2 = 1): Round[] {
   if (teamIds.length < 2) throw new Error('At least 2 teams are required');
   if (new Set(teamIds).size !== teamIds.length) throw new Error('Duplicate team ids');
 
@@ -44,10 +49,25 @@ export function generateRoundRobin(teamIds: number[]): Round[] {
     // Keep the first position fixed and rotate the rest clockwise.
     circle.splice(1, 0, circle.pop() ?? null);
   }
-  return rounds;
+  if (legs === 1) return rounds;
+  const firstLeg = rounds.length;
+  const secondLeg = rounds.map((r, i) => ({
+    round: firstLeg + i + 1,
+    matches: r.matches.map(([a, b]): [number, number] => [b, a]),
+    bye: r.bye,
+  }));
+  return [...rounds, ...secondLeg];
 }
 
-function addMinutes(time: string, minutes: number): string {
+const TIME_PATTERN = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+
+export function isValidTime(value: string): boolean {
+  return TIME_PATTERN.test(value);
+}
+
+export function addMinutes(time: string, minutes: number): string {
+  if (!isValidTime(time)) throw new Error(`Invalid time "${time}": expected HH:MM`);
+  if (!Number.isInteger(minutes) || minutes <= 0) throw new Error(`Invalid slot minutes: ${minutes}`);
   const [h, m] = time.split(':').map(Number) as [number, number];
   const total = h * 60 + m + minutes;
   const hh = String(Math.floor(total / 60) % 24).padStart(2, '0');
@@ -57,7 +77,9 @@ function addMinutes(time: string, minutes: number): string {
 
 /** Assigns each round (all its matches at once) to the next free date/time slot. */
 export function assignSchedule(rounds: Round[], days: DaySlots[], slotMinutes: number): RoundSlot[] {
-  const free = days.flatMap((d) => d.startTimes.map((startTime) => ({ date: d.date, startTime })));
+  const free = days.flatMap((d) =>
+    d.startTimes.map((startTime) => ({ date: d.date, startTime, minutes: d.slotMinutes ?? slotMinutes })),
+  );
   if (free.length < rounds.length) {
     throw new Error(`Insufficient time slots: ${rounds.length} rounds need slots but only ${free.length} available`);
   }
@@ -67,7 +89,7 @@ export function assignSchedule(rounds: Round[], days: DaySlots[], slotMinutes: n
       round: r.round,
       date: slot.date,
       startTime: slot.startTime,
-      endTime: addMinutes(slot.startTime, slotMinutes),
+      endTime: addMinutes(slot.startTime, slot.minutes),
     };
   });
 }

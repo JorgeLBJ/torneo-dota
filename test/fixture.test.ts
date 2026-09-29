@@ -78,3 +78,55 @@ describe('assignSchedule', () => {
     expect(() => assignSchedule(generateRoundRobin(ids(7)), [days[0]!], 45)).toThrow(/insufficient/i);
   });
 });
+
+describe('generateRoundRobin double round-robin', () => {
+  it('doubles the rounds and mirrors the first leg with home/away swapped', () => {
+    const single = generateRoundRobin(ids(4), 1);
+    const double = generateRoundRobin(ids(4), 2);
+    expect(double).toHaveLength(single.length * 2);
+    single.forEach((round, i) => {
+      const mirror = double[single.length + i]!;
+      expect(mirror.round).toBe(single.length + i + 1);
+      expect(mirror.matches).toEqual(round.matches.map(([a, b]) => [b, a]));
+      expect(mirror.bye).toBe(round.bye);
+    });
+  });
+
+  it('plays every ordered pair exactly once with 5 teams', () => {
+    const seen = new Set<string>();
+    for (const r of generateRoundRobin(ids(5), 2)) for (const [a, b] of r.matches) seen.add(`${a}>${b}`);
+    expect(seen.size).toBe(20);
+  });
+
+  it('defaults to a single leg', () => {
+    expect(generateRoundRobin(ids(4))).toEqual(generateRoundRobin(ids(4), 1));
+  });
+});
+
+describe('assignSchedule slot minutes per day', () => {
+  it('lets a day override the default slot length', () => {
+    const slots = assignSchedule(
+      generateRoundRobin(ids(4)),
+      [
+        { date: '2026-10-03', startTimes: ['14:00', '15:00'], slotMinutes: 30 },
+        { date: '2026-10-04', startTimes: ['14:00'] },
+      ],
+      60,
+    );
+    expect(slots.map((s) => s.endTime)).toEqual(['14:30', '15:30', '15:00']);
+  });
+});
+
+describe('time validation', () => {
+  const day = (t: string) => [{ date: '2026-10-03', startTimes: [t] }];
+  it('rejects malformed start times', () => {
+    for (const bad of ['9:00', '25:00', '14:60', 'abc', '']) {
+      expect(() => assignSchedule(generateRoundRobin(ids(2)), day(bad), 60)).toThrow(/time/i);
+    }
+  });
+  it('rejects non-positive or fractional slot minutes', () => {
+    for (const bad of [0, -5, 1.5, Number.NaN]) {
+      expect(() => assignSchedule(generateRoundRobin(ids(2)), day('14:00'), bad)).toThrow(/minutes/i);
+    }
+  });
+});

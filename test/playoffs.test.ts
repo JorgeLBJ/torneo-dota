@@ -110,3 +110,30 @@ describe('buildPlayoffs', () => {
     expect(buildPlayoffs([], []).seeds).toEqual([]);
   });
 });
+
+describe('buildPlayoffs winner validation', () => {
+  it('ignores a semifinal winner that is not one of its two teams', () => {
+    const b = buildPlayoffs(resolved, [
+      pm('semifinal', 1, 1, 4, 3),
+      pm('semifinal', 2, 2, 3, 2),
+    ]);
+    expect(b.semifinals[0].winnerId).toBeNull();
+    expect(b.semifinals[1].winnerId).toBe(2);
+    expect(b.final.team1Id).toBeNull();
+    expect(b.final.team2Id).toBe(2);
+  });
+
+  it('ignores a winner on a semifinal without both teams stored', () => {
+    const b = buildPlayoffs(resolved, [pm('semifinal', 1, 1, null, 1)]);
+    expect(b.semifinals[0].winnerId).toBeNull();
+  });
+
+  it('ignores a final winner outside the finalists', () => {
+    const b = buildPlayoffs(resolved, [
+      pm('semifinal', 1, 1, 4, 1),
+      pm('semifinal', 2, 2, 3, 2),
+      pm('final', 1, 1, 2, 5),
+    ]);
+    expect(b.championId).toBeNull();
+  });
+});

@@ -166,3 +166,45 @@ describe('last5 form', () => {
     expect(row(rows, 1).played).toBe(6);
   });
 });
+
+describe('configurable rules', () => {
+  it('uses points per win and per loss', () => {
+    n = 0;
+    const rows = computeStandings(teams, [m(1, 2, 1, 10, 5, 5, 10), m(3, 4, 3, 10, 5, 5, 10)], 2, {
+      pointsWin: 3,
+      pointsLoss: 1,
+    });
+    const alpha = rows.find((r) => r.teamId === 1)!;
+    const bravo = rows.find((r) => r.teamId === 2)!;
+    expect(alpha.points).toBe(3);
+    expect(bravo.points).toBe(1);
+  });
+
+  it('applies the configured tiebreaker order', () => {
+    n = 0;
+    // Both win once: A has diff +10 with 20 kills, C has diff +5 with 30 kills.
+    const matches = [m(1, 2, 1, 20, 10, 0, 0), m(3, 4, 3, 30, 25, 0, 0)];
+    const byDiff = computeStandings(teams, matches, 2, { tiebreakers: ['kd', 'kills'] });
+    expect(byDiff.map((r) => r.teamId).slice(0, 2)).toEqual([1, 3]);
+    const byKills = computeStandings(teams, matches, 2, { tiebreakers: ['kills', 'kd'] });
+    expect(byKills.map((r) => r.teamId).slice(0, 2)).toEqual([3, 1]);
+  });
+
+  it('does not flag ties on criteria that are not configured', () => {
+    n = 0;
+    const matches = [m(1, 2, 1, 10, 5, 0, 0), m(3, 4, 3, 20, 15, 0, 0)];
+    // Same diff (+5), different kills.
+    const kdOnly = computeStandings(teams, matches, 2, { tiebreakers: ['kd'] });
+    expect(kdOnly.find((r) => r.teamId === 1)!.unresolvedTie).toBe(true);
+    const both = computeStandings(teams, matches, 2, { tiebreakers: ['kd', 'kills'] });
+    expect(both.find((r) => r.teamId === 1)!.unresolvedTie).toBe(false);
+  });
+
+  it('keeps the default behaviour without rules', () => {
+    n = 0;
+    const matches = [m(1, 2, 1, 10, 5, 5, 10)];
+    expect(computeStandings(teams, matches, 2)).toEqual(
+      computeStandings(teams, matches, 2, { pointsWin: 1, pointsLoss: 0, tiebreakers: ['kd', 'kills'] }),
+    );
+  });
+});

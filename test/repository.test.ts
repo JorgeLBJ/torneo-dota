@@ -129,13 +129,13 @@ describe('matches', () => {
     });
   });
 
-  it('rejects a winner that is not one of the teams (CHECK constraint)', () => {
+  it('rejects a winner that is not one of the teams', () => {
     const { t, a, b, c } = setup();
     repo.insertMatches(fixture(t.id, a.id, b.id, c.id));
     const [m1] = repo.listMatches(t.id);
     expect(() =>
       repo.recordResult(m1!.id, { winnerId: c.id, team1Kills: 1, team1Deaths: 1, team2Kills: 1, team2Deaths: 1 }),
-    ).toThrow(/CHECK/);
+    ).toThrow(/winner must be one of/);
   });
 
   it('deletes matches of a phase', () => {
