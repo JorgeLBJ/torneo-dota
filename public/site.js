@@ -54,39 +54,54 @@
   }
 
   // Times come from the server as UTC instants and are shown in the visitor's own time zone; days are
-  // regrouped by the visitor's calendar day. Without JavaScript the server's (tournament zone) text stays.
+  // regrouped by the visitor's calendar day. Whatever cannot be computed (no Intl, unknown zone, a bad
+  // instant) is left as the server rendered it, in the tournament's zone.
   function localize() {
     var core = window.SiteCore;
     if (!core || !window.Intl) return;
-    var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (!tz) return;
+    var tz;
+    try {
+      tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch (error) {
+      return;
+    }
+    if (!tz || core.formatTime('2000-01-01T00:00:00Z', tz) === null) return;
 
-    each('.day-head', function (head) {
-      head.parentNode.removeChild(head);
-    });
     var rounds = Array.prototype.slice.call(app.querySelectorAll('.days > .round'));
-    core.groupDays(rounds.map(function (r) { return r.getAttribute('data-start'); }), tz).forEach(function (group) {
-      var head = document.createElement('div');
-      head.className = 'sec day-head';
-      var title = document.createElement('h2');
-      title.textContent = group.label;
-      var sub = document.createElement('span');
-      sub.textContent = 'Fase de grupos';
-      head.appendChild(title);
-      head.appendChild(sub);
-      rounds[group.index].parentNode.insertBefore(head, rounds[group.index]);
-    });
+    var isos = rounds.map(function (r) { return r.getAttribute('data-start'); });
+    // Regroup only when every scheduled round has a usable instant; otherwise the server headings stay.
+    var regroup = rounds.length > 0 && isos.every(function (iso) { return iso === null || core.isInstant(iso); });
+    if (regroup) {
+      each('.day-head', function (head) {
+        head.parentNode.removeChild(head);
+      });
+      core.groupDays(isos, tz).forEach(function (group) {
+        var head = document.createElement('div');
+        head.className = 'sec day-head';
+        var title = document.createElement('h2');
+        title.textContent = group.label;
+        var sub = document.createElement('span');
+        sub.textContent = 'Fase de grupos';
+        head.appendChild(title);
+        head.appendChild(sub);
+        rounds[group.index].parentNode.insertBefore(head, rounds[group.index]);
+      });
+    }
 
+    function setText(el, text) {
+      if (text !== null) el.textContent = text;
+    }
     each('.match .time[data-start]', function (el) {
-      el.textContent = core.formatTime(el.getAttribute('data-start'), tz);
+      setText(el, core.formatTime(el.getAttribute('data-start'), tz));
     });
     each('.when[data-start]', function (el) {
-      var end = el.getAttribute('data-end');
       var start = core.formatTime(el.getAttribute('data-start'), tz);
-      el.textContent = end ? start + ' – ' + core.formatTime(end, tz) : start;
+      var endIso = el.getAttribute('data-end');
+      var end = endIso ? core.formatTime(endIso, tz) : null;
+      if (start !== null) el.textContent = end !== null ? start + ' – ' + end : start;
     });
     each('[data-format="short"][data-start]', function (el) {
-      el.textContent = core.formatShort(el.getAttribute('data-start'), tz);
+      setText(el, core.formatShort(el.getAttribute('data-start'), tz));
     });
     each('[data-tz-note]', function (el) {
       el.textContent = 'Horarios en tu hora local (' + tz + ')';
@@ -94,9 +109,14 @@
   }
 
   function apply() {
-    localize();
+    try {
+      localize();
+    } catch (error) {
+      /* keep what the server rendered */
+    }
     applyTabs();
     applyFilter();
+    scheduleBoundary();
   }
 
   app.addEventListener('click', function (event) {
@@ -120,6 +140,24 @@
   });
 
   apply();
+
+  // "En juego" and "Siguiente" depend on the clock: refresh the fragment when the next slot starts or ends.
+  var live = null;
+  var boundaryTimer = null;
+  var MAX_TIMEOUT_MS = 6 * 60 * 60 * 1000;
+  function scheduleBoundary() {
+    clearTimeout(boundaryTimer);
+    if (!live || !window.SiteCore) return;
+    var instants = [];
+    each('.days > .round .when', function (el) {
+      instants.push(el.getAttribute('data-start'), el.getAttribute('data-end'));
+    });
+    var wait = window.SiteCore.msUntilNextBoundary(instants, Date.now());
+    if (wait === null) return;
+    boundaryTimer = setTimeout(function () {
+      live.refreshSoon();
+    }, Math.min(wait + 1000, MAX_TIMEOUT_MS));
+  }
 
   // ---- Live updates -------------------------------------------------------------------------
   // The server pushes a bare "change" event; we re-fetch the rendered fragment and swap it in,
@@ -178,7 +216,7 @@
   }
 
   if (eventsUrl && partialUrl && window.EventSource && window.SiteCore) {
-    window.SiteCore.createLive({
+    live = window.SiteCore.createLive({
       eventsUrl: eventsUrl,
       connect: function (url) {
         return new EventSource(url);
@@ -199,6 +237,8 @@
         window.clearTimeout(id);
       },
       random: Math.random,
-    }).open();
+    });
+    live.open();
+    scheduleBoundary();
   }
 })();

@@ -11,6 +11,7 @@ interface Source {
 interface Live {
   open(): void;
   close(): void;
+  refreshSoon(): void;
 }
 interface Deps {
   eventsUrl: string;
@@ -232,6 +233,45 @@ describe('refreshing the page fragment', () => {
     h.sources[0]!.fail(CLOSED);
     await h.fire();
     h.sources[1]!.emit('hello');
+    await h.fire();
+    expect(h.log.fetches).toBe(1);
+  });
+});
+
+describe('a refused connection (HTTP 503) is retried, not given up on', () => {
+  it('keeps retrying forever with delays that grow and stop at the 30 s cap', async () => {
+    const h = harness(1);
+    h.live.open();
+    const delays: number[] = [];
+    for (let i = 0; i < 12; i++) {
+      h.sources[i]!.fail(CLOSED);
+      delays.push(...[...h.timers.values()].map((t) => t.ms));
+      await h.fire();
+    }
+    expect(h.sources).toHaveLength(13);
+    expect(delays.slice(0, 5)).toEqual([1000, 2000, 4000, 8000, 16000]);
+    expect(Math.max(...delays)).toBe(30000);
+    expect(delays.slice(5).every((d) => d === 30000)).toBe(true);
+  });
+
+  it('shows the live pill again as soon as a retry is accepted', async () => {
+    const h = harness();
+    h.live.open();
+    h.sources[0]!.fail(CLOSED);
+    await h.fire();
+    h.sources[1]!.emit('hello');
+    expect(h.log.live).toEqual([false, true]);
+  });
+});
+
+describe('refreshSoon (used when a match slot starts or ends)', () => {
+  it('schedules one jittered refresh, sharing the pipeline of change events', async () => {
+    const h = harness(0.5);
+    h.live.open();
+    h.live.refreshSoon();
+    h.live.refreshSoon();
+    h.sources[0]!.emit('change');
+    expect([...h.timers.values()].map((t) => t.ms)).toEqual([250]);
     await h.fire();
     expect(h.log.fetches).toBe(1);
   });

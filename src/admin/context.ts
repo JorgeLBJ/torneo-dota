@@ -1,3 +1,4 @@
+import type { Clock } from '../clock.js';
 import type { LoginRateLimiter } from '../auth/rate-limit.js';
 import type { AppConfig } from '../config.js';
 import type { Admin, Repository, Tournament } from '../db/repository.js';
@@ -8,6 +9,7 @@ export interface Deps {
   events: Events;
   config: AppConfig;
   limiter: LoginRateLimiter;
+  now: Clock;
 }
 
 /** `tournament` is only set on routes under /t/:tid (see tournamentScope). */

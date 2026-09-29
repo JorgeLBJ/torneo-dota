@@ -290,6 +290,8 @@ export function createRepository(db: Database.Database) {
     if (q.markActive.run(id).changes === 0) throw new Error('Tournament not found');
   });
 
+  const inTransaction = <T>(work: () => T): T => db.transaction(work)();
+
   const replaceScheduleDaysTx = db.transaction((tournamentId: number, days: ScheduleDay[]) => {
     q.deleteScheduleDays.run(tournamentId);
     days.forEach((d, position) =>
@@ -305,6 +307,9 @@ export function createRepository(db: Database.Database) {
   });
 
   return {
+    /** Runs several repository calls as one atomic unit: any throw rolls all of them back. */
+    transaction: inTransaction,
+
     // Tournaments
     createTournament(input: { name: string; slug: string; qualifiers?: number }): Tournament {
       const info = q.insertTournament.run({ qualifiers: 4, ...input });

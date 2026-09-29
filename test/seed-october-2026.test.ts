@@ -1,5 +1,10 @@
 import type Database from 'better-sqlite3';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openDatabase } from '../src/db/open.js';
 import { createRepository, type Repository } from '../src/db/repository.js';
 import { loadState } from '../src/services/state.js';
@@ -138,4 +143,47 @@ describe('seedOctober2026', () => {
     expect(repo.getTournamentById(old.id)!.isActive).toBe(false);
     expect(repo.getActiveTournament()!.id).toBe(tournament.id);
   });
+});
+
+describe('atomicity', () => {
+  it('writes nothing when a step fails midway', () => {
+    let teams = 0;
+    const create = repo.createTeam.bind(repo);
+    vi.spyOn(repo, 'createTeam').mockImplementation((...args) => {
+      if (++teams === 4) throw new Error('disk full');
+      return create(...args);
+    });
+    expect(() => seedOctober2026(repo)).toThrow('disk full');
+    vi.restoreAllMocks();
+    expect(repo.listTournaments()).toEqual([]);
+    // ...so a retry starts clean instead of finding half a tournament.
+    expect(seedOctober2026(repo).created).toBe(true);
+    expect(repo.listMatches(repo.getTournamentBySlug(SLUG)!.id, 'group')).toHaveLength(21);
+  });
+
+  it('rolls back the fixture too when the last write fails', () => {
+    vi.spyOn(repo, 'setActiveTournament').mockImplementation(() => {
+      throw new Error('locked');
+    });
+    expect(() => seedOctober2026(repo)).toThrow('locked');
+    vi.restoreAllMocks();
+    expect(repo.listTournaments()).toEqual([]);
+    expect(db.prepare('SELECT COUNT(*) FROM matches').pluck().get()).toBe(0);
+    expect(db.prepare('SELECT COUNT(*) FROM teams').pluck().get()).toBe(0);
+  });
+});
+
+describe('command line entry', () => {
+  it('seeds and reports, then reports that it already exists (Windows paths included)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'seed-'));
+    try {
+      const tsx = fileURLToPath(new URL('../node_modules/tsx/dist/cli.mjs', import.meta.url));
+      const script = fileURLToPath(new URL('../scripts/seed-october-2026.ts', import.meta.url));
+      const run = () => execFileSync(process.execPath, [tsx, script], { env: { ...process.env, DATABASE_PATH: join(dir, 'x.db') }, encoding: 'utf8' });
+      expect(run()).toContain('Seeded "torneo-oct-2026"');
+      expect(run()).toContain('already exists');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
 });

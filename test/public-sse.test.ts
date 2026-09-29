@@ -171,6 +171,22 @@ describe('connection limits', () => {
   });
 });
 
+describe('refused connections leave the counters alone', () => {
+  it('lets in exactly one more client after one slot frees, however many were refused before', async () => {
+    const limited = await makeApp({ trustProxy: true, sseLimits: { global: 2, perIp: 2 } });
+    limited.repo.createTournament({ name: 'Torneo Oct', slug: 'torneo-oct' });
+    const ask = (ip: string) => limited.send('GET', '/t/torneo-oct/events', { headers: { 'x-forwarded-for': ip } });
+    const first = await ask('7.7.7.7');
+    await ask('7.7.7.7');
+    for (let i = 0; i < 5; i++) expect((await ask('7.7.7.7')).status).toBe(503);
+    await first.body!.getReader().cancel();
+    await settle();
+    expect((await ask('7.7.7.7')).status).toBe(200);
+    expect((await ask('7.7.7.7')).status).toBe(503);
+    limited.db.close();
+  });
+});
+
 describe('root stream fan-out', () => {
   it('looks up the active tournament once per event, however many clients listen', async () => {
     const readers = await Promise.all([1, 2, 3, 4, 5].map(() => open('/events')));

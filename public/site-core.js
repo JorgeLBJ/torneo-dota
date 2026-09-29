@@ -23,23 +23,48 @@
     return out;
   }
 
-  /** "2026-10-03" for the calendar day of the instant in the zone, or null without an instant. */
+  /** Whether the value is a string holding a real point in time. */
+  function isInstant(value) {
+    return typeof value === 'string' && value !== '' && !isNaN(Date.parse(value));
+  }
+
+  /** parts(), or null when the instant or the zone is not usable (the caller then keeps the server's text). */
+  function safeParts(iso, timeZone) {
+    if (!isInstant(iso)) return null;
+    try {
+      return parts(iso, timeZone);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /** "2026-10-03" for the calendar day of the instant in the zone, or null without a usable instant. */
   function dayKey(iso, timeZone) {
-    if (!iso) return null;
-    var p = parts(iso, timeZone);
-    return p.year + '-' + p.month + '-' + p.day;
+    var p = safeParts(iso, timeZone);
+    return p ? p.year + '-' + p.month + '-' + p.day : null;
   }
 
-  /** "21:00" (24 hours). */
+  /** "21:00" (24 hours), or null when it cannot be computed. */
   function formatTime(iso, timeZone) {
-    var p = parts(iso, timeZone);
-    return p.hour + ':' + p.minute;
+    var p = safeParts(iso, timeZone);
+    return p ? p.hour + ':' + p.minute : null;
   }
 
-  /** "11 Oct · 14:00" */
+  /** "11 Oct · 14:00", or null when it cannot be computed. */
   function formatShort(iso, timeZone) {
-    var p = parts(iso, timeZone);
-    return p.day + ' ' + MONTHS[Number(p.month) - 1] + ' · ' + p.hour + ':' + p.minute;
+    var p = safeParts(iso, timeZone);
+    return p ? p.day + ' ' + MONTHS[Number(p.month) - 1] + ' · ' + p.hour + ':' + p.minute : null;
+  }
+
+  /** Milliseconds until the earliest of these instants that is still in the future, or null if none is. */
+  function msUntilNextBoundary(isos, nowMs) {
+    var best = null;
+    isos.forEach(function (iso) {
+      if (!isInstant(iso)) return;
+      var delta = Date.parse(iso) - nowMs;
+      if (delta > 0 && (best === null || delta < best)) best = delta;
+    });
+    return best;
   }
 
   /** "sábado, 03 de octubre" for a "YYYY-MM-DD" key, or "Sin fecha". */
@@ -160,7 +185,8 @@
       if (source) source.close();
     }
 
-    return { open: open, close: close };
+    // A slot started or ended: fetch the fragment again so "En juego" / "Siguiente" are recomputed by the server.
+    return { open: open, close: close, refreshSoon: schedule };
   }
 
   root.SiteCore = {
@@ -169,6 +195,8 @@
     formatShort: formatShort,
     dayLabel: dayLabel,
     groupDays: groupDays,
+    isInstant: isInstant,
+    msUntilNextBoundary: msUntilNextBoundary,
     backoffDelay: backoffDelay,
     createLive: createLive,
   };

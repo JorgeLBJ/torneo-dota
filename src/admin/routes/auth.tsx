@@ -17,7 +17,7 @@ const getDummyHash = () => (dummyHash ??= hashPassword('not-a-real-password'));
 
 export function loginRoutes(deps: Deps) {
   const app = new Hono<AdminEnv>();
-  const now = () => deps.config.now?.() ?? new Date();
+  const now = deps.now;
 
   app.get('/login', (c) => c.html(<LoginPage flash={takeFlash(c)} />));
 
@@ -55,7 +55,7 @@ export function loginRoutes(deps: Deps) {
 export function requireAdmin(deps: Deps) {
   return createMiddleware<AdminEnv>(async (c, next) => {
     const token = getCookie(c, SESSION_COOKIE);
-    const admin = token ? resolveSession(deps.repo, token, deps.config.now?.() ?? new Date()) : undefined;
+    const admin = token ? resolveSession(deps.repo, token, deps.now()) : undefined;
     if (!admin) return c.redirect('/admin/login', 303);
     c.set('admin', admin);
     return next();

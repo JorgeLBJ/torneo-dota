@@ -2,7 +2,7 @@
 // Usage: npm run seed:oct2026   (uses DATABASE_PATH like the server; safe to run twice)
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { openDatabase } from '../src/db/open.js';
 import { createRepository, type Repository } from '../src/db/repository.js';
 import { addMinutes } from '../src/domain/fixture.js';
@@ -27,13 +27,16 @@ export interface SeedResult {
   tournamentId: number;
 }
 
-/** Creates the tournament through the repository layer. Does nothing when the slug already exists. */
+/**
+ * Creates the tournament through the repository layer, all in one transaction: either everything is written
+ * or nothing is. Does nothing when the slug already exists.
+ */
 export function seedOctober2026(repo: Repository): SeedResult {
   const existing = repo.getTournamentBySlug(SLUG);
   if (existing) return { created: false, tournamentId: existing.id };
 
-  const tournament = repo.createTournament({ name: 'Torneo All vs All · Oct 2026', slug: SLUG, qualifiers: 4 });
-  try {
+  return repo.transaction(() => {
+    const tournament = repo.createTournament({ name: 'Torneo All vs All · Oct 2026', slug: SLUG, qualifiers: 4 });
     repo.updateTournament(tournament.id, {
       game: 'Dota 2',
       pointsWin: 1,
@@ -73,15 +76,12 @@ export function seedOctober2026(repo: Repository): SeedResult {
     );
 
     repo.setActiveTournament(tournament.id);
-  } catch (error) {
-    // Leave nothing half-seeded behind: a retry would otherwise see the slug and refuse to run.
-    repo.deleteTournament(tournament.id);
-    throw error;
-  }
-  return { created: true, tournamentId: tournament.id };
+    return { created: true, tournamentId: tournament.id };
+  });
 }
 
-const isMain = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Run only when executed directly (not when imported by tests). Comparing file URLs works for Windows paths too.
+const isMain = process.argv[1] !== undefined && pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
 if (isMain) {
   const databasePath = resolve(process.env.DATABASE_PATH ?? './data/torneos.db');
   mkdirSync(dirname(databasePath), { recursive: true });

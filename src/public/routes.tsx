@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
+import type { Clock } from '../clock.js';
 import type { AppConfig } from '../config.js';
 import type { Repository, Tournament } from '../db/repository.js';
 import { parentHostsFor } from '../domain/stream.js';
@@ -19,7 +20,8 @@ import {
 export interface PublicDeps {
   repo: Repository;
   events: Events;
-  config: Pick<AppConfig, 'heartbeatMs' | 'now' | 'sseLimits' | 'streamParentHosts' | 'trustProxy'>;
+  config: Pick<AppConfig, 'heartbeatMs' | 'sseLimits' | 'streamParentHosts' | 'trustProxy'>;
+  now: Clock;
 }
 
 export const DEFAULT_HEARTBEAT_MS = 25_000;
@@ -37,12 +39,12 @@ const linksFor = (tournament: Tournament): PageLinks => ({
 });
 const ROOT_LINKS: PageLinks = { events: '/events', partial: '/partial' };
 
-export function publicApp({ repo, events, config }: PublicDeps) {
+export function publicApp({ repo, events, config, now }: PublicDeps) {
   const app = new Hono();
 
   const content = (tournament: Tournament, parentHosts: readonly string[]) => {
     const model = buildPublicModel(loadState(repo, tournament), repo.listScheduleDays(tournament.id), {
-      now: config.now?.() ?? new Date(),
+      now: now(),
       parentHosts,
     });
     return { model, node: <PublicContent model={model} /> };

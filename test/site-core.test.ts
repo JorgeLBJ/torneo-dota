@@ -4,10 +4,12 @@ import { describe, expect, it } from 'vitest';
 
 interface Core {
   dayKey(iso: string | null, tz: string): string | null;
-  formatTime(iso: string, tz: string): string;
-  formatShort(iso: string, tz: string): string;
+  formatTime(iso: string, tz: string): string | null;
+  formatShort(iso: string, tz: string): string | null;
   dayLabel(key: string | null): string;
   groupDays(isos: (string | null)[], tz: string): { index: number; key: string | null; label: string }[];
+  isInstant(value: unknown): boolean;
+  msUntilNextBoundary(isos: (string | null)[], nowMs: number): number | null;
 }
 
 /** Loads the browser file the way a browser would: as a plain script with no module system. */
@@ -67,5 +69,32 @@ describe('grouping by the viewer calendar day', () => {
 
   it('returns nothing for an empty list', () => {
     expect(core.groupDays([], 'UTC')).toEqual([]);
+  });
+});
+
+describe('bad input never throws: the server text stays', () => {
+  it('recognises real instants only', () => {
+    expect(core.isInstant('2026-10-03T19:00:00Z')).toBe(true);
+    for (const bad of ['', 'garbage', null, undefined, 42, '2026-13-45T99:00:00Z']) expect(core.isInstant(bad)).toBe(false);
+  });
+
+  it('returns null instead of throwing for an invalid instant or zone', () => {
+    expect(core.formatTime('garbage', 'UTC')).toBeNull();
+    expect(core.formatShort('garbage', 'UTC')).toBeNull();
+    expect(core.formatTime(LIMA_1900, 'Not/AZone')).toBeNull();
+    expect(core.dayKey('garbage', 'UTC')).toBeNull();
+  });
+});
+
+describe('msUntilNextBoundary', () => {
+  const now = Date.parse('2026-10-03T19:30:00Z');
+  it('is the time to the next start or end that is still ahead', () => {
+    const isos = ['2026-10-03T19:00:00Z', '2026-10-03T20:00:00Z', '2026-10-03T21:00:00Z'];
+    expect(core.msUntilNextBoundary(isos, now)).toBe(30 * 60_000);
+    expect(core.msUntilNextBoundary(isos, Date.parse('2026-10-03T20:00:00Z'))).toBe(60 * 60_000);
+  });
+  it('ignores the past, nulls and garbage, and is null when nothing is ahead', () => {
+    expect(core.msUntilNextBoundary(['2026-10-03T19:00:00Z', null, 'garbage'], now)).toBeNull();
+    expect(core.msUntilNextBoundary([], now)).toBeNull();
   });
 });

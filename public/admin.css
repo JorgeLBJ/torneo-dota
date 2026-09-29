@@ -213,7 +213,6 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;overflow:hidde
   select option:checked{color:var(--gold)}
   select option::checkmark{color:var(--gold)}
 }
-}
 
 /* Sidebar footer: the session and logout stay pinned to the bottom. */
 .side-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line)}

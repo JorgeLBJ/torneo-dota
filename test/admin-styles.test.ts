@@ -53,4 +53,20 @@ describe('admin stylesheet', () => {
     expect(css).toMatch(/select::picker-icon\{display:block;[^}]*margin-left:auto/);
     expect(css).not.toContain('select::picker-icon{display:none}');
   });
+
+  it('is well-formed: braces balance, so no stray brace can swallow the rule after it', () => {
+    for (const [name, source] of [['admin.css', css], ['site.css', readFileSync(new URL('../public/site.css', import.meta.url), 'utf8')]] as const) {
+      // Comments and quoted strings (data: URLs contain braces-like text) are not structure.
+      const text = source.replace(/\/\*[\s\S]*?\*\//g, '').split('"').filter((_, k) => k % 2 === 0).join('');
+      let depth = 0;
+      let line = 1;
+      for (const ch of text) {
+        if (ch === String.fromCharCode(10)) line++;
+        if (ch === '{') depth++;
+        if (ch === '}') depth--;
+        expect(depth, `${name}: unmatched } near line ${line}`).toBeGreaterThanOrEqual(0);
+      }
+      expect(depth, `${name}: unclosed {`).toBe(0);
+    }
+  });
 });

@@ -7,6 +7,7 @@ import { PUBLIC_DIR, assetUrl } from './assets.js';
 import { adminApp } from './admin/index.js';
 import { LoginRateLimiter } from './auth/rate-limit.js';
 import type { AppConfig } from './config.js';
+import { clockOf } from './clock.js';
 import { createRepository } from './db/repository.js';
 import { createEvents } from './events.js';
 import { FAVICON_SVG } from './favicon.js';
@@ -26,6 +27,7 @@ export function createApp({ db, config }: CreateAppOptions) {
   const repo = createRepository(db);
   const events = createEvents();
   const limiter = new LoginRateLimiter();
+  const now = clockOf(config);
   const app = new Hono();
 
   app.use(
@@ -48,8 +50,8 @@ export function createApp({ db, config }: CreateAppOptions) {
   );
   app.get('/favicon.svg', (c) => c.body(FAVICON_SVG, 200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' }));
   app.get('/favicon.ico', (c) => c.body(null, 204));
-  app.route('/admin', adminApp({ repo, events, config, limiter }));
-  app.route('/', publicApp({ repo, events, config }));
+  app.route('/admin', adminApp({ repo, events, config, limiter, now }));
+  app.route('/', publicApp({ repo, events, config, now }));
 
   return { app, repo, events };
 }
