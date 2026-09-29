@@ -17,10 +17,11 @@ export interface Tournament {
   tiebreakers: TiebreakerKey[];
   groupLegs: 1 | 2;
   rulesText: string;
+  isActive: boolean;
   createdAt: string;
 }
 
-export type TournamentPatch = Partial<Omit<Tournament, 'id' | 'createdAt'>>;
+export type TournamentPatch = Partial<Omit<Tournament, 'id' | 'createdAt' | 'isActive'>>;
 
 export interface ScheduleDay {
   /** YYYY-MM-DD */
@@ -105,7 +106,7 @@ export interface Session {
 }
 
 const TOURNAMENT_COLS = `id, name, slug, qualifiers, game, points_win AS pointsWin, points_loss AS pointsLoss,
-  tiebreakers, group_legs AS groupLegs, rules_text AS rulesText, created_at AS createdAt`;
+  tiebreakers, group_legs AS groupLegs, rules_text AS rulesText, is_active AS isActive, created_at AS createdAt`;
 const TEAM_COLS = 'id, tournament_id AS tournamentId, code, name, captain, hero';
 const MATCH_COLS = `id, tournament_id AS tournamentId, phase, round, match_number AS matchNumber,
   scheduled_date AS scheduledDate, start_time AS startTime, end_time AS endTime,
@@ -114,12 +115,12 @@ const MATCH_COLS = `id, tournament_id AS tournamentId, phase, round, match_numbe
 const ADMIN_COLS = 'id, username, password_hash AS passwordHash, created_at AS createdAt';
 const SESSION_COLS = 'id, admin_id AS adminId, expires_at AS expiresAt';
 
-type TournamentRow = Omit<Tournament, 'tiebreakers'> & { tiebreakers: string };
+type TournamentRow = Omit<Tournament, 'tiebreakers' | 'isActive'> & { tiebreakers: string; isActive: number };
 type ScheduleDayRow = Omit<ScheduleDay, 'startTimes'> & { startTimes: string };
 
 function toTournament(row: TournamentRow): Tournament {
   const tiebreakers = row.tiebreakers === '' ? [] : (row.tiebreakers.split(',') as TiebreakerKey[]);
-  return { ...row, tiebreakers };
+  return { ...row, tiebreakers, isActive: row.isActive === 1 };
 }
 
 export function createRepository(db: Database.Database) {
@@ -133,6 +134,9 @@ export function createRepository(db: Database.Database) {
          points_win = @pointsWin, points_loss = @pointsLoss, tiebreakers = @tiebreakers,
          group_legs = @groupLegs, rules_text = @rulesText WHERE id = @id`,
     ),
+    activeTournament: db.prepare(`SELECT ${TOURNAMENT_COLS} FROM tournaments WHERE is_active = 1`),
+    clearActive: db.prepare('UPDATE tournaments SET is_active = 0 WHERE is_active = 1'),
+    markActive: db.prepare('UPDATE tournaments SET is_active = 1 WHERE id = ?'),
     deleteTournament: db.prepare('DELETE FROM tournaments WHERE id = ?'),
 
     deleteScheduleDays: db.prepare('DELETE FROM schedule_days WHERE tournament_id = ?'),
@@ -241,6 +245,11 @@ export function createRepository(db: Database.Database) {
     rows.forEach((row, i) => q.setMatchNumber.run(i + 1, row.id));
   });
 
+  const setActiveTx = db.transaction((id: number) => {
+    q.clearActive.run();
+    if (q.markActive.run(id).changes === 0) throw new Error('Tournament not found');
+  });
+
   const replaceScheduleDaysTx = db.transaction((tournamentId: number, days: ScheduleDay[]) => {
     q.deleteScheduleDays.run(tournamentId);
     days.forEach((d, position) =>
@@ -271,6 +280,14 @@ export function createRepository(db: Database.Database) {
       const next = { ...requireRow(tournamentById(id), 'Tournament'), ...patch, id };
       q.updateTournament.run({ ...next, tiebreakers: next.tiebreakers.join(',') });
       return requireRow(tournamentById(id), 'Tournament');
+    },
+    getActiveTournament(): Tournament | undefined {
+      const row = q.activeTournament.get() as TournamentRow | undefined;
+      return row && toTournament(row);
+    },
+    /** Makes exactly this tournament the active one (atomic). */
+    setActiveTournament(id: number): void {
+      setActiveTx(id);
     },
     deleteTournament(id: number): void {
       q.deleteTournament.run(id);

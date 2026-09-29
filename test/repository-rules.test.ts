@@ -166,3 +166,25 @@ describe('admin management', () => {
     expect(repo.getAdminById(a.id)).toBeDefined();
   });
 });
+
+describe('active tournament', () => {
+  it('has none until one is set, then switches atomically', () => {
+    const a = repo.createTournament({ name: 'A', slug: 'a' });
+    const b = repo.createTournament({ name: 'B', slug: 'b' });
+    expect(a.isActive).toBe(false);
+    expect(repo.getActiveTournament()).toBeUndefined();
+    repo.setActiveTournament(a.id);
+    expect(repo.getActiveTournament()?.id).toBe(a.id);
+    repo.setActiveTournament(b.id);
+    expect(repo.getActiveTournament()?.id).toBe(b.id);
+    expect(repo.getTournamentById(a.id)?.isActive).toBe(false);
+    expect(repo.listTournaments().filter((t) => t.isActive)).toHaveLength(1);
+  });
+
+  it('keeps the previous active tournament when the target does not exist', () => {
+    const a = repo.createTournament({ name: 'A', slug: 'a' });
+    repo.setActiveTournament(a.id);
+    expect(() => repo.setActiveTournament(999)).toThrow(/not found/);
+    expect(repo.getActiveTournament()?.id).toBe(a.id);
+  });
+});

@@ -6,19 +6,19 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "dev": "echo \"dev server arrives in T6\"",
-    "start": "echo \"start arrives in T6\"",
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
     "fetch:heroes": "tsx scripts/fetch-heroes.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.2",
     "better-sqlite3": "^13.0.3",
-    "hono": "^4.13.10"
+    "hono": "^4.13.10",
+    "tsx": "^4.23.15"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.3",
-    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.2"
   }

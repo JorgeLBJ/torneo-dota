@@ -85,3 +85,13 @@ describe('002_rules_heroes: winner triggers', () => {
     expect(() => db.exec('UPDATE matches SET team1_id = 3, team2_id = 2')).toThrow(/winner/);
   });
 });
+
+describe('002_rules_heroes: single active tournament', () => {
+  it('defaults to inactive and allows at most one active tournament', () => {
+    expect(db.prepare('SELECT is_active FROM tournaments WHERE id = 1').pluck().get()).toBe(0);
+    db.exec('UPDATE tournaments SET is_active = 1 WHERE id = 1');
+    expect(() => db.exec('UPDATE tournaments SET is_active = 1 WHERE id = 2')).toThrow(/UNIQUE/);
+    db.exec('UPDATE tournaments SET is_active = 0 WHERE id = 1');
+    db.exec('UPDATE tournaments SET is_active = 1 WHERE id = 2');
+  });
+});
