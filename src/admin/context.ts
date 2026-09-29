@@ -10,5 +10,5 @@ export interface Deps {
   limiter: LoginRateLimiter;
 }
 
-export type AdminEnv = { Variables: { admin: Admin } };
-export type TournamentEnv = { Variables: { admin: Admin; tournament: Tournament } };
+/** `tournament` is only set on routes under /t/:tid (see tournamentScope). */
+export type AdminEnv = { Variables: { admin: Admin; tournament: Tournament } };
