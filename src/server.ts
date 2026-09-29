@@ -6,6 +6,7 @@ import { ensureInitialAdmin } from './auth/bootstrap.js';
 import { resolveSetupToken } from './auth/setup-token.js';
 import { configFromEnv } from './config.js';
 import { openDatabase } from './db/open.js';
+import { createShutdown } from './shutdown.js';
 
 const port = Number(process.env.PORT ?? 3000);
 const databasePath = resolve(process.env.DATABASE_PATH ?? './data/torneos.db');
@@ -28,14 +29,18 @@ try {
     console.log(`Torneos listening on http://localhost:${info.port} (database: ${databasePath})`);
   });
 
-  const shutdown = () => {
-    server.close(() => {
-      db.close();
-      process.exit(0);
-    });
-  };
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  const shutdown = createShutdown({
+    server,
+    db,
+    exit: (code) => process.exit(code),
+    log: (message) => console.log(message),
+    // Docker sends SIGKILL after stop_grace_period (20 s in deploy/compose.yml): finish well before that.
+    timeoutMs: 10_000,
+    setTimeout,
+    clearTimeout,
+  });
+  process.on('SIGINT', () => void shutdown('SIGINT'));
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
 } catch (error) {
   console.error(`Startup failed: ${(error as Error).message}`);
   process.exit(1);
