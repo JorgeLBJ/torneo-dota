@@ -3,10 +3,8 @@ import type { Repository } from '../db/repository.js';
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const RESERVED_SLUGS = new Set(['admin', 'assets', 'api', 't', 'static']);
 
-export type Checked<T> = { ok: true; value: T } | { ok: false; error: string };
-
-export const ok = <T>(value: T): Checked<T> => ({ ok: true, value });
-export const fail = (error: string): Checked<never> => ({ ok: false, error });
+export { fail, ok, type Checked } from '../checked.js';
+import { fail, ok, type Checked } from '../checked.js';
 
 export function checkName(name: string): Checked<string> {
   return name.length >= 1 && name.length <= 80 ? ok(name) : fail('Escribe un nombre de hasta 80 caracteres.');

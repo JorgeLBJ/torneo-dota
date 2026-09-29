@@ -93,3 +93,21 @@ export function assignSchedule(rounds: Round[], days: DaySlots[], slotMinutes: n
     };
   });
 }
+
+export interface RoundRobinSummary {
+  rounds: number;
+  matches: number;
+  /** Teams resting in every round (1 for odd team counts). */
+  byesPerRound: number;
+}
+
+/** Size of a round-robin for a team count: rounds, matches and byes per round. */
+export function describeRoundRobin(teams: number, legs: 1 | 2 = 1): RoundRobinSummary {
+  if (teams < 2) return { rounds: 0, matches: 0, byesPerRound: 0 };
+  const odd = teams % 2 === 1;
+  return {
+    rounds: (odd ? teams : teams - 1) * legs,
+    matches: ((teams * (teams - 1)) / 2) * legs,
+    byesPerRound: odd ? 1 : 0,
+  };
+}

@@ -3,6 +3,9 @@ import { sameOriginGuard } from '../security.js';
 import type { AdminEnv, Deps } from './context.js';
 import { loginRoutes, logoutRoutes, requireAdmin } from './routes/auth.js';
 import { configRoutes } from './routes/config.js';
+import { fixtureRoutes } from './routes/fixture.js';
+import { playoffRoutes } from './routes/playoffs.js';
+import { resultRoutes } from './routes/results.js';
 import { rulesRoutes } from './routes/rules.js';
 import { tournamentScope } from './routes/scope.js';
 import { teamRoutes } from './routes/teams.js';
@@ -19,6 +22,6 @@ export function adminApp(deps: Deps) {
   app.use('/t/:tid/*', tournamentScope(deps));
   app.route('/', userRoutes(deps));
   app.route('/', tournamentListRoutes(deps));
-  for (const routes of [configRoutes, rulesRoutes, teamRoutes]) app.route('/t/:tid', routes(deps));
+  for (const routes of [configRoutes, rulesRoutes, teamRoutes, fixtureRoutes, resultRoutes, playoffRoutes]) app.route('/t/:tid', routes(deps));
   return app;
 }

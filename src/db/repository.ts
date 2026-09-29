@@ -235,7 +235,11 @@ export function createRepository(db: Database.Database) {
     for (const m of matches) q.insertMatch.run(withDefaults(m));
   });
 
-  const replaceGroupMatchesTx = db.transaction((tournamentId: number, matches: NewMatch[]) => {
+  const replaceGroupMatchesTx = db.transaction((tournamentId: number, matches: NewMatch[], clearPlayoffs: boolean) => {
+    if (clearPlayoffs) {
+      q.deleteMatchesByPhase.run(tournamentId, 'semifinal');
+      q.deleteMatchesByPhase.run(tournamentId, 'final');
+    }
     q.deleteMatchesByPhase.run(tournamentId, 'group');
     for (const m of matches) q.insertMatch.run(withDefaults(m));
   });
@@ -331,9 +335,9 @@ export function createRepository(db: Database.Database) {
       const info = q.insertMatch.run(withDefaults(match));
       return requireRow(matchById(Number(info.lastInsertRowid)), 'Match');
     },
-    /** Atomically swaps every group-phase match for the given list. */
-    replaceGroupMatches(tournamentId: number, matches: NewMatch[]): void {
-      replaceGroupMatchesTx(tournamentId, matches);
+    /** Atomically swaps every group-phase match for the given list (optionally dropping playoff matches too). */
+    replaceGroupMatches(tournamentId: number, matches: NewMatch[], options: { clearPlayoffs?: boolean } = {}): void {
+      replaceGroupMatchesTx(tournamentId, matches, options.clearPlayoffs ?? false);
     },
     /** Rewrites group match numbers 1..n ordered by round, then previous number. */
     renumberGroupMatches(tournamentId: number): void {
