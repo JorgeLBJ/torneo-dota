@@ -50,3 +50,14 @@ export function requestHost(c: Context, trustProxy: boolean): string {
   const forwarded = trustProxy ? c.req.header('x-forwarded-host')?.split(',')[0]?.trim() : undefined;
   return forwarded || c.req.header('host') || new URL(c.req.url).host;
 }
+
+/**
+ * Origin used in absolute share URLs: PUBLIC_BASE_URL when configured, otherwise the one the visitor used
+ * (scheme and host from X-Forwarded-Proto / X-Forwarded-Host only when the proxy is trusted).
+ */
+export function publicOrigin(c: Context, config: { trustProxy: boolean; publicBaseUrl?: string }): string {
+  if (config.publicBaseUrl) return config.publicBaseUrl;
+  const proto = config.trustProxy ? c.req.header('x-forwarded-proto')?.split(',')[0]?.trim() : undefined;
+  const scheme = proto === 'https' || proto === 'http' ? proto : new URL(c.req.url).protocol.replace(':', '');
+  return `${scheme}://${requestHost(c, config.trustProxy)}`;
+}

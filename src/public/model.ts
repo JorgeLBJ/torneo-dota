@@ -40,7 +40,7 @@ export function formatDayList(dates: string[]): string {
   return groups.length === 1 ? groups[0]! : `${groups.slice(0, -1).join(', ')} y ${groups[groups.length - 1]}`;
 }
 
-const shortDate = (date: string) => {
+export const shortDate = (date: string) => {
   const { month, day } = parts(date);
   return `${day} ${MONTHS_SHORT[month]}`;
 };

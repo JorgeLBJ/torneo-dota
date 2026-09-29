@@ -48,7 +48,7 @@ describe('site root', () => {
     const res = await t.get('/');
     expect(res.status).toBe(200);
     const body = await res.text();
-    expect(body).toContain('<title>Torneo Oct</title>');
+    expect(body).toContain('<title>Torneo Oct · Torneo de Dota 2</title>');
     expect(body).toContain('<h1>Torneo Oct</h1>');
     for (const label of ['Partidos', 'Posiciones', 'Playoffs', 'Reglas']) expect(body).toContain(`>${label}</button>`);
     for (const key of ['partidos', 'posiciones', 'playoffs', 'reglas']) expect(body).toContain(`data-tab="${key}"`);

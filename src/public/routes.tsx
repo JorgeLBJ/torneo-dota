@@ -5,7 +5,9 @@ import type { Clock } from '../clock.js';
 import type { AppConfig } from '../config.js';
 import type { Repository, Tournament } from '../db/repository.js';
 import { parentHostsFor } from '../domain/stream.js';
-import { clientKey, requestHost } from '../security.js';
+import { assetUrl } from '../assets.js';
+import { clientKey, publicOrigin, requestHost } from '../security.js';
+import { NO_TOURNAMENT_SHARE, buildShare, type Share } from './share.js';
 import type { Events } from '../events.js';
 import { loadState } from '../services/state.js';
 import { buildPublicModel } from './model.js';
@@ -15,14 +17,20 @@ import {
   PublicContent,
   PublicDocument,
   type PageLinks,
+  type PageMeta,
 } from './views.js';
 
 export interface PublicDeps {
   repo: Repository;
   events: Events;
-  config: Pick<AppConfig, 'heartbeatMs' | 'sseLimits' | 'streamParentHosts' | 'trustProxy'>;
+  config: Pick<AppConfig, 'heartbeatMs' | 'publicBaseUrl' | 'sseLimits' | 'streamParentHosts' | 'trustProxy'>;
   now: Clock;
 }
+
+const NOT_FOUND_SHARE: Share = {
+  title: 'Torneo no encontrado · torneo-dota',
+  description: 'Este torneo no existe o cambió de dirección.',
+};
 
 export const DEFAULT_HEARTBEAT_MS = 25_000;
 const DEFAULT_SSE_LIMITS = { global: 500, perIp: 10 };
@@ -53,11 +61,17 @@ export function publicApp({ repo, events, config, now }: PublicDeps) {
   /** Twitch embeds must name every page that frames the player: this host and, by default, Google Sites. */
   const parentHosts = (c: Context) => parentHostsFor(requestHost(c, config.trustProxy), config.streamParentHosts);
 
+  /** Head data for a page: the share text plus absolute URLs built from the public origin. */
+  const metaFor = (c: Context, share: Share, noindex = false): PageMeta => {
+    const origin = publicOrigin(c, config);
+    return { ...share, url: `${origin}${c.req.path}`, imageUrl: `${origin}${assetUrl('img/og.jpg')}`, noindex };
+  };
+
   const page = (c: Context, tournament: Tournament | undefined, links: PageLinks | undefined, status: 200 | 404 = 200) => {
     c.header('Cache-Control', 'no-cache');
     if (!tournament) {
       return c.html(
-        <PublicDocument title={status === 404 ? 'Torneo no encontrado' : 'Próximamente · Torneos'} links={links}>
+        <PublicDocument meta={metaFor(c, status === 404 ? NOT_FOUND_SHARE : NO_TOURNAMENT_SHARE, status === 404)} links={links}>
           {status === 404 ? <NotFoundContent /> : <ComingSoonContent />}
         </PublicDocument>,
         status,
@@ -65,7 +79,7 @@ export function publicApp({ repo, events, config, now }: PublicDeps) {
     }
     const { model, node } = content(tournament, parentHosts(c));
     return c.html(
-      <PublicDocument title={model.name} links={links}>
+      <PublicDocument meta={metaFor(c, buildShare(model))} links={links}>
         {node}
       </PublicDocument>,
     );

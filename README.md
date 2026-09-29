@@ -12,6 +12,7 @@ Aplicación web ligera y multitorneo para ligas de Dota 2. Genera un fixture de 
 - **Página pública en vivo** con estética de Dota 2 (interfaz en español): Partidos, En vivo, Posiciones, Playoffs, Reglas. Se actualiza sin recargar.
 - **Pestaña de transmisión**: un enlace de Kick, Twitch o YouTube por torneo, incrustado en la página pública.
 - **Varios torneos**: uno está *activo* y se muestra en `/`; además, cada torneo tiene su propia URL para el archivo histórico.
+- **Vista previa al compartir**: cada enlace público muestra en WhatsApp, Telegram o Discord una imagen y un texto que cambian según el estado del torneo (grupos, en vivo, semifinales, campeón). La imagen se regenera con `npm run render:og`.
 - **Zonas horarias**: las horas de los partidos se guardan en UTC; cada visitante ve su hora local.
 - **Panel de administración** (acceso con contraseña, varios administradores, todos con el mismo rol): torneos, reglas, equipos con emblema de héroe (127 héroes, retratos alojados en el propio proyecto), fixture, resultados, playoffs y usuarios.
 
@@ -73,6 +74,7 @@ El servidor lee estas variables de entorno:
 | `ADMIN_SETUP_TOKEN` | aleatorio en cada arranque | Código que exige `/admin/setup`. Si no se define, se genera uno aleatorio y se imprime una sola vez al arrancar (consulta la salida del servidor; con Docker, los registros del contenedor) |
 | `COOKIE_SECURE` | desactivado | `1` o `true`: marca la cookie de sesión como `Secure`. Actívalo cuando se sirva por HTTPS |
 | `TRUST_PROXY` | desactivado | `1` o `true`: confía en `X-Forwarded-For` / `X-Forwarded-Host` de un proxy inverso (ver más abajo) |
+| `PUBLIC_BASE_URL` | vacío | URL pública de la app (por ejemplo `https://torneo-dota.jpsolutions.app`, sin barra final) para las URL absolutas de la vista previa al compartir. Vacío: se usa el origen de la solicitud (respetando `TRUST_PROXY`) |
 | `STREAM_PARENT_HOSTS` | vacío | Hosts, separados por comas, autorizados a incrustar el reproductor de Twitch. Vacío significa el host de la solicitud más `sites.google.com` |
 
 `TRUST_PROXY` supone **exactamente un** proxy de confianza delante (por ejemplo, Caddy en el mismo servidor). El limitador de intentos de inicio de sesión usa entonces la entrada más a la derecha de `X-Forwarded-For`, la que agregó el proxy.
@@ -87,6 +89,7 @@ El servidor lee estas variables de entorno:
 | `/t/:slug` | Página pública de cualquier torneo (archivo); 404 en español si no existe |
 | `/partial`, `/t/:slug/partial` | El contenido de la página como fragmento HTML (se usa para la actualización en vivo) |
 | `/events`, `/t/:slug/events` | Flujo de eventos enviados por el servidor, SSE (`hello`, `change`, `ping`) |
+| `/robots.txt` | Permite las páginas públicas y excluye `/admin` |
 | `/healthz` | Estado de salud para Docker/monitoreo: `200 {"status":"ok"}` si la base responde, `503` si no |
 | `/admin` | Panel: abre los resultados del torneo activo |
 | `/admin/setup` | Configuración inicial (solo mientras no haya administradores; después, 404) |
@@ -173,6 +176,7 @@ docs/screenshots/     imágenes usadas en este README
 | `npm test` | Ejecuta todas las pruebas una vez (`vitest run`) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run seed:oct2026` | Carga el torneo de octubre de 2026 (idempotente) |
+| `npm run render:og` | Regenera `public/img/og.jpg` y `apple-touch-icon.png` con Chrome (necesita Chrome instalado o `CHROME_PATH`) |
 | `npm run fetch:heroes` | Descarga los retratos de héroes que falten en `public/heroes/` (ya están incluidos en el repositorio; usa `-- --force` para volver a descargarlos) |
 
 - **TDD:** primero se escribe la prueba que falla y después el código. Las pruebas de rutas usan `app.request()` sobre una base de datos en memoria.
