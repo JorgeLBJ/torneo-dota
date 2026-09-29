@@ -30,11 +30,11 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
 - Applies to: migrator, fixture generator, standings, playoffs, repository.
 
 ## Tasks
-- [ ] T1 Scaffold (package.json, tsconfig, vitest) + migration runner (TDD) + `001_init.sql` — route: delegated writer
-- [ ] T2 Round-robin fixture generator (circle method, byes, schedule slots) (TDD) — route: delegated writer
-- [ ] T3 Standings calculation + qualification + unresolved-tie flag (TDD) — route: delegated writer
-- [ ] T4 Playoff bracket (seeding, winners, champion) (TDD) — route: delegated writer
-- [ ] T5 Repository module (SQL) with in-memory DB tests — route: delegated writer
+- [x] T1 Scaffold (package.json, tsconfig, vitest) + migration runner (TDD) + `001_init.sql` — route: delegated writer
+- [x] T2 Round-robin fixture generator (circle method, byes, schedule slots) (TDD) — route: delegated writer
+- [x] T3 Standings calculation + qualification + unresolved-tie flag (TDD) — route: delegated writer
+- [x] T4 Playoff bracket (seeding, winners, champion) (TDD) — route: delegated writer
+- [x] T5 Repository module (SQL) with in-memory DB tests — route: delegated writer
 - [ ] T6 Backoffice: auth, tournaments, teams, fixture, results, playoffs — route: delegated writer
 - [ ] T7 Public site `/t/:slug` + SSE live updates, mockup design — route: delegated writer
 - [ ] T8 Seed script for the current tournament (7 teams, sheet fixture, Oct 3/10/11/17) — route: delegated writer
@@ -54,7 +54,12 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
 - Strategy: ask-on-risk. No git remote yet, so no PRs; work-unit commits on `feat/tournament-app`. Chain strategy asked once a remote exists.
 
 ## Progress / Evidence
-- (none yet)
+- T1 (9860a63): route delegated writer. RED: migrate.test.ts failed on missing module `src/db/migrate`; GREEN after implementing. Schema tests (schema.test.ts) written alongside 001_init.sql, so no separate RED observed for them. 15 tests.
+- T2 (e6c4121): route delegated writer. RED: fixture.test.ts failed on missing module; GREEN 55 total. Fixture tests cover n=2..8 plus 7-team schedule (4+3), insufficient slots error.
+- T3 (6b3cea2): route delegated writer. RED: standings.test.ts failed on missing module; GREEN after implementation. One test expectation (last5) was miscalculated in the test and corrected; 15 tests.
+- T4 (12e6832): route delegated writer. RED: playoffs.test.ts failed on missing module; GREEN 79 total. 9 tests.
+- T5 (see git log, `feat: add repository`): route delegated writer. RED: repository.test.ts failed on missing module; GREEN 94 total (6 files). 15 tests.
+- Assumptions: playoff auto-seeding also requires no unresolved tie inside the top 4 (seed order ambiguous); admin can assign semifinal teams manually and stored teams take precedence. Standings `unresolvedTie` only among teams with played > 0. `last5` is chronological (oldest first). Deleting a team referenced by matches fails on FK (no cascade).
 
 ## Next step
-T1.
+T6.
