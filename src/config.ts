@@ -9,6 +9,8 @@ export interface AppConfig {
   sseLimits?: { global: number; perIp: number };
   /** Ancestor hosts Twitch embeds must name (STREAM_PARENT_HOSTS). Empty: request host + sites.google.com. */
   streamParentHosts?: string[];
+  /** Code required by /admin/setup while no admin exists (from ADMIN_SETUP_TOKEN or generated at startup). */
+  setupToken?: string;
   /** Clock override for tests. */
   now?: () => Date;
 }

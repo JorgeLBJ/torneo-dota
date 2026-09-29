@@ -4,9 +4,8 @@ import type { AdminEnv, Deps } from '../context.js';
 import { readBody, str } from '../form.js';
 import { setFlash } from '../flash.js';
 import { renderPage } from '../render.js';
+import { checkNewPassword, checkUsername } from '../validate.js';
 import { UsersView } from '../views/auth.js';
-
-const USERNAME = /^[a-z0-9._-]{3,32}$/;
 
 export function userRoutes(deps: Deps) {
   const app = new Hono<AdminEnv>();
@@ -23,18 +22,16 @@ export function userRoutes(deps: Deps) {
 
   app.post('/usuarios', async (c) => {
     const body = await readBody(c);
-    const username = str(body, 'username').toLowerCase();
+    const checkedName = checkUsername(str(body, 'username'));
     const password = typeof body.password === 'string' ? body.password : '';
     const fail = (message: string) => {
       setFlash(c, 'error', message);
       return c.redirect('/admin/usuarios', 303);
     };
-    if (!USERNAME.test(username)) {
-      return fail('El usuario debe tener entre 3 y 32 caracteres: letras, números, punto, guion o guion bajo.');
-    }
-    if (password.length < 8 || password.length > 200) {
-      return fail('La contraseña debe tener al menos 8 caracteres.');
-    }
+    if (!checkedName.ok) return fail(checkedName.error);
+    const username = checkedName.value;
+    const checkedPassword = checkNewPassword(password);
+    if (!checkedPassword.ok) return fail(checkedPassword.error);
     if (repo.getAdminByUsername(username)) return fail(`Ya existe un usuario "${username}".`);
     repo.createAdmin(username, await hashPassword(password));
     setFlash(c, 'ok', `Usuario "${username}" agregado.`);

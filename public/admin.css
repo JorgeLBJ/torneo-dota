@@ -215,7 +215,8 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;overflow:hidde
 }
 
 /* Sidebar footer: the session and logout stay pinned to the bottom. */
-.side-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line)}
+.side-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line);display:grid;gap:8px}
+.btn.change-pass{gap:8px}
 .btn.logout{gap:8px}
 .confirm-modal{width:min(420px,calc(100vw - 32px));padding:22px;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--fg);box-shadow:0 20px 60px rgba(0,0,0,.6)}
 .confirm-modal::backdrop{background:rgba(0,0,0,.7)}
@@ -226,10 +227,10 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;overflow:hidde
 @media (max-width:760px){
   /* Compact top bar: the logout becomes an icon-only button beside the title, the session text is hidden. */
   aside{position:relative}
-  .brand{padding-right:56px}
-  .side-foot{position:absolute;top:8px;right:14px;margin:0;padding:0;border:0}
+  .brand{padding-right:104px}
+  .side-foot{position:absolute;top:8px;right:14px;margin:0;padding:0;border:0;display:flex;gap:6px}
   .side-foot small,.side-foot .logout-text{display:none}
-  aside .side-foot .btn.logout{width:auto;padding:0 10px}
+  aside .side-foot .btn.logout,aside .side-foot .btn.change-pass{width:auto;padding:0 10px}
 }
 
 .tsel small{display:flex;align-items:center;gap:8px}

@@ -35,7 +35,7 @@ export interface NavInfo {
   publicUrl?: string;
 }
 
-export type Section = 'torneos' | 'config' | 'reglas' | 'equipos' | 'fixture' | 'resultados' | 'playoffs' | 'usuarios';
+export type Section = 'torneos' | 'config' | 'reglas' | 'equipos' | 'fixture' | 'resultados' | 'playoffs' | 'usuarios' | 'cuenta';
 
 interface LayoutProps {
   title: string;
@@ -45,7 +45,7 @@ interface LayoutProps {
   flash?: Flash;
 }
 
-const SECTIONS: { key: Exclude<Section, 'torneos' | 'usuarios'>; path: string; label: string }[] = [
+const SECTIONS: { key: Exclude<Section, 'torneos' | 'usuarios' | 'cuenta'>; path: string; label: string }[] = [
   { key: 'config', path: 'config', label: 'Configuración' },
   { key: 'reglas', path: 'reglas', label: 'Reglas' },
   { key: 'equipos', path: 'equipos', label: 'Equipos' },
@@ -124,6 +124,13 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, active, admi
             </a>
           ) : null}
           <div class="side-foot">
+            <a class="btn sm change-pass" href="/admin/cuenta" aria-label="Cambiar contraseña" title="Cambiar contraseña">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="7.5" cy="15.5" r="4.5" />
+                <path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2" />
+              </svg>
+              <span class="logout-text">Cambiar contraseña</span>
+            </a>
             <form method="post" action="/admin/logout" class="stack">
               <small class="muted">Sesión: {admin.username}</small>
               <button class="btn logout" type="submit" data-logout-open aria-label="Cerrar sesión">

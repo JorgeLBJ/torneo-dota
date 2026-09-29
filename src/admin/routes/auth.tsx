@@ -1,3 +1,4 @@
+import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
@@ -15,9 +16,20 @@ export const SESSION_COOKIE = 'sid';
 let dummyHash: Promise<string> | undefined;
 const getDummyHash = () => (dummyHash ??= hashPassword('not-a-real-password'));
 
+/** Signs the admin in: creates a session and sets its cookie. */
+export function startSession(c: Context, deps: Deps, adminId: number): void {
+  const token = createSession(deps.repo, adminId, deps.now());
+  setCookie(c, SESSION_COOKIE, token, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'Lax',
+    secure: deps.config.secureCookies,
+    maxAge: SESSION_TTL_MS / 1000,
+  });
+}
+
 export function loginRoutes(deps: Deps) {
   const app = new Hono<AdminEnv>();
-  const now = deps.now;
 
   app.get('/login', (c) => c.html(<LoginPage flash={takeFlash(c)} />));
 
@@ -37,14 +49,7 @@ export function loginRoutes(deps: Deps) {
     }
 
     deps.limiter.reset(key);
-    const token = createSession(deps.repo, admin.id, now());
-    setCookie(c, SESSION_COOKIE, token, {
-      path: '/',
-      httpOnly: true,
-      sameSite: 'Lax',
-      secure: deps.config.secureCookies,
-      maxAge: SESSION_TTL_MS / 1000,
-    });
+    startSession(c, deps, admin.id);
     return c.redirect('/admin', 303);
   });
 

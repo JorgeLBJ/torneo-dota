@@ -226,6 +226,8 @@ export function createRepository(db: Database.Database) {
     listAdmins: db.prepare(`SELECT ${ADMIN_COLS} FROM admins ORDER BY id`),
     countAdmins: db.prepare('SELECT COUNT(*) FROM admins').pluck(),
     deleteAdmin: db.prepare('DELETE FROM admins WHERE id = ?'),
+    setAdminPassword: db.prepare('UPDATE admins SET password_hash = ? WHERE id = ?'),
+    deleteOtherSessions: db.prepare('DELETE FROM sessions WHERE admin_id = ? AND id <> ?'),
 
     insertSession: db.prepare('INSERT INTO sessions (id, admin_id, expires_at) VALUES (?, ?, ?)'),
     validSession: db.prepare(`SELECT ${SESSION_COLS} FROM sessions WHERE id = ? AND expires_at > ?`),
@@ -288,6 +290,13 @@ export function createRepository(db: Database.Database) {
   const setActiveTx = db.transaction((id: number) => {
     q.clearActive.run();
     if (q.markActive.run(id).changes === 0) throw new Error('Tournament not found');
+  });
+
+  const createFirstAdminTx = db.transaction((username: string, passwordHash: string): Admin | null => {
+    // Re-checked inside the transaction: of two setups that raced past the first check, only one gets here first.
+    if ((q.countAdmins.get() as number) > 0) return null;
+    const info = q.insertAdmin.run(username, passwordHash);
+    return q.adminById.get(Number(info.lastInsertRowid)) as Admin;
   });
 
   const inTransaction = <T>(work: () => T): T => db.transaction(work)();
@@ -427,6 +436,13 @@ export function createRepository(db: Database.Database) {
       const info = q.insertAdmin.run(username, passwordHash);
       return requireRow(q.adminById.get(Number(info.lastInsertRowid)) as Admin | undefined, 'Admin');
     },
+    /** Creates the first admin, or returns null (creating nothing) if one already exists. Atomic. */
+    createFirstAdmin(username: string, passwordHash: string): Admin | null {
+      return createFirstAdminTx(username, passwordHash);
+    },
+    setAdminPassword(id: number, passwordHash: string): void {
+      q.setAdminPassword.run(passwordHash, id);
+    },
     getAdminById: (id: number) => q.adminById.get(id) as Admin | undefined,
     getAdminByUsername: (username: string) => q.adminByUsername.get(username) as Admin | undefined,
     listAdmins: () => q.listAdmins.all() as Admin[],
@@ -441,6 +457,10 @@ export function createRepository(db: Database.Database) {
     },
     /** `now` is an ISO-8601 UTC string, compared lexicographically with expires_at. */
     getValidSession: (id: string, now: string) => q.validSession.get(id, now) as Session | undefined,
+    /** Deletes every session of the admin except the one with this (hashed) id. */
+    deleteOtherSessions(adminId: number, keepId: string): void {
+      q.deleteOtherSessions.run(adminId, keepId);
+    },
     deleteSession(id: string): void {
       q.deleteSession.run(id);
     },

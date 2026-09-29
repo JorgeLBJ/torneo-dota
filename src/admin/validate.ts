@@ -21,3 +21,18 @@ export function checkSlug(repo: Repository, slug: string, ownId?: number): Check
   if (existing && existing.id !== ownId) return fail(`Ya existe un torneo con la URL "${value}".`);
   return ok(value);
 }
+
+const USERNAME = /^[a-z0-9._-]{3,32}$/;
+
+/** Lower-cases and validates an admin username. */
+export function checkUsername(raw: string): Checked<string> {
+  const value = raw.trim().toLowerCase();
+  return USERNAME.test(value)
+    ? ok(value)
+    : fail('El usuario debe tener entre 3 y 32 caracteres: letras, números, punto, guion o guion bajo.');
+}
+
+/** A password to set (not the one to verify): 8 to 200 characters. */
+export function checkNewPassword(password: string): Checked<string> {
+  return password.length >= 8 && password.length <= 200 ? ok(password) : fail('La contraseña debe tener al menos 8 caracteres.');
+}

@@ -26,10 +26,10 @@ export interface TestApp {
   login(username?: string, password?: string): Promise<string>;
 }
 
-export async function makeApp(config: Partial<AppConfig> = {}): Promise<TestApp> {
+export async function makeApp(config: Partial<AppConfig> = {}, options: { withAdmin?: boolean } = {}): Promise<TestApp> {
   const db = openDatabase(':memory:');
   const created = createApp({ db, config: { secureCookies: false, trustProxy: false, ...config } });
-  await ensureInitialAdmin(created.repo, PASSWORD);
+  if (options.withAdmin !== false) await ensureInitialAdmin(created.repo, PASSWORD);
 
   const send: TestApp['send'] = async (method, path, opts = {}) => {
     const headers: Record<string, string> = { ...opts.headers };

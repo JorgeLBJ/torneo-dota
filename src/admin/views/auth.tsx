@@ -28,6 +28,69 @@ export const LoginPage: FC<{ flash?: Flash }> = ({ flash }) => (
   </AuthLayout>
 );
 
+export const SetupPage: FC<{ flash?: Flash }> = ({ flash }) => (
+  <AuthLayout title="Configuración inicial">
+    <div class="login">
+      <form class="card" method="post" action="/admin/setup">
+        <div class="brand">
+          Torneos <em>Admin</em>
+        </div>
+        <p class="muted" style="margin:0;font-size:13px">
+          Crea el primer administrador. El código de setup aparece en los registros del servidor.
+        </p>
+        <FlashMessage flash={flash} />
+        <label class="f">
+          Usuario
+          <input name="username" autocomplete="username" required minlength={3} maxlength={32} autofocus />
+        </label>
+        <label class="f">
+          Contraseña (mínimo 8 caracteres)
+          <input name="password" type="password" autocomplete="new-password" required minlength={8} maxlength={200} />
+        </label>
+        <label class="f">
+          Confirmar contraseña
+          <input name="confirm" type="password" autocomplete="new-password" required minlength={8} maxlength={200} />
+        </label>
+        <label class="f">
+          Código de setup
+          <input name="code" autocomplete="off" spellcheck={false} required />
+        </label>
+        <button class="btn pri" type="submit">
+          Crear administrador
+        </button>
+      </form>
+    </div>
+  </AuthLayout>
+);
+
+export const AccountView: FC = () => (
+  <>
+    <div class="head">
+      <div>
+        <h1>Cambiar contraseña</h1>
+        <p class="sub">Al cambiarla se cierran tus otras sesiones abiertas. Esta sigue activa.</p>
+      </div>
+    </div>
+    <form class="card stack narrow" method="post" action="/admin/cuenta">
+      <label class="f">
+        Contraseña actual
+        <input name="current" type="password" autocomplete="current-password" required />
+      </label>
+      <label class="f">
+        Nueva contraseña (mínimo 8 caracteres)
+        <input name="next" type="password" autocomplete="new-password" required minlength={8} maxlength={200} />
+      </label>
+      <label class="f">
+        Confirmar contraseña
+        <input name="confirm" type="password" autocomplete="new-password" required minlength={8} maxlength={200} />
+      </label>
+      <button class="btn pri" type="submit">
+        Cambiar contraseña
+      </button>
+    </form>
+  </>
+);
+
 export const TooManyAttemptsPage: FC = () => (
   <AuthLayout title="Demasiados intentos">
     <div class="login">

@@ -98,11 +98,12 @@ describe('sessions and bootstrap', () => {
     expect(await verifyPassword('a-strong-password', admin!.passwordHash)).toBe(true);
   });
 
-  it('refuses to start without ADMIN_PASSWORD when there is no admin', async () => {
-    await expect(ensureInitialAdmin(repo, undefined)).rejects.toThrow(/ADMIN_PASSWORD/);
-    await expect(ensureInitialAdmin(repo, '')).rejects.toThrow(/ADMIN_PASSWORD/);
-    repo.createAdmin('someone', 'hash');
-    await ensureInitialAdmin(repo, undefined);
+  it('reports what happened instead of refusing to start when there is no ADMIN_PASSWORD', async () => {
+    expect(await ensureInitialAdmin(repo, undefined)).toBe('setup-required');
+    expect(await ensureInitialAdmin(repo, '')).toBe('setup-required');
+    expect(repo.countAdmins()).toBe(0);
+    expect(await ensureInitialAdmin(repo, 'a-strong-password')).toBe('created');
+    expect(await ensureInitialAdmin(repo, undefined)).toBe('exists');
   });
 
   it('stores only a hash of the session token and expires after 7 days', () => {

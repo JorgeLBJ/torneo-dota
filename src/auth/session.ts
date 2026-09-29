@@ -19,6 +19,11 @@ export function resolveSession(repo: Repository, token: string, now: Date = new 
   return session ? repo.getAdminById(session.adminId) : undefined;
 }
 
+/** Ends every other session of the admin; the one belonging to `keepToken` stays. */
+export function destroyOtherSessions(repo: Repository, adminId: number, keepToken: string): void {
+  repo.deleteOtherSessions(adminId, sessionId(keepToken));
+}
+
 export function destroySession(repo: Repository, token: string): void {
   repo.deleteSession(sessionId(token));
 }
