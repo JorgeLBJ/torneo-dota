@@ -29,7 +29,7 @@ A lightweight, multi-tournament web app for Dota 2 leagues. Set up a round-robin
 
 ```bash
 npm ci
-ADMIN_PASSWORD='choose-a-password' npm run dev
+npm run dev
 ```
 
 Then open:
@@ -37,9 +37,18 @@ Then open:
 | URL | What |
 | --- | --- |
 | <http://localhost:3000/> | Public page of the active tournament ("Próximamente" until one is active) |
-| <http://localhost:3000/admin> | Backoffice. Sign in as user `admin` with the password you set |
+| <http://localhost:3000/admin> | Backoffice. On a fresh database it sends you to the first-run setup |
 
-- `ADMIN_PASSWORD` is only used to create the **first** admin, when the database has none. The server refuses to start without it on an empty database. Afterwards, manage users in the backoffice (**Usuarios**; passwords are 8 to 200 characters).
+**First run: create the first admin.** Pick one:
+
+| Way | How |
+| --- | --- |
+| Setup page (default) | Start the server. It prints `Setup required: open /admin/setup and use code: <code>`. Open `/admin/setup`, enter a username, a password (8 to 200 characters, confirmed) and that code |
+| `ADMIN_PASSWORD` | Start with `ADMIN_PASSWORD='choose-a-password' npm run dev`: the admin `admin` is created at startup and setup is never shown |
+
+- The generated setup code is random (192 bits), printed **once** in the server output, and different on every start. To use your own, set `ADMIN_SETUP_TOKEN`.
+- `/admin/setup` exists only while there are no admins; afterwards it returns 404. Attempts are rate-limited like the login.
+- Afterwards manage users in the backoffice (**Usuarios**). Each admin can change their own password from the sidebar (**Cambiar contraseña**), which also signs out their other sessions.
 - The SQLite database is created at `./data/torneos.db` on first run and migrated automatically.
 - Optional demo data: `npm run seed:oct2026` creates *Torneo All vs All · Oct 2026* (7 teams, 21 matches) and makes it active. It is safe to run twice (it does nothing if the tournament exists).
 
@@ -60,7 +69,8 @@ The server reads these environment variables:
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP port |
 | `DATABASE_PATH` | `./data/torneos.db` | SQLite file (its folder is created if missing) |
-| `ADMIN_PASSWORD` | none | Password of the first admin (`admin`). Required only while no admin exists |
+| `ADMIN_PASSWORD` | none | Optional. If set and there are no admins, creates the admin `admin` with this password at startup. Without it, the first admin is created on `/admin/setup` |
+| `ADMIN_SETUP_TOKEN` | random per start | Code required by `/admin/setup`. If unset, a random one is generated and printed once at startup (see the server output; with Docker, the container logs) |
 | `COOKIE_SECURE` | off | `1` or `true`: mark the session cookie `Secure`. Set it when served over HTTPS |
 | `TRUST_PROXY` | off | `1` or `true`: trust `X-Forwarded-For` / `X-Forwarded-Host` from a reverse proxy (see below) |
 | `STREAM_PARENT_HOSTS` | empty | Comma-separated hosts allowed to frame the Twitch player. Empty means the request host plus `sites.google.com` |
@@ -78,6 +88,8 @@ The server reads these environment variables:
 | `/partial`, `/t/:slug/partial` | The page content as an HTML fragment (used for live refresh) |
 | `/events`, `/t/:slug/events` | Server-sent events stream (`hello`, `change`, `ping`) |
 | `/admin` | Backoffice: opens the active tournament's results |
+| `/admin/setup` | First-run setup (only while there are no admins; otherwise 404) |
+| `/admin/cuenta` | Change your own password |
 | `/admin/torneos`, `/admin/usuarios` | Tournaments list, admin users |
 | `/admin/t/:id/{config,reglas,equipos,fixture,resultados,playoffs}` | Per-tournament screens |
 | `/assets/*` | CSS, JS, images and hero portraits |
@@ -165,7 +177,7 @@ docs/screenshots/     images used in this README
 
 ## Deployment
 
-**Docker deployment: coming soon**, behind an existing Caddy reverse proxy. This repository does not contain Docker files yet.
+**Docker deployment: coming soon**, behind an existing Caddy reverse proxy. This repository does not contain Docker files yet. Once it does, the first-run setup code will be in the container logs (`docker compose logs`); alternatively set `ADMIN_PASSWORD` or `ADMIN_SETUP_TOKEN` in the environment.
 
 Settings needed behind a proxy that terminates HTTPS:
 
