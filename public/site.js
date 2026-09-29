@@ -5,7 +5,7 @@
   var app = document.getElementById('app');
   if (!app) return;
 
-  var TABS = ['partidos', 'posiciones', 'playoffs', 'reglas'];
+  var TABS = ['partidos', 'envivo', 'posiciones', 'playoffs', 'reglas'];
   var state = { tab: tabFromHash() || TABS[0], filter: '' };
 
   function tabFromHash() {
@@ -128,10 +128,49 @@
   var eventsUrl = app.getAttribute('data-events');
   var partialUrl = app.getAttribute('data-partial');
 
+  // When the stream is unchanged, everything around its player is replaced but the player itself stays
+  // in place: moving or re-creating an iframe would restart the video on every result update.
+  function patchKeepingPlayer(html) {
+    var next = document.createElement('div');
+    next.innerHTML = html;
+    var oldPanel = app.querySelector('.panel[data-panel="envivo"]');
+    var newPanel = next.querySelector('.panel[data-panel="envivo"]');
+    var oldFrame = oldPanel && oldPanel.querySelector('[data-stream-frame]');
+    var newFrame = newPanel && newPanel.querySelector('[data-stream-frame]');
+    if (!oldFrame || !newFrame || oldFrame.parentNode !== oldPanel || newFrame.parentNode !== newPanel) return false;
+    if (oldFrame.getAttribute('data-embed') !== newFrame.getAttribute('data-embed')) return false;
+    var oldMain = app.querySelector('main');
+    var newMain = next.querySelector('main');
+    var oldHero = app.querySelector('.hero');
+    var newHero = next.querySelector('.hero');
+    var oldBar = app.querySelector('.tabs-bar');
+    var newBar = next.querySelector('.tabs-bar');
+    if (!oldMain || !newMain || !oldHero || !newHero || !oldBar || !newBar) return false;
+
+    oldHero.parentNode.replaceChild(newHero, oldHero);
+    oldBar.parentNode.replaceChild(newBar, oldBar);
+    Array.prototype.slice.call(newMain.querySelectorAll('.panel')).forEach(function (panel) {
+      var key = panel.getAttribute('data-panel');
+      var current = oldMain.querySelector('.panel[data-panel="' + key + '"]');
+      if (key === 'envivo' || !current) return;
+      current.parentNode.replaceChild(panel, current);
+    });
+    var around = Array.prototype.slice.call(newPanel.children);
+    var at = around.indexOf(newFrame);
+    Array.prototype.slice.call(oldPanel.children).forEach(function (child) {
+      if (child !== oldFrame) oldPanel.removeChild(child);
+    });
+    around.forEach(function (child, i) {
+      if (i < at) oldPanel.insertBefore(child, oldFrame);
+      else if (i > at) oldPanel.appendChild(child);
+    });
+    return true;
+  }
+
   function swap(html) {
     var x = window.scrollX;
     var y = window.scrollY;
-    app.innerHTML = html;
+    if (!patchKeepingPlayer(html)) app.innerHTML = html;
     apply();
     var heading = app.querySelector('h1');
     if (heading) document.title = heading.textContent;

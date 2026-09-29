@@ -3,7 +3,8 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { AppConfig } from '../config.js';
 import type { Repository, Tournament } from '../db/repository.js';
-import { clientKey } from '../security.js';
+import { parentHostsFor } from '../domain/stream.js';
+import { clientKey, requestHost } from '../security.js';
 import type { Events } from '../events.js';
 import { loadState } from '../services/state.js';
 import { buildPublicModel } from './model.js';
@@ -18,7 +19,7 @@ import {
 export interface PublicDeps {
   repo: Repository;
   events: Events;
-  config: Pick<AppConfig, 'heartbeatMs' | 'now' | 'sseLimits' | 'trustProxy'>;
+  config: Pick<AppConfig, 'heartbeatMs' | 'now' | 'sseLimits' | 'streamParentHosts' | 'trustProxy'>;
 }
 
 export const DEFAULT_HEARTBEAT_MS = 25_000;
@@ -39,12 +40,16 @@ const ROOT_LINKS: PageLinks = { events: '/events', partial: '/partial' };
 export function publicApp({ repo, events, config }: PublicDeps) {
   const app = new Hono();
 
-  const content = (tournament: Tournament) => {
+  const content = (tournament: Tournament, parentHosts: readonly string[]) => {
     const model = buildPublicModel(loadState(repo, tournament), repo.listScheduleDays(tournament.id), {
       now: config.now?.() ?? new Date(),
+      parentHosts,
     });
     return { model, node: <PublicContent model={model} /> };
   };
+
+  /** Twitch embeds must name every page that frames the player: this host and, by default, Google Sites. */
+  const parentHosts = (c: Context) => parentHostsFor(requestHost(c, config.trustProxy), config.streamParentHosts);
 
   const page = (c: Context, tournament: Tournament | undefined, links: PageLinks | undefined, status: 200 | 404 = 200) => {
     c.header('Cache-Control', 'no-cache');
@@ -56,7 +61,7 @@ export function publicApp({ repo, events, config }: PublicDeps) {
         status,
       );
     }
-    const { model, node } = content(tournament);
+    const { model, node } = content(tournament, parentHosts(c));
     return c.html(
       <PublicDocument title={model.name} links={links}>
         {node}
@@ -67,7 +72,7 @@ export function publicApp({ repo, events, config }: PublicDeps) {
   const fragment = (c: Context, tournament: Tournament | undefined) => {
     c.header('Cache-Control', 'no-cache');
     if (!tournament) return c.html(<ComingSoonContent />);
-    return c.html(content(tournament).node);
+    return c.html(content(tournament, parentHosts(c)).node);
   };
 
   app.get('/', (c) => page(c, repo.getActiveTournament(), ROOT_LINKS));

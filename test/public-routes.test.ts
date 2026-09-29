@@ -217,6 +217,75 @@ describe('times for visitors in any zone', () => {
   });
 });
 
+describe('live stream tab', () => {
+  const tabKeys = (body: string) => [...body.matchAll(/data-tab="([a-z]+)"/g)].map((m) => m[1]);
+
+  it('puts "En vivo" second, right after Partidos, with the hash #envivo', async () => {
+    const body = await html('/');
+    expect(tabKeys(body)).toEqual(['partidos', 'envivo', 'posiciones', 'playoffs', 'reglas']);
+    expect(body).toContain('data-panel="envivo"');
+  });
+
+  it('shows a themed placeholder and no red dot while no stream is set', async () => {
+    const body = await html('/');
+    expect(body).toContain('Transmisión no disponible');
+    expect(body).toContain('Cuando haya transmisión en vivo aparecerá aquí.');
+    expect(body).not.toContain('<iframe');
+    expect(body).not.toContain('tab-dot');
+  });
+
+  it('embeds a Kick channel in a responsive player with an open link and a red dot on the tab', async () => {
+    t.repo.updateTournament(tournament.id, { streamUrl: 'https://kick.com/mychannel' });
+    const body = await html('/');
+    expect(body).toContain('<iframe src="https://player.kick.com/mychannel"');
+    expect(body).toContain('allow="autoplay; fullscreen; picture-in-picture"');
+    expect(body).toMatch(/<iframe[^>]* allowfullscreen/);
+    expect(body).toContain('data-stream-frame');
+    expect(body).toContain('data-embed="https://player.kick.com/mychannel"');
+    expect(body).toMatch(/<a href="https:\/\/kick\.com\/mychannel" target="_blank" rel="noopener">\s*Abrir en Kick\s*<\/a>/);
+    expect(body).toMatch(/data-tab="envivo">\s*En vivo\s*<span class="tab-dot"/);
+    expect(body).not.toContain('Transmisión no disponible');
+  });
+
+  it('gives Twitch the serving host and Google Sites as parents', async () => {
+    t.repo.updateTournament(tournament.id, { streamUrl: 'https://www.twitch.tv/some_channel' });
+    const body = await html('/');
+    expect(body).toContain('src="https://player.twitch.tv/?channel=some_channel&amp;parent=localhost&amp;parent=sites.google.com&amp;muted=true"');
+    expect(body).toContain('Abrir en Twitch');
+  });
+
+  it('honours STREAM_PARENT_HOSTS', async () => {
+    const custom = await makeApp({ streamParentHosts: ['torneo.example.com', 'abc.googleusercontent.com'] });
+    const cup = custom.repo.createTournament({ name: 'Cup', slug: 'cup' });
+    custom.repo.setActiveTournament(cup.id);
+    custom.repo.updateTournament(cup.id, { streamUrl: 'twitch.tv/some_channel' });
+    const body = await (await custom.get('/')).text();
+    expect(body).toContain('parent=torneo.example.com&amp;parent=abc.googleusercontent.com&amp;muted=true');
+    custom.db.close();
+  });
+
+  it('never renders the raw stored URL or anything unvalidated', async () => {
+    t.db.prepare("UPDATE tournaments SET stream_url = 'javascript:alert(1)' WHERE id = ?").run(tournament.id);
+    let body = await html('/');
+    expect(body).not.toContain('javascript:');
+    expect(body).not.toContain('<iframe');
+    expect(body).toContain('Transmisión no disponible');
+    t.repo.updateTournament(tournament.id, { streamUrl: 'https://kick.com/mychannel?x="><script>alert(1)</script>' });
+    body = await html('/');
+    expect(body).not.toContain('<script>alert(1)');
+    expect(body).toContain('src="https://player.kick.com/mychannel"');
+  });
+
+  it('is part of the live fragment, and public pages stay frameable with a player on them', async () => {
+    t.repo.updateTournament(tournament.id, { streamUrl: 'https://youtu.be/dQw4w9WgXcQ' });
+    const res = await t.get('/partial');
+    expect(await res.text()).toContain('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+    const page = await t.get('/');
+    expect(page.headers.get('content-security-policy')).toBeNull();
+    expect(page.headers.get('x-frame-options')).toBeNull();
+  });
+});
+
 describe('partial', () => {
   it('returns the content fragment without a document shell', async () => {
     const body = await html('/t/torneo-oct/partial');

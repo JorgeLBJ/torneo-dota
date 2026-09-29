@@ -91,6 +91,18 @@ html[data-live="on"] .live { display: inline-flex; }
 .tab[aria-selected="true"]::after { content: ""; position: absolute; left: 18%; right: 18%; bottom: -1px; height: 2px;
   background: linear-gradient(90deg, transparent, var(--gold), transparent); }
 
+/* ---------- Live stream ---------- */
+.tab-dot { display: inline-block; width: 7px; height: 7px; margin-left: 8px; vertical-align: middle; border-radius: 50%; background: var(--crimson); box-shadow: 0 0 0 0 rgba(194,60,42,.7); animation: pulse 2s infinite; }
+@media (prefers-reduced-motion: reduce) { .tab-dot { animation: none; } }
+.stream-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border: 1px solid var(--line-2); overflow: hidden; }
+.stream-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.stream-foot { margin: 0; text-align: center; font: 600 14px/1 var(--fl); letter-spacing: .14em; text-transform: uppercase; }
+.stream-empty { position: relative; isolation: isolate; display: grid; gap: 8px; place-content: center; justify-items: center; min-height: 280px; padding: 32px 16px; text-align: center; border: 1px solid var(--line-2); overflow: hidden; }
+.stream-empty::before { content: ""; position: absolute; inset: 0; z-index: -2; background: url("img/hero-bg.jpg") center 35% / cover no-repeat; filter: grayscale(.6) brightness(.35); }
+.stream-empty::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(7,8,10,.5), rgba(7,8,10,.85)); }
+.stream-empty strong { font: 800 22px/1.1 var(--fd); letter-spacing: .08em; text-transform: uppercase; color: var(--gold-hi); }
+.stream-empty span { font: 500 16px/1.4 var(--fl); letter-spacing: .06em; color: var(--muted); }
+
 main { padding: 30px 16px 70px; }
 .panel { display: none; gap: 26px; }
 .panel.on { display: grid; }
@@ -263,7 +275,8 @@ td.pts { font: 800 22px/1 var(--fd); color: var(--gold-hi); }
   .phases small { letter-spacing: .12em; font-size: 10px; }
   .phases b { font-size: 13px; }
   .tabs { padding: 0 4px; justify-content: space-between; gap: 0; }
-  .tab { flex: 1 1 auto; min-width: 0; padding: 14px 4px; font-size: 11.5px; letter-spacing: .04em; }
+  .tab { flex: 1 1 auto; min-width: 0; padding: 14px 3px; font-size: 10.5px; letter-spacing: .02em; }
+  .tab-dot { margin-left: 4px; }
   .tab[aria-selected="true"]::after { left: 10%; right: 10%; }
   main { padding: 22px 12px 56px; }
   .side, .side.b { padding-inline: 10px; }

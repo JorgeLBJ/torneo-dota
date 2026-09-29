@@ -1,4 +1,5 @@
 import type { Match, ScheduleDay, Team, TiebreakerKey } from '../db/repository.js';
+import { describeStream, type StreamView } from '../domain/stream.js';
 import { zonedToUtc } from '../format/timezone.js';
 import type { QualificationStatus, StandingRow } from '../domain/standings.js';
 import { renderRulebook, type RulebookBlock } from '../markdown.js';
@@ -124,6 +125,8 @@ export interface PublicModel {
   /** IANA zone the server-rendered times are shown in (visitors' browsers re-render in their own). */
   timezone: string;
   kicker: string;
+  /** The tournament's live stream, ready to embed, or null. */
+  stream: StreamView | null;
   phases: PublicPhase[];
   progress: { played: number; total: number; percent: number };
   teams: Team[];
@@ -364,7 +367,7 @@ function buildRules(state: TournamentState): PublicModel['rules'] {
   };
 }
 
-export function buildPublicModel(state: TournamentState, scheduleDays: ScheduleDay[], options: { now?: Date } = {}): PublicModel {
+export function buildPublicModel(state: TournamentState, scheduleDays: ScheduleDay[], options: { now?: Date; parentHosts?: readonly string[] } = {}): PublicModel {
   const { tournament, groupMatches } = state;
   const { live, next: nextRound } = liveAndNext(groupMatches, options.now ?? new Date());
   const played = groupMatches.length - state.pendingGroup;
@@ -378,6 +381,7 @@ export function buildPublicModel(state: TournamentState, scheduleDays: ScheduleD
     slug: tournament.slug,
     timezone: tournament.timezone,
     kicker,
+    stream: describeStream(tournament.streamUrl, options.parentHosts ?? ['sites.google.com']),
     phases: buildPhases(state, scheduleDays),
     progress: {
       played,

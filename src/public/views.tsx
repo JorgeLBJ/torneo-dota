@@ -19,6 +19,7 @@ const FONTS =
 /** Tab keys double as the URL hash, so a shared link opens the right tab. */
 export const TABS = [
   { key: 'partidos', label: 'Partidos' },
+  { key: 'envivo', label: 'En vivo' },
   { key: 'posiciones', label: 'Posiciones' },
   { key: 'playoffs', label: 'Playoffs' },
   { key: 'reglas', label: 'Reglas' },
@@ -245,6 +246,43 @@ const MatchesPanel: FC<{ model: PublicModel }> = ({ model }) => (
     </div>
   </>
 );
+
+// ---------- Live stream ----------
+
+// The player is a direct child of its panel and has a stable `data-embed`, so site.js can keep the very same
+// iframe element across live refreshes (moving or re-creating an iframe would restart the video).
+const StreamPanel: FC<{ model: PublicModel }> = ({ model }) => {
+  const { stream } = model;
+  return (
+    <>
+      <Section title="En vivo" sub={stream?.label} />
+      {stream ? (
+        <>
+          <div class="stream-frame" data-stream-frame data-embed={stream.embedUrl}>
+            <iframe
+              src={stream.embedUrl}
+              title={`Transmisión en vivo en ${stream.label}`}
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowfullscreen
+              loading="lazy"
+              referrerpolicy="strict-origin-when-cross-origin"
+            ></iframe>
+          </div>
+          <p class="stream-foot">
+            <a href={stream.openUrl} target="_blank" rel="noopener">
+              Abrir en {stream.label}
+            </a>
+          </p>
+        </>
+      ) : (
+        <div class="stream-empty">
+          <strong>Transmisión no disponible</strong>
+          <span>Cuando haya transmisión en vivo aparecerá aquí.</span>
+        </div>
+      )}
+    </>
+  );
+};
 
 // ---------- Standings ----------
 
@@ -483,6 +521,7 @@ export const PublicContent: FC<{ model: PublicModel }> = ({ model }) => (
         {TABS.map((tab, i) => (
           <button type="button" class="tab" role="tab" aria-selected={i === 0 ? 'true' : 'false'} data-tab={tab.key}>
             {tab.label}
+            {tab.key === 'envivo' && model.stream ? <span class="tab-dot" role="img" aria-label="Transmisión activa"></span> : null}
           </button>
         ))}
       </nav>
@@ -490,6 +529,9 @@ export const PublicContent: FC<{ model: PublicModel }> = ({ model }) => (
     <main class="wrap">
       <section class="panel on" id="p-partidos" role="tabpanel" data-panel="partidos">
         <MatchesPanel model={model} />
+      </section>
+      <section class="panel" id="p-envivo" role="tabpanel" data-panel="envivo">
+        <StreamPanel model={model} />
       </section>
       <section class="panel" id="p-posiciones" role="tabpanel" data-panel="posiciones">
         <StandingsPanel model={model} />
