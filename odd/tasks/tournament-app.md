@@ -40,6 +40,13 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
 - [ ] T8 Seed script for the current tournament (7 teams, sheet fixture, Oct 3/10/11/17) — route: delegated writer
 - [ ] T9 Dockerfile + docker-compose (+ Caddy once domain known) — route: delegated writer
 
+## Stakeholder feedback on mockups (2026-09-29)
+- Rules need their own larger section: backoffice "Rules" screen (points per win/loss, ordered tiebreakers, format, free-text rulebook) + public "Rules" tab. Accepted.
+- Fixture must support more/fewer teams and extra rounds: generator already adapts to N teams; add single/double round-robin option and manual "add round" / "add match" (e.g. tiebreaker match). Accepted.
+- Each team gets a hero emblem (Dota 2 hero portrait) — proposed, pending confirmation.
+- Proposed in mockup, NOT yet confirmed: BO1/BO3 series, 2/8 qualifiers, allow draws.
+- Public site style: Dota 2 look (Cinzel + Barlow, black/gold, Radiant green vs Dire red). Valve CDN images to be self-hosted in production.
+
 ## Acceptance criteria
 - Standings and playoffs derive only from match results (no stored points).
 - Seeded current tournament reproduces the sheet's 21-match fixture exactly.
