@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup vista previa</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+  :root { --gold: #c8aa6e; --gold-hi: #f0dcaa; --bg: #07080a; --wa-bg: #0b141a; --wa-bubble: #005c4b; --wa-card: #025144; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #1a1d21; color: #e8e4dc; font: 15px/1.5 "Barlow", system-ui, sans-serif; }
+  .wrap { max-width: 1320px; margin: 0 auto; padding: 28px 16px 60px; display: grid; gap: 34px; }
+  h1 { margin: 0; font: 700 22px "Barlow Condensed"; letter-spacing: .12em; text-transform: uppercase; color: #9aa0a6; }
+  h2 { margin: 0 0 12px; font: 600 15px "Barlow Condensed"; letter-spacing: .14em; text-transform: uppercase; color: #9aa0a6; }
+
+  /* ---------- OG image 1200x630 (shown scaled) ---------- */
+  .og-frame { width: 100%; max-width: 1200px; aspect-ratio: 1200 / 630; container-type: inline-size; border-radius: 6px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+  .og { position: relative; width: 100%; height: 100%; isolation: isolate; display: grid; place-items: center; text-align: center; }
+  .og::before { content: ""; position: absolute; inset: 0; z-index: -2;
+    background: url("file:///F:/PROYECTOS_NODE/torneo-dota/public/img/hero-bg.jpg") center 40% / cover; }
+  .og::after { content: ""; position: absolute; inset: 0; z-index: -1;
+    background: linear-gradient(90deg, rgba(109,191,75,.22), transparent 35%, transparent 65%, rgba(210,69,47,.26)),
+                radial-gradient(60% 70% at 50% 50%, rgba(7,8,10,.55), rgba(7,8,10,.9)); }
+  .og-inner { display: grid; justify-items: center; gap: 1.6cqw; }
+  .og svg { width: 9cqw; height: auto; filter: drop-shadow(0 0 2.5cqw rgba(240,220,170,.45)); }
+  .og .kick { font: 600 1.7cqw "Barlow Condensed"; letter-spacing: .45em; text-transform: uppercase; color: var(--gold); }
+  .og .title { font: 900 7.4cqw/0.95 "Cinzel", serif; letter-spacing: .04em; text-transform: uppercase;
+    background: linear-gradient(180deg, #fff 20%, var(--gold-hi) 60%, var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .og .sides { font: 700 1.9cqw "Barlow Condensed"; letter-spacing: .35em; }
+  .og .sides .r { color: #6dbf4b; } .og .sides .d { color: #d2452f; } .og .sides i { font-style: normal; color: #8c8a86; margin: 0 1.2cqw; }
+  .og .brand { position: absolute; bottom: 3.2cqw; left: 0; right: 0; font: 600 1.5cqw "Barlow Condensed"; letter-spacing: .3em; text-transform: uppercase; color: #bdb7ab; }
+  .og .brand b { color: var(--gold-hi); font-weight: 700; }
+  .og .corner { position: absolute; top: 3cqw; left: 3.4cqw; font: 600 1.4cqw "Barlow Condensed"; letter-spacing: .25em; color: #bdb7ab; text-transform: uppercase; }
+  .note { color: #9aa0a6; font-size: 13px; margin: 8px 0 0; }
+
+  /* ---------- WhatsApp previews ---------- */
+  .chats { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 22px; }
+  .chat { background: var(--wa-bg); border-radius: 12px; padding: 16px 14px; display: grid; gap: 6px; }
+  .chat .state { font: 600 12px "Barlow Condensed"; letter-spacing: .14em; text-transform: uppercase; color: #8696a0; margin-bottom: 4px; }
+  .bubble { justify-self: end; max-width: 340px; background: var(--wa-bubble); border-radius: 8px 0 8px 8px; padding: 4px; font-family: "Segoe UI", Helvetica, Arial, sans-serif; }
+  .card { background: var(--wa-card); border-radius: 6px; overflow: hidden; }
+  .thumb { aspect-ratio: 1200 / 630; container-type: inline-size; }
+  .meta { padding: 8px 10px 9px; display: grid; gap: 2px; }
+  .meta b { color: #e9edef; font-size: 14px; font-weight: 600; line-height: 1.3; }
+  .meta span { color: #b7c3c9; font-size: 13px; line-height: 1.35; }
+  .meta small { color: #8fa3ad; font-size: 12px; }
+  .msg { color: #e9edef; font-size: 14px; padding: 6px 6px 2px; word-break: break-all; }
+  .msg a { color: #53bdeb; text-decoration: none; }
+  .time { text-align: right; color: #8fa3ad; font-size: 11px; padding: 0 6px 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Mockup · vista previa al compartir el link</h1>
+
+  <section>
+    <h2>1 · Imagen de vista previa (1200×630, fija)</h2>
+    <div class="og-frame"><div class="og" id="ogTemplate">
+      <span class="corner">Dota 2</span>
+      <div class="og-inner">
+        <svg viewBox="0 0 64 76" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0dcaa"/><stop offset="1" stop-color="#8a6d3b"/></linearGradient></defs>
+          <path d="M32 2 60 12v22c0 18-12 32-28 40C16 66 4 52 4 34V12Z" fill="none" stroke="url(#g)" stroke-width="3"/>
+          <path d="M32 14 48 20v14c0 11-7 20-16 25-9-5-16-14-16-25V20Z" fill="url(#g)" opacity=".85"/></svg>
+        <div class="kick">Torneos · En vivo</div>
+        <div class="title">Torneo Dota</div>
+        <div class="sides"><span class="r">Radiant</span><i>vs</i><span class="d">Dire</span></div>
+      </div>
+      <div class="brand">torneo-dota · powered by <b>jpsolutions</b></div>
+    </div></div>
+    <p class="note">Una sola imagen para todos los estados: las redes la guardan en caché por días. Lo que cambia es el texto.</p>
+  </section>
+
+  <section>
+    <h2>2 · Cómo se vería en WhatsApp (el texto cambia según el estado del torneo)</h2>
+    <div class="chats" id="chats"></div>
+  </section>
+</div>
+
+<script>
+  // Mockup only: clone the OG image into each preview and fill the dynamic text per state.
+  const states = [
+    ['Fase de grupos', 'Copa Octubre · Torneo de Dota 2', 'Fase de grupos · 12/21 partidos · Líder: Tigres (5 pts) · Semis el 11 Oct'],
+    ['Stream en vivo', '🔴 EN VIVO · Copa Octubre · Torneo de Dota 2', 'Ronda 5 en juego · Míralo en vivo en Twitch'],
+    ['Playoffs', 'Copa Octubre · Semifinales', 'Tigres vs Lobos · Cuervos vs Halcones · Final el 17 Oct'],
+    ['Terminado', 'Copa Octubre · 🏆 Campeón: Cuervos', 'Cuervos venció a Lobos en la gran final'],
+    ['Sin torneo activo', 'Torneos de Dota 2 · jpsolutions', 'Próximamente: fixture, tabla en vivo y playoffs'],
+  ];
+  const tpl = document.getElementById('ogTemplate');
+  document.getElementById('chats').innerHTML = states.map(([s, t, d]) => `
+    <div class="chat"><div class="state">${s}</div>
+      <div class="bubble">
+        <div class="card"><div class="thumb">${tpl.outerHTML.replace('id="ogTemplate"', '')}</div>
+          <div class="meta"><b>${t}</b><span>${d}</span><small>torneo-dota.jpsolutions.app</small></div></div>
+        <div class="msg"><a href="#">https://torneo-dota.jpsolutions.app</a></div>
+        <div class="time">21:04 ✓✓</div>
+      </div>
+    </div>`).join('');
+</script>
+</body>
+</html>
