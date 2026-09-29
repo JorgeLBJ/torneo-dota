@@ -49,7 +49,7 @@ td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
 .muted{color:var(--muted)}
 
 /* Fixture list */
-.round{display:grid;grid-template-columns:110px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);align-items:start}
+.round{display:grid;grid-template-columns:170px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);align-items:start}
 .round .rh b{font-family:var(--fd);font-size:18px;display:block}
 .pairs{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .pair{display:inline-flex;align-items:center;gap:6px;min-height:calc(var(--control-h-sm) + 12px);padding:5px 10px 5px 6px;border-radius:10px;background:var(--panel-2);border:1px solid var(--line)}
@@ -186,3 +186,4 @@ table.cal select,table.cal input{min-width:0;text-overflow:ellipsis}
 .hero-cell .hero-name{min-width:0;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
 .code-cell{display:flex;align-items:center;gap:6px}
 .code-cell input{width:70px;flex:none}
+.pill:not(:first-child){margin-left:8px}

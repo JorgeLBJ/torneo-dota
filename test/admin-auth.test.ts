@@ -129,6 +129,15 @@ describe('users screen', () => {
     expect(await t.login('second', 'another-pass-1')).toContain('sid=');
   });
 
+  it('shows the creation time as DD/MM/YYYY HH:mm:ss and the "Tú" chip without stray spaces', async () => {
+    const cookie = await t.login();
+    t.db.prepare("UPDATE admins SET created_at = '2026-09-29 02:13:45'").run();
+    const page = await (await t.get('/admin/usuarios', cookie)).text();
+    expect(page).toContain('29/09/2026 02:13:45');
+    expect(page).not.toContain('2026-09-29');
+    expect(page).toContain('<span class="pill next">Tú</span>');
+  });
+
   it('validates username and password on creation', async () => {
     const cookie = await t.login();
     const cases: [Record<string, string>, string][] = [

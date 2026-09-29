@@ -1,5 +1,6 @@
 import type { FC } from 'hono/jsx';
 import type { Admin } from '../../db/repository.js';
+import { formatDateTime } from '../../format/datetime.js';
 import type { Flash } from '../flash.js';
 import { AuthLayout, FlashMessage } from './layout.js';
 
@@ -67,9 +68,9 @@ export const UsersView: FC<{ admins: Admin[]; currentId: number }> = ({ admins, 
             <tr>
               <td>
                 <b>{a.username}</b>
-                {a.id === currentId ? <span class="pill next"> Tú</span> : null}
+                {a.id === currentId ? <span class="pill next">Tú</span> : null}
               </td>
-              <td class="muted">{a.createdAt}</td>
+              <td class="muted">{formatDateTime(a.createdAt)}</td>
               <td>
                 {a.id === currentId ? null : (
                   <form method="post" action={`/admin/usuarios/${a.id}/eliminar`}>

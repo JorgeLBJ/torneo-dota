@@ -43,8 +43,11 @@ describe('results screen', () => {
     expect(html).toContain('Pendiente');
     expect(html).toContain('Tabla en vivo');
     expect(html).toContain('type="radio"');
-    expect(html).toContain('Sáb 03 oct');
-    expect(html).toContain('Sáb 10 oct');
+    // Date selector labels and card headers use DD/MM/YYYY[ HH:mm:ss].
+    expect(html).toContain('>03/10/2026</option>');
+    expect(html).toContain('>10/10/2026</option>');
+    expect(html).toMatch(/Partido 1 · Ronda 1 · 03\/10\/2026 \d{2}:\d{2}:00/);
+    expect(html).not.toContain('Sáb 03 oct');
     // 5 teams -> 2 matches per round, 3 rounds on Oct 3.
     expect(html.match(/class="rc /g)).toHaveLength(6);
     const all = await (await t.get(`${base}?fecha=todos`, cookie)).text();

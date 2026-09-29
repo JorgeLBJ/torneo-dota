@@ -1,26 +1,13 @@
 import type { Child, FC } from 'hono/jsx';
 import type { Match, Team, Tournament } from '../../db/repository.js';
 import type { StandingRow } from '../../domain/standings.js';
+import { formatDate, formatLocalDateTime } from '../../format/datetime.js';
 import { TeamBadge } from './layout.js';
 import { PageHead } from './parts.js';
 
-const WEEKDAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-
-/** "2026-10-03" -> "Sáb 03 oct" (calendar date only, no timezone involved). */
-export function dateLabel(date: string): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  return `${WEEKDAYS[d.getUTCDay()]} ${String(d.getUTCDate()).padStart(2, '0')} ${MONTHS[d.getUTCMonth()]}`;
-}
-
-/** "2026-10-03" -> "03 oct". */
-export function shortDate(date: string): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  return `${String(d.getUTCDate()).padStart(2, '0')} ${MONTHS[d.getUTCMonth()]}`;
-}
-
+/** "03/10/2026 14:00:00" (date and/or time of a scheduled match). */
 export const scheduleLabel = (m: Pick<Match, 'scheduledDate' | 'startTime'>): string =>
-  [m.scheduledDate ? shortDate(m.scheduledDate) : null, m.startTime].filter(Boolean).join(' ') || 'Sin horario';
+  formatLocalDateTime(m.scheduledDate, m.startTime) || 'Sin horario';
 
 export interface ResultCardProps {
   action: string;
@@ -135,7 +122,7 @@ export const StandingsTable: FC<{ rows: StandingRow[]; qualifiers: number }> = (
             <td>{row.rank}</td>
             <td>
               <TeamBadge team={{ id: row.teamId, code: row.code }} /> {row.name}
-              {row.unresolvedTie ? <span class="pill next"> Empate</span> : null}
+              {row.unresolvedTie ? <span class="pill next">Empate</span> : null}
             </td>
             <td>{row.played}</td>
             <td>{row.wins}</td>
@@ -175,7 +162,7 @@ export const ResultsView: FC<ResultsViewProps> = ({ tournament, cards, dates, ha
         <select name="fecha" data-autosubmit aria-label="Filtrar por fecha" style="width:auto">
           {dates.map((d) => (
             <option value={d} selected={filter === d}>
-              {dateLabel(d)}
+              {formatDate(d)}
             </option>
           ))}
           {hasUndated ? (

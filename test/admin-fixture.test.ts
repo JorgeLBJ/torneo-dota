@@ -43,7 +43,8 @@ describe('fixture screen', () => {
     expect(html).toContain('Ronda 1');
     expect(html).toContain('Ronda 7');
     expect(html).toContain('Descansa');
-    expect(html).toContain('03 oct 14:00');
+    expect(html).toContain('03/10/2026 14:00:00');
+    expect(html).not.toMatch(/03 oct/);
     expect(t.repo.listMatches(tournament.id, 'group')).toHaveLength(21);
   });
 

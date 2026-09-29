@@ -36,4 +36,8 @@ describe('admin stylesheet', () => {
     expect(css).toMatch(/input:focus-visible[^{]*\{[^}]*border-color:transparent/);
     expect(css).not.toMatch(/:focus[^-][^{]*\{[^}]*box-shadow/);
   });
+
+  it('spaces a chip from the text before it', () => {
+    expect(rule('.pill:not(:first-child)')).toMatch(/margin-left:\s*8px/);
+  });
 });
