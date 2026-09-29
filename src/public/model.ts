@@ -1,4 +1,5 @@
 import type { Match, ScheduleDay, Team, TiebreakerKey } from '../db/repository.js';
+import { zonedToUtc } from '../format/timezone.js';
 import type { QualificationStatus, StandingRow } from '../domain/standings.js';
 import { renderRulebook, type RulebookBlock } from '../markdown.js';
 import type { TournamentState } from '../services/state.js';
@@ -52,6 +53,8 @@ export interface PublicMatch {
   teamA: Team | null;
   teamB: Team | null;
   played: boolean;
+  /** ISO UTC start, or null while unscheduled. */
+  startsAt: string | null;
   winnerId: number | null;
   kills: [number, number] | null;
   deaths: [number, number] | null;
@@ -62,7 +65,11 @@ export interface PublicRound {
   number: number;
   startTime: string | null;
   endTime: string | null;
-  status: 'next' | 'done' | 'pending';
+  /** ISO UTC instants of the round (its first scheduled match). */
+  startsAt: string | null;
+  endsAt: string | null;
+  /** live: a match is in its time slot without a result; next: the soonest upcoming round. */
+  status: 'live' | 'next' | 'done' | 'pending';
   bye: Team | null;
   matches: PublicMatch[];
 }
@@ -98,6 +105,8 @@ export interface BracketSlotView {
 
 export interface BracketMatchView {
   title: string;
+  /** ISO UTC start; the visible `when` text is the server-side (tournament zone) fallback. */
+  startsAt: string | null;
   when: string | null;
   slots: [BracketSlotView, BracketSlotView];
 }
@@ -112,6 +121,8 @@ export interface PublicPhase {
 export interface PublicModel {
   name: string;
   slug: string;
+  /** IANA zone the server-rendered times are shown in (visitors' browsers re-render in their own). */
+  timezone: string;
   kicker: string;
   phases: PublicPhase[];
   progress: { played: number; total: number; percent: number };
@@ -145,7 +156,32 @@ const TIEBREAK_LONG: Record<TiebreakerKey, string> = {
 };
 const TIEBREAK_SHORT: Record<TiebreakerKey, string> = { kd: 'K−D', kills: 'kills' };
 
-function buildDays(state: TournamentState, nextRound: number | undefined): PublicDay[] {
+const DEFAULT_SLOT_MS = 60 * 60_000;
+
+/**
+ * Which rounds are in progress and which comes next, from real instants.
+ * Live: an unplayed match inside [start, end). Next: the unplayed round starting soonest after `now`
+ * (unscheduled rounds only when nothing scheduled is left). A past round still missing results is neither.
+ */
+export function liveAndNext(matches: Match[], now: Date): { live: Set<number>; next: number | undefined } {
+  const t = now.getTime();
+  const unplayed = matches.filter((m) => m.winnerId === null);
+  const live = new Set<number>();
+  for (const m of unplayed) {
+    if (!m.startsAt) continue;
+    const start = Date.parse(m.startsAt);
+    const end = m.endsAt ? Date.parse(m.endsAt) : start + DEFAULT_SLOT_MS;
+    if (start <= t && t < end) live.add(m.round);
+  }
+  const upcoming = unplayed
+    .filter((m) => m.startsAt && Date.parse(m.startsAt) > t && !live.has(m.round))
+    .sort((a, b) => Date.parse(a.startsAt!) - Date.parse(b.startsAt!) || a.round - b.round)[0];
+  if (upcoming) return { live, next: upcoming.round };
+  const unscheduled = unplayed.filter((m) => !m.startsAt && !live.has(m.round)).sort((a, b) => a.round - b.round)[0];
+  return { live, next: unscheduled?.round };
+}
+
+function buildDays(state: TournamentState, live: Set<number>, nextRound: number | undefined): PublicDay[] {
   const { teams, teamsById, groupMatches } = state;
   const toMatch = (m: Match): PublicMatch => ({
     id: m.id,
@@ -153,6 +189,7 @@ function buildDays(state: TournamentState, nextRound: number | undefined): Publi
     round: m.round,
     teamA: m.team1Id === null ? null : (teamsById.get(m.team1Id) ?? null),
     teamB: m.team2Id === null ? null : (teamsById.get(m.team2Id) ?? null),
+    startsAt: m.startsAt,
     played: m.winnerId !== null,
     winnerId: m.winnerId,
     kills: m.winnerId === null ? null : [m.team1Kills ?? 0, m.team2Kills ?? 0],
@@ -180,9 +217,11 @@ function buildDays(state: TournamentState, nextRound: number | undefined): Publi
           number,
           startTime: timed?.startTime ?? null,
           endTime: timed?.endTime ?? null,
+          startsAt: timed?.startsAt ?? null,
+          endsAt: timed?.endsAt ?? null,
           // A bye exists only in a complete round of an odd-sized group: exactly one team sits out.
           bye: complete && resting.length === 1 ? resting[0]! : null,
-          status: number === nextRound ? 'next' : done ? 'done' : 'pending',
+          status: live.has(number) ? 'live' : number === nextRound ? 'next' : done ? 'done' : 'pending',
           matches: list.map(toMatch),
         };
       });
@@ -226,6 +265,15 @@ function buildBracket(state: TournamentState, days: ScheduleDay[]): PublicModel[
   const confirmed = bracket.semifinals.some((s) => s.team1Id !== null || s.team2Id !== null);
   const team = (id: number | null) => (id === null ? null : (teamsById.get(id) ?? null));
 
+  const startsAt = (phase: 'semifinal' | 'final', number: number): string | null => {
+    const stored = playoffMatches.find((m) => m.phase === phase && m.matchNumber === number);
+    if (stored?.startsAt) return stored.startsAt;
+    const slot = days
+      .filter((d) => d.phase === phase)
+      .flatMap((d) => d.startTimes.map((time) => ({ date: d.date, time })))[number - 1];
+    return slot ? zonedToUtc(slot.date, slot.time, state.tournament.timezone) : null;
+  };
+
   const when = (phase: 'semifinal' | 'final', number: number): string | null => {
     const stored = playoffMatches.find((m) => m.phase === phase && m.matchNumber === number);
     const slots = days
@@ -253,7 +301,7 @@ function buildBracket(state: TournamentState, days: ScheduleDay[]): PublicModel[
       seedLabel: seeded(id) || 'Por definir',
       isWinner: id !== null && slot.winnerId === id,
     });
-    return { title: `Semifinal ${i + 1}`, when: when('semifinal', i + 1), slots: [view(ids[0]), view(ids[1])] };
+    return { title: `Semifinal ${i + 1}`, startsAt: startsAt('semifinal', i + 1), when: when('semifinal', i + 1), slots: [view(ids[0]), view(ids[1])] };
   }) as [BracketMatchView, BracketMatchView];
 
   const finalView = (id: number | null, label: string): BracketSlotView => ({
@@ -276,6 +324,7 @@ function buildBracket(state: TournamentState, days: ScheduleDay[]): PublicModel[
     semifinals,
     final: {
       title: 'Gran final',
+      startsAt: startsAt('final', 1),
       when: when('final', 1),
       slots: [finalView(bracket.final.team1Id, 'Ganador SF1'), finalView(bracket.final.team2Id, 'Ganador SF2')],
     },
@@ -315,11 +364,9 @@ function buildRules(state: TournamentState): PublicModel['rules'] {
   };
 }
 
-export function buildPublicModel(state: TournamentState, scheduleDays: ScheduleDay[]): PublicModel {
+export function buildPublicModel(state: TournamentState, scheduleDays: ScheduleDay[], options: { now?: Date } = {}): PublicModel {
   const { tournament, groupMatches } = state;
-  const nextRound = groupMatches
-    .filter((m) => m.winnerId === null)
-    .reduce<number | undefined>((min, m) => (min === undefined || m.round < min ? m.round : min), undefined);
+  const { live, next: nextRound } = liveAndNext(groupMatches, options.now ?? new Date());
   const played = groupMatches.length - state.pendingGroup;
   const first = scheduleDays.map((d) => d.date).sort()[0];
   const kicker = first
@@ -329,6 +376,7 @@ export function buildPublicModel(state: TournamentState, scheduleDays: ScheduleD
   return {
     name: tournament.name,
     slug: tournament.slug,
+    timezone: tournament.timezone,
     kicker,
     phases: buildPhases(state, scheduleDays),
     progress: {
@@ -337,7 +385,7 @@ export function buildPublicModel(state: TournamentState, scheduleDays: ScheduleD
       percent: groupMatches.length === 0 ? 0 : Math.round((played / groupMatches.length) * 100),
     },
     teams: state.teams,
-    days: buildDays(state, nextRound),
+    days: buildDays(state, live, nextRound),
     standings: buildStandings(state),
     standingsSub: `${played} de ${groupMatches.length} partidos jugados`,
     bracket: buildBracket(state, scheduleDays),

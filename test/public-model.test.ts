@@ -13,7 +13,9 @@ let tournament: Tournament;
 let teams: Team[];
 
 const current = () => repo.getTournamentById(tournament.id)!;
-const model = () => buildPublicModel(loadState(repo, current()), repo.listScheduleDays(tournament.id));
+// A fixed clock before the first match (2026-10-03T19:00Z) so "next" never depends on today's date.
+const BEFORE = new Date('2026-09-30T12:00:00Z');
+const model = (now: Date = BEFORE) => buildPublicModel(loadState(repo, current()), repo.listScheduleDays(tournament.id), { now });
 
 const win = (matchId: number, winnerId: number, k1 = 20, d1 = 10, k2 = 10, d2 = 20) =>
   repo.recordResult(matchId, { winnerId, team1Kills: k1, team1Deaths: d1, team2Kills: k2, team2Deaths: d2 });
@@ -93,6 +95,51 @@ describe('matches by day and round', () => {
     const last = m.days[m.days.length - 1]!;
     expect(last).toMatchObject({ date: null, label: 'Sin fecha' });
     expect(last.rounds[0]!.bye).toBeNull();
+  });
+});
+
+describe('real instants: live and next rounds', () => {
+  const round = (m: ReturnType<typeof model>, n: number) => m.days.flatMap((d) => d.rounds).find((r) => r.number === n)!;
+
+  it('exposes UTC instants for rounds, matches and the time zone', () => {
+    const m = model();
+    expect(m.timezone).toBe('America/Lima');
+    expect(round(m, 1)).toMatchObject({ startsAt: '2026-10-03T19:00:00Z', endsAt: '2026-10-03T20:00:00Z' });
+    expect(round(m, 1).matches[0]).toMatchObject({ startsAt: '2026-10-03T19:00:00Z' });
+    expect(m.bracket.semifinals[0]!.startsAt).toBe('2026-10-11T19:00:00Z');
+    expect(m.bracket.final.startsAt).toBe('2026-10-17T19:00:00Z');
+  });
+
+  it('marks the round in progress as live and the following one as next', () => {
+    const m = model(new Date('2026-10-03T19:30:00Z'));
+    expect(round(m, 1).status).toBe('live');
+    expect(round(m, 2).status).toBe('next');
+    expect(round(m, 3).status).toBe('pending');
+    expect(round(m, 1).matches.every((x) => !x.isNext)).toBe(true);
+    expect(round(m, 2).matches.every((x) => x.isNext)).toBe(true);
+  });
+
+  it('picks the next round by start instant, not by round number', () => {
+    const [first, second] = repo.listMatches(tournament.id, 'group').filter((x) => x.round <= 2);
+    // Swap the slots of round 1 and round 2: round 2 now starts first.
+    repo.updateMatchSchedule(first!.id, { scheduledDate: '2026-10-03', startTime: '18:00', endTime: '19:00' });
+    for (const x of repo.listMatches(tournament.id, 'group').filter((y) => y.round === 2)) {
+      repo.updateMatchSchedule(x.id, { scheduledDate: '2026-10-03', startTime: '13:00', endTime: '14:00' });
+    }
+    expect(second).toBeDefined();
+    const m = model(new Date('2026-10-03T12:00:00Z'));
+    expect(round(m, 2).status).toBe('next');
+  });
+
+  it('does not call a past round without results "next": it waits for its result', () => {
+    const m = model(new Date('2026-10-03T23:30:00Z'));
+    expect(round(m, 4).status).toBe('pending');
+    expect(round(m, 5).status).toBe('next');
+  });
+
+  it('is not live once every match of the round has a result', () => {
+    for (const x of repo.listMatches(tournament.id, 'group').filter((y) => y.round === 1)) win(x.id, x.team1Id!);
+    expect(round(model(new Date('2026-10-03T19:30:00Z')), 1).status).toBe('done');
   });
 });
 
