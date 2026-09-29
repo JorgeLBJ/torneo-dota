@@ -243,8 +243,6 @@
     var y = window.scrollY;
     if (!(window.SiteCore && patchRegions(html))) app.innerHTML = html;
     apply();
-    var heading = app.querySelector('h1');
-    if (heading) document.title = heading.textContent;
     window.scrollTo(x, y);
   }
 

@@ -62,6 +62,7 @@ const Document: FC<PropsWithChildren<{ title: string }>> = ({ title, children })
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{title} · Torneos Admin</title>
+        <meta name="robots" content="noindex, nofollow" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="stylesheet" href={FONTS} />
         <link rel="stylesheet" href={assetUrl('admin.css')} />

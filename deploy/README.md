@@ -34,7 +34,7 @@ Guía para publicar **torneo-dota** en un VPS que ya tiene Caddy en Docker. La i
    chmod 600 .env
    ```
 
-2. **Revisa `.env`.** Los valores por defecto sirven; lo habitual es dejar `ADMIN_SETUP_TOKEN` y `ADMIN_PASSWORD` vacíos (ver el paso 4).
+2. **Revisa `.env`.** Los valores por defecto sirven; lo habitual es dejar `ADMIN_SETUP_TOKEN` y `ADMIN_PASSWORD` vacíos (ver el paso 4). `PUBLIC_BASE_URL` debe ser la URL pública real: las vistas previas al compartir (WhatsApp, Telegram, Discord) la usan para sus enlaces absolutos.
 
 3. **Construye y arranca:**
 
@@ -152,6 +152,7 @@ Usa proyecto, contenedor y volumen propios (`torneo-dota-local`), así que no to
 | --- | --- |
 | Caddy responde 502 | El contenedor no está en `mbd_edge` o no está sano. Revisa `docker network inspect mbd_edge` y `docker compose ps` |
 | Tras recrear el contenedor Caddy no lo encuentra | Comprueba que sigue conectado a `mbd_edge`; `docker compose up -d` lo vuelve a conectar (la red está declarada en `compose.yml`) |
+| Al compartir el enlace se ve una vista previa vieja | Las redes guardan la vista previa en caché. La imagen lleva `?v=` con su huella, así que cambia sola cuando cambia el archivo; para el texto, vuelve a pedirla con el depurador de Facebook/Meta o espera unos días |
 | La página no se actualiza en vivo | Falta `flush_interval -1` en el bloque de Caddy o hay otro proxy que hace buffering. Recarga Caddy tras corregirlo |
 | Twitch no se reproduce dentro de Google Sites | Añade el host que incrusta la página (por ejemplo un subdominio de `googleusercontent.com`) a `STREAM_PARENT_HOSTS` en `.env` y ejecuta `docker compose up -d` |
 | El reproductor no aparece | Un bloqueador de anuncios puede bloquearlo; la pestaña "En vivo" ofrece abrir el canal en su plataforma |

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
 import { serveStatic } from '@hono/node-server/serve-static';
 import type Database from 'better-sqlite3';
@@ -59,6 +60,8 @@ export function createApp({ db, config }: CreateAppOptions) {
       return c.json({ status: 'error' }, 503);
     }
   });
+  // Crawlers: public pages are open, the backoffice is not (see public/robots.txt).
+  app.get('/robots.txt', (c) => c.body(readFileSync(`${PUBLIC_DIR}/robots.txt`, 'utf8'), 200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' }));
   app.get('/favicon.svg', (c) => c.body(FAVICON_SVG, 200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' }));
   app.get('/favicon.ico', (c) => c.body(null, 204));
   app.route('/admin', adminApp({ repo, events, config, limiter, accountLimiter, now }));

@@ -34,7 +34,22 @@ export interface PageLinks {
   partial: string;
 }
 
-export const PublicDocument: FC<PropsWithChildren<{ title: string; links?: PageLinks }>> = ({ title, links, children }) => (
+/** What goes in <head> for sharing and search; every value is printed escaped. */
+export interface PageMeta {
+  title: string;
+  description: string;
+  /** Absolute canonical URL of this page. */
+  url: string;
+  /** Absolute URL of the share image. */
+  imageUrl: string;
+  /** Ask search engines not to index the page (404). */
+  noindex?: boolean;
+}
+
+const SITE_NAME = 'torneo-dota · jpsolutions';
+const IMAGE_ALT = 'Torneo de Dota 2: Radiant vs Dire';
+
+export const PublicDocument: FC<PropsWithChildren<{ meta: PageMeta; links?: PageLinks }>> = ({ meta, links, children }) => (
   <>
     {raw('<!doctype html>')}
     <html lang="es">
@@ -42,8 +57,27 @@ export const PublicDocument: FC<PropsWithChildren<{ title: string; links?: PageL
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#07080a" />
-        <title>{title}</title>
+        <title>{meta.title}</title>
+        <meta name="description" content={meta.description} />
+        {meta.noindex ? <meta name="robots" content="noindex" /> : null}
+        <link rel="canonical" href={meta.url} />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content={SITE_NAME} />
+        <meta property="og:locale" content="es_ES" />
+        <meta property="og:title" content={meta.title} />
+        <meta property="og:description" content={meta.description} />
+        <meta property="og:url" content={meta.url} />
+        <meta property="og:image" content={meta.imageUrl} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:type" content="image/jpeg" />
+        <meta property="og:image:alt" content={IMAGE_ALT} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={meta.title} />
+        <meta name="twitter:description" content={meta.description} />
+        <meta name="twitter:image" content={meta.imageUrl} />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href={assetUrl('img/apple-touch-icon.png')} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
         <link rel="stylesheet" href={FONTS} />

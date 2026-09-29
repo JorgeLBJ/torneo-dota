@@ -54,6 +54,7 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
 - [x] T7.6 Stream follow-ups (clearable invalid link, 300-char cap, server-clock boundaries, robust player-preserving patch) — route: delegated writer
 - [x] T7.7 First-run setup and change password — route: delegated writer
 - [x] T7.8 Review follow-ups (separate change-password limiter, message wording, one stream-length constant, page patch guard, fresh server-time stamp) — route: delegated writer
+- [x] T10 Share previews (Open Graph) — route: delegated writer
 - [x] T9 Docker deployment (Dockerfile, healthz, graceful shutdown, VPS compose, Caddy block, Spanish guide) — route: delegated writer
 
 ## Stakeholder feedback on mockups (2026-09-29)
@@ -124,12 +125,9 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
   - Verified locally with Docker 26: image 229 MB; container healthy; setup code in logs; admin, tournament and team created; data intact after `restart`, `down` + `up -d`, `kill -s KILL` (also right after a write) and image rebuild + recreate, `PRAGMA integrity_check` = ok every time; `stop` took under 1 s with an open SSE stream, exit 0, "Shutdown complete: database closed cleanly", no leftover WAL; backup (online `backup()` API and tar) and restore commands from the guide worked. Test containers, volume, network and images were removed.
   - NOT verifiable until this branch is merged to `main` and pushed: the remote `build.context` (`...torneo-dota.git#main`) needs the Dockerfile on `main`.
 
-## Next step
-Merge `feat/docker-deploy` to `main` and push, then follow `deploy/README.md` on the VPS (authorization required for anything remote). After deploy, verify Twitch inside the Google Sites iframe and, if needed, add the framing host to `STREAM_PARENT_HOSTS`.
+- T10 (branch `feat/og-meta`, not pushed): `scripts/render-og.ts` (`npm run render:og`, playwright-core + local Chrome or `CHROME_PATH`; refuses to render if the Cinzel/Barlow fonts did not load) produces `public/img/og.jpg` (1200x630, 86 KB) from the approved mockup (`odd/mockups/og-mockup.html`) and `apple-touch-icon.png` (180x180). `src/public/share.ts` (pure, tested) derives title/description per state: groups (with "Empieza el" before results, leader and semis date after), live (only with a stream and a live round), semifinals, grand final, champion, no tournament; tournament-zone dates, single-line title, description capped at 200 chars ("pt"/"pts" pluralized). Every public page (active, archive, Próximamente, 404 with `noindex`) prints the full head: title, description, canonical, og:* (incl. image size/type/alt, `?v=` content hash), twitter:*, apple-touch-icon; escaped by hono/jsx. Absolute URLs use `PUBLIC_BASE_URL`, else the request origin (X-Forwarded-Proto/Host only with `TRUST_PROXY`). Admin: `noindex, nofollow` meta and `X-Robots-Tag`, no OG. `/robots.txt` (from `public/robots.txt`). The live page no longer overwrites `document.title`. Set `PUBLIC_BASE_URL` on the VPS `.env`.
+  - Verified with a temp server driven through every state (curl of the head), image served as `image/jpeg` 88122 bytes with immutable cache and no cookies, crawler user agent gets the tags, Chromium loads it at 1200x630.
+  - Social caches keep old previews for days; the `?v=` on the image changes when the file does, the text updates when the page is fetched again.
 
-## Production deploy (2026-09-29)
-- Deployed to https://torneo-dota.jpsolutions.app on the VPS (ssh alias `gymsys`), authorized by the user.
-- `~/torneo-dota/compose.yml` (= deploy/compose.yml) + `.env` (600, from .env.example); image built inside Docker from the public GitHub repo (`#main`); volume `torneo-dota_data`; attached to `mbd_edge`; healthy; ~24 MiB RAM.
-- Caddy: `/opt/mbd/caddy-sites/_torneo-dota.caddy` (owned by the user, no sudo needed), `caddy validate` then `caddy reload`; Let's Encrypt certificate obtained.
-- Verified: /healthz 200 over HTTPS, `/` 200, `/admin` → `/admin/setup`, SSE streams through Caddy (hello event), public pages frameable (no XFO), admin denies framing, tasks.jpsolutions.app still 200.
-- Pending (user): first-run setup with the code from `docker logs torneo-dota`; check Twitch embed inside Google Sites (parent hosts).
+## Next step
+Merge `feat/og-meta`, set `PUBLIC_BASE_URL` in the VPS `.env` and redeploy (`docker compose build --pull && docker compose up -d`), then test a shared link in WhatsApp (and Meta's sharing debugger to refresh caches).

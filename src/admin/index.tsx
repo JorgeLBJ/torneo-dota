@@ -22,6 +22,7 @@ export function adminApp(deps: Deps) {
   app.use('*', async (c, next) => {
     await next();
     c.res.headers.set('X-Frame-Options', 'DENY');
+    c.res.headers.set('X-Robots-Tag', 'noindex, nofollow');
     c.res.headers.set('Content-Security-Policy', "frame-ancestors 'none'");
   });
   app.use('*', sameOriginGuard({ trustProxy: deps.config.trustProxy }));
