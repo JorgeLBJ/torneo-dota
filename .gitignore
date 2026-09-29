@@ -1,7 +1,8 @@
 node_modules/
 dist/
-data/
+/data/
 *.db
 *.db-wal
 *.db-shm
 .env
+.playwright-mcp/

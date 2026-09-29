@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torneo All vs All</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --cdn: "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react";
+    --bg: #07080a;
+    --panel: #0f1114;
+    --panel-2: #15181c;
+    --line: rgba(255,255,255,.08);
+    --line-2: rgba(200,170,110,.28);
+    --fg: #e8e4dc;
+    --muted: #8c8a86;
+    --gold: #c8aa6e;
+    --gold-hi: #f0dcaa;
+    --crimson: #c23c2a;
+    --radiant: #6dbf4b;
+    --dire: #d2452f;
+    --fd: "Cinzel", Georgia, serif;
+    --fl: "Barlow Condensed", "Arial Narrow", sans-serif;
+    --fb: "Barlow", "Segoe UI", system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body { margin: 0; color: var(--fg); font: 15px/1.5 var(--fb); background: var(--bg); -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 1px solid var(--gold); outline-offset: 3px; }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    position: relative; isolation: isolate; overflow: hidden;
+    min-height: 440px; display: grid; align-content: end;
+    padding: 48px 16px 34px;
+  }
+  .hero::before {
+    content: ""; position: absolute; inset: 0; z-index: -2;
+    background: url("https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/home/radiant_dire5.jpg") center 35% / cover no-repeat;
+    transform: scale(1.04);
+  }
+  .hero::after {
+    content: ""; position: absolute; inset: 0; z-index: -1;
+    background:
+      linear-gradient(90deg, rgba(109,191,75,.18), transparent 35%, transparent 65%, rgba(210,69,47,.22)),
+      linear-gradient(180deg, rgba(7,8,10,.35) 0%, rgba(7,8,10,.55) 45%, var(--bg) 100%);
+  }
+  .wrap { width: min(1080px, 100%); margin: 0 auto; }
+  .hero-inner { display: grid; gap: 16px; justify-items: center; text-align: center; }
+  .kicker {
+    font: 600 13px/1 var(--fl); letter-spacing: .38em; text-transform: uppercase; color: var(--gold);
+    display: inline-flex; align-items: center; gap: 14px;
+  }
+  .kicker::before, .kicker::after { content: ""; width: 42px; height: 1px; background: linear-gradient(90deg, transparent, var(--gold)); }
+  .kicker::after { transform: scaleX(-1); }
+  h1 {
+    margin: 0; font: 900 clamp(38px, 8vw, 78px)/.95 var(--fd); letter-spacing: .04em; text-transform: uppercase;
+    background: linear-gradient(180deg, #fff 20%, var(--gold-hi) 60%, var(--gold) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 2px 30px rgba(0,0,0,.4);
+  }
+  .sides { display: flex; align-items: center; gap: 18px; font: 700 14px/1 var(--fl); letter-spacing: .3em; text-transform: uppercase; }
+  .sides .r { color: var(--radiant); } .sides .d { color: var(--dire); } .sides i { color: var(--muted); font-style: normal; letter-spacing: .1em; }
+  .live { display: inline-flex; align-items: center; gap: 8px; font: 600 12px/1 var(--fl); letter-spacing: .2em; text-transform: uppercase; color: var(--fg);
+    padding: 7px 12px; border: 1px solid var(--line); background: rgba(0,0,0,.45); backdrop-filter: blur(6px); }
+  .live b { width: 7px; height: 7px; border-radius: 50%; background: var(--crimson); box-shadow: 0 0 0 0 rgba(194,60,42,.7); animation: pulse 2s infinite; }
+  @keyframes pulse { 70% { box-shadow: 0 0 0 8px rgba(194,60,42,0); } 100% { box-shadow: 0 0 0 0 rgba(194,60,42,0); } }
+
+  .phases { margin-top: 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(720px, 100%);
+    border: 1px solid var(--line-2); background: rgba(7,8,10,.6); backdrop-filter: blur(8px); }
+  .phases div { padding: 12px 10px; display: grid; gap: 2px; }
+  .phases div + div { border-left: 1px solid var(--line); }
+  .phases small { font: 600 11px/1 var(--fl); letter-spacing: .22em; text-transform: uppercase; color: var(--muted); }
+  .phases b { font: 700 18px/1.2 var(--fd); letter-spacing: .04em; }
+  .phases .cur b { color: var(--gold-hi); }
+  .phases .cur { box-shadow: inset 0 -2px 0 var(--gold); }
+  .prog { width: min(720px, 100%); height: 2px; background: var(--line); }
+  .prog i { display: block; height: 100%; background: linear-gradient(90deg, var(--radiant), var(--gold), var(--dire)); }
+
+  /* ---------- Tabs ---------- */
+  .tabs-bar { position: sticky; top: 0; z-index: 5; background: rgba(7,8,10,.88); backdrop-filter: blur(10px); border-block: 1px solid var(--line); }
+  .tabs { display: flex; justify-content: center; gap: 4px; overflow-x: auto; padding: 0 16px; }
+  .tab { position: relative; padding: 16px 22px; border: 0; background: none; cursor: pointer;
+    font: 700 15px/1 var(--fd); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); transition: color .2s; white-space: nowrap; }
+  .tab:hover { color: var(--fg); }
+  .tab[aria-selected="true"] { color: var(--gold-hi); }
+  .tab[aria-selected="true"]::after { content: ""; position: absolute; left: 18%; right: 18%; bottom: -1px; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent); }
+
+  main { padding: 30px 16px 70px; }
+  .panel { display: none; gap: 26px; } .panel.on { display: grid; }
+
+  /* ---------- Section titles ---------- */
+  .sec { display: flex; align-items: center; gap: 16px; }
+  .sec h2 { margin: 0; font: 800 26px/1 var(--fd); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+  .sec::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line-2), transparent); }
+  .sec span { font: 600 13px/1 var(--fl); letter-spacing: .18em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+
+  /* ---------- Filter ---------- */
+  .filter { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; cursor: pointer;
+    background: var(--panel); border: 1px solid var(--line); font: 600 14px/1 var(--fl); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .chip.all { padding: 9px 14px; }
+  .chip:hover { color: var(--fg); }
+  .chip[aria-pressed="true"] { border-color: var(--gold); color: var(--gold-hi); background: linear-gradient(180deg, rgba(200,170,110,.14), rgba(200,170,110,.03)); }
+  .chip img { width: 44px; height: 25px; object-fit: cover; display: block; }
+
+  /* ---------- Rounds & matches ---------- */
+  .round { display: grid; gap: 10px; }
+  .round-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font: 600 13px/1 var(--fl); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .round-head b { font: 700 17px/1 var(--fd); color: var(--fg); letter-spacing: .1em; }
+  .tag { padding: 4px 9px; font: 700 11px/1 var(--fl); letter-spacing: .18em; text-transform: uppercase; border: 1px solid var(--line); }
+  .tag.next { color: var(--gold-hi); border-color: var(--gold); background: rgba(200,170,110,.1); }
+  .tag.done { color: var(--muted); }
+  .rest { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+  .rest img { width: 36px; height: 20px; object-fit: cover; filter: grayscale(1) brightness(.7); }
+
+  .matches { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+  .match {
+    position: relative; display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center;
+    background: linear-gradient(180deg, var(--panel-2), var(--panel)); border: 1px solid var(--line); overflow: hidden;
+  }
+  .match::before, .match::after { content: ""; position: absolute; top: 0; bottom: 0; width: 3px; }
+  .match::before { left: 0; background: var(--radiant); opacity: .7; }
+  .match::after { right: 0; background: var(--dire); opacity: .7; }
+  .match.is-next { border-color: var(--line-2); box-shadow: 0 0 0 1px rgba(200,170,110,.15), 0 10px 40px -20px rgba(200,170,110,.5); }
+  .side { position: relative; display: grid; gap: 8px; padding: 12px 12px 12px 14px; min-width: 0; }
+  .side.b { text-align: right; padding: 12px 14px 12px 12px; }
+  .portrait { position: relative; aspect-ratio: 16/9; overflow: hidden; border: 1px solid var(--line); }
+  .portrait img { width: 100%; height: 100%; object-fit: cover; display: block; transition: filter .3s; }
+  .side.lose .portrait img { filter: grayscale(1) brightness(.55); }
+  .side.win .portrait { border-color: var(--gold); }
+  .crown { position: absolute; top: 4px; left: 4px; padding: 3px 6px; font: 700 10px/1 var(--fl); letter-spacing: .18em; background: var(--gold); color: #1b1408; }
+  .side.b .crown { left: auto; right: 4px; }
+  .who strong { display: block; font: 700 15px/1.15 var(--fd); letter-spacing: .03em; text-transform: uppercase; overflow-wrap: anywhere; }
+  .who small { font: 500 13px/1 var(--fl); letter-spacing: .06em; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .side.lose .who strong { color: var(--muted); }
+  .mid { display: grid; justify-items: center; gap: 6px; padding: 0 4px; min-width: 70px; }
+  .mid .vs { font: 900 22px/1 var(--fd); color: var(--muted); letter-spacing: .06em; }
+  .mid .res { font: 800 30px/1 var(--fd); font-variant-numeric: tabular-nums; display: flex; gap: 6px; align-items: baseline; }
+  .mid .res .w { color: var(--gold-hi); } .mid .res .l { color: var(--muted); } .mid .res i { font-style: normal; font-size: 18px; color: var(--muted); }
+  .mid small { font: 600 11px/1 var(--fl); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  .mid .time { font: 700 16px/1 var(--fl); letter-spacing: .08em; color: var(--fg); }
+
+  .day { display: grid; gap: 22px; }
+  .day + .day { margin-top: 18px; }
+
+  /* ---------- Standings ---------- */
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--line); background: var(--panel); }
+  table { width: 100%; border-collapse: collapse; min-width: 640px; }
+  th { font: 600 12px/1 var(--fl); letter-spacing: .18em; text-transform: uppercase; color: var(--muted); text-align: center; padding: 14px 10px; border-bottom: 1px solid var(--line-2); background: #0b0c0f; }
+  th.l, td.l { text-align: left; }
+  td { padding: 10px; text-align: center; border-bottom: 1px solid var(--line); font: 500 17px/1 var(--fl); font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: 0; }
+  td.pos { font: 800 20px/1 var(--fd); color: var(--muted); width: 54px; }
+  tr.q td.pos { color: var(--gold-hi); }
+  tr.q td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
+  tr.cut td { border-bottom: 1px solid var(--gold); }
+  .team { display: flex; align-items: center; gap: 12px; }
+  .team img { width: 64px; height: 36px; object-fit: cover; border: 1px solid var(--line); }
+  .team strong { font: 700 15px/1.1 var(--fd); letter-spacing: .03em; text-transform: uppercase; }
+  .team small { display: block; font: 500 12px/1.2 var(--fl); color: var(--muted); letter-spacing: .06em; }
+  td.pts { font: 800 22px/1 var(--fd); color: var(--gold-hi); }
+  .pos-d { color: var(--radiant); } .neg-d { color: var(--dire); }
+  .form { display: inline-flex; gap: 3px; }
+  .form i { width: 18px; height: 18px; display: grid; place-items: center; font: 700 10px/1 var(--fl); font-style: normal; }
+  .form .W { background: rgba(109,191,75,.2); color: var(--radiant); border: 1px solid rgba(109,191,75,.45); }
+  .form .L { background: rgba(210,69,47,.16); color: var(--dire); border: 1px solid rgba(210,69,47,.4); }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 22px; font: 500 13px/1.4 var(--fl); letter-spacing: .06em; color: var(--muted); }
+  .legend b { color: var(--gold-hi); font-weight: 600; }
+
+  /* ---------- Bracket ---------- */
+  .bracket { display: grid; grid-template-columns: 1fr 70px 1fr 70px 1fr; align-items: center; }
+  .col { display: grid; gap: 40px; }
+  .bm { border: 1px solid var(--line); background: linear-gradient(180deg, var(--panel-2), var(--panel)); }
+  .bm header { display: flex; justify-content: space-between; padding: 9px 12px; font: 600 12px/1 var(--fl); letter-spacing: .18em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line); }
+  .bm header b { color: var(--gold); font-weight: 600; }
+  .slot { display: flex; align-items: center; gap: 10px; padding: 8px 12px; }
+  .slot + .slot { border-top: 1px solid var(--line); }
+  .slot img, .slot .ph { width: 56px; height: 32px; object-fit: cover; flex: none; }
+  .slot .ph { border: 1px dashed rgba(255,255,255,.18); display: grid; place-items: center; font: 800 14px/1 var(--fd); color: var(--muted); }
+  .slot strong { font: 700 14px/1.1 var(--fd); text-transform: uppercase; letter-spacing: .03em; }
+  .slot small { display: block; font: 500 12px/1.2 var(--fl); color: var(--muted); letter-spacing: .08em; }
+  .slot.tbd strong { color: var(--muted); }
+  .link { height: 100%; position: relative; }
+  .link::before { content: ""; position: absolute; left: 0; right: 50%; top: 25%; bottom: 25%; border: 1px solid var(--line-2); border-left: 0; }
+  .link::after { content: ""; position: absolute; left: 50%; right: 0; top: 50%; border-top: 1px solid var(--line-2); }
+  .link.single::before { display: none; } .link.single::after { left: 0; }
+  .aegis { text-align: center; display: grid; gap: 10px; justify-items: center; padding: 26px 14px; border: 1px solid var(--line-2);
+    background: radial-gradient(100% 80% at 50% 0%, rgba(200,170,110,.2), transparent 70%), var(--panel); }
+  .aegis svg { width: 64px; height: 76px; filter: drop-shadow(0 0 18px rgba(240,220,170,.35)); }
+  .aegis small { font: 600 12px/1 var(--fl); letter-spacing: .3em; text-transform: uppercase; color: var(--gold); }
+  .aegis b { font: 900 22px/1.1 var(--fd); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .notice { padding: 14px 18px; border: 1px solid var(--line-2); background: rgba(200,170,110,.06); font: 500 15px/1.4 var(--fl); letter-spacing: .04em; color: var(--gold-hi); text-align: center; }
+
+  /* ---------- Rules ---------- */
+  .rules-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); border: 1px solid var(--line-2); background: var(--panel); }
+  .rule { padding: 16px; display: grid; gap: 6px; text-align: center; }
+  .rule + .rule { border-left: 1px solid var(--line); }
+  .rule small { font: 600 11px/1 var(--fl); letter-spacing: .22em; text-transform: uppercase; color: var(--muted); }
+  .rule b { font: 800 20px/1.1 var(--fd); color: var(--gold-hi); letter-spacing: .03em; }
+  .rules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+  .rbox { border: 1px solid var(--line); background: linear-gradient(180deg, var(--panel-2), var(--panel)); padding: 18px 20px; }
+  .rbox h3 { margin: 0 0 10px; font: 700 16px/1 var(--fd); letter-spacing: .12em; text-transform: uppercase; color: var(--gold); }
+  .rbox ul, .rbox ol { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: #cfcac1; }
+  .rbox li::marker { color: var(--gold); }
+
+  footer { text-align: center; padding: 26px 16px 40px; font: 500 12px/1.5 var(--fl); letter-spacing: .14em; text-transform: uppercase; color: #55534f; border-top: 1px solid var(--line); }
+
+  @media (max-width: 760px) {
+    .hero { min-height: 380px; }
+    .phases b { font-size: 15px; }
+    .matches { grid-template-columns: 1fr; }
+    .bracket { grid-template-columns: 1fr; gap: 14px; }
+    .link { display: none; }
+    .col { gap: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap hero-inner">
+    <span class="live"><b></b> En vivo · actualizado al instante</span>
+    <span class="kicker">Dota 2 · Temporada Octubre 2026</span>
+    <h1>Torneo All vs All</h1>
+    <div class="sides"><span class="r">Radiant</span><i>vs</i><span class="d">Dire</span></div>
+    <div class="phases">
+      <div class="cur"><small>Fase de grupos</small><b>03 y 10 Oct</b></div>
+      <div><small>Semifinales</small><b>11 Oct</b></div>
+      <div><small>Gran final</small><b>17 Oct</b></div>
+    </div>
+    <div class="prog" aria-label="Progreso"><i id="progBar" style="width:0"></i></div>
+  </div>
+</header>
+
+<div class="tabs-bar">
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-tab="matches">Partidos</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="standings">Posiciones</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="bracket">Playoffs</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="rules">Reglas</button>
+  </nav>
+</div>
+
+<main class="wrap">
+  <section class="panel on" id="p-matches">
+    <div class="filter" id="filter"></div>
+    <div id="days"></div>
+  </section>
+
+  <section class="panel" id="p-standings">
+    <div class="sec"><h2>Posiciones</h2><span id="stdSub"></span></div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>#</th><th class="l">Equipo</th><th>PJ</th><th>G</th><th>P</th><th>Pts</th><th>Kills</th><th>Deaths</th><th>K−D</th><th>Últimos</th></tr></thead>
+      <tbody id="stdBody"></tbody>
+    </table></div>
+    <div class="legend">
+      <span><b>Victoria</b> 1 pt · <b>Derrota</b> 0 pts</span>
+      <span><b>Desempate:</b> K−D, luego kills</span>
+      <span>La línea dorada marca a los <b>4</b> que pasan a semifinales</span>
+    </div>
+  </section>
+
+  <section class="panel" id="p-bracket">
+    <div class="sec"><h2>Playoffs</h2><span>Semis 11 Oct · Final 17 Oct</span></div>
+    <div class="notice" id="bracketNote"></div>
+    <div class="bracket" id="bracket"></div>
+  </section>
+  <section class="panel" id="p-rules">
+    <div class="sec"><h2>Reglas</h2><span>Reglamento oficial</span></div>
+    <div class="rules-top">
+      <div class="rule"><small>Victoria</small><b>1 pt</b></div>
+      <div class="rule"><small>Derrota</small><b>0 pts</b></div>
+      <div class="rule"><small>Clasifican</small><b>Top 4</b></div>
+      <div class="rule"><small>Semis</small><b>1.º vs 4.º · 2.º vs 3.º</b></div>
+    </div>
+    <div class="rules-grid">
+      <article class="rbox"><h3>Desempate</h3>
+        <ol><li>Diferencia de kills y deaths (K − D)</li><li>Mayor cantidad de kills</li><li>Si persiste: partida de desempate</li></ol></article>
+      <article class="rbox"><h3>Generales</h3>
+        <ul><li>Cada equipo tiene 5 jugadores titulares y hasta 1 suplente.</li><li>Tolerancia de 10 minutos; pasado ese tiempo se pierde la partida.</li><li>Modo de juego: Captains Mode.</li></ul></article>
+      <article class="rbox"><h3>Pausas y desconexiones</h3>
+        <ul><li>Máximo 5 minutos de pausa por equipo por partida.</li><li>Si un jugador se desconecta antes del minuto 5 se puede reiniciar la partida.</li></ul></article>
+      <article class="rbox"><h3>Conducta</h3>
+        <ul><li>Prohibido el uso de hacks, scripts o cuentas ajenas: descalificación inmediata.</li><li>Las decisiones de la organización son finales.</li></ul></article>
+    </div>
+  </section>
+</main>
+
+<footer>Resultados oficiales del torneo · Dota 2 es una marca de Valve Corporation</footer>
+
+<script>
+  // Mockup data. In the real app this comes from the server and refreshes via SSE.
+  const CDN = 'https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/';
+  const TEAMS = {
+    A: { name: 'Alpha Legion',  hero: 'juggernaut',       cap: 'Cap. Kelvin' },
+    B: { name: 'Bravos',        hero: 'phantom_assassin', cap: 'Cap. —' },
+    C: { name: 'Corsarios',     hero: 'invoker',          cap: 'Cap. —' },
+    D: { name: 'Dragones',      hero: 'crystal_maiden',   cap: 'Cap. —' },
+    E: { name: 'Eclipse',       hero: 'axe',              cap: 'Cap. —' },
+    F: { name: 'Fénix',         hero: 'lina',             cap: 'Cap. —' },
+    G: { name: 'Gárgolas',      hero: 'pudge',            cap: 'Cap. —' },
+  };
+  const img = c => `${CDN}${TEAMS[c].hero}.png`;
+  const ROUNDS = [
+    ['2026-10-03','14:00',[['A','B'],['C','D'],['E','F']],'G'], ['2026-10-03','15:00',[['B','G'],['C','F'],['D','E']],'A'],
+    ['2026-10-03','16:00',[['A','E'],['C','G'],['D','F']],'B'], ['2026-10-03','17:00',[['A','F'],['B','E'],['D','G']],'C'],
+    ['2026-10-10','14:00',[['A','G'],['B','F'],['C','E']],'D'], ['2026-10-10','15:00',[['A','D'],['B','C'],['F','G']],'E'],
+    ['2026-10-10','16:00',[['A','C'],['B','D'],['E','G']],'F'],
+  ];
+  // Results for rounds 1–3: [winner, k1, d1, k2, d2]
+  const RESULTS = {
+    'A-B':['A',32,18,18,32], 'C-D':['D',21,27,27,21], 'E-F':['E',29,24,24,29],
+    'B-G':['G',19,26,26,19], 'C-F':['C',35,20,20,35], 'D-E':['D',24,22,22,24],
+    'A-E':['A',27,15,15,27], 'C-G':['C',30,28,28,30], 'D-F':['F',17,23,23,17],
+  };
+  const matches = ROUNDS.flatMap(([date, time, pairs], r) =>
+    pairs.map(([a, b], i) => ({ n: r * 3 + i + 1, round: r + 1, date, time, a, b, res: RESULTS[a + '-' + b] || null })));
+  const nextRound = matches.find(m => !m.res)?.round;
+  document.getElementById('progBar').style.width = (matches.filter(m => m.res).length / matches.length * 100) + '%';
+
+  // ---- Matches tab
+  const DAY_FMT = new Intl.DateTimeFormat('es', { weekday: 'long', day: '2-digit', month: 'long', timeZone: 'UTC' });
+  let filter = null;
+  function renderFilter() {
+    const chips = [`<button class="chip all" aria-pressed="${!filter}" data-f="">Todos</button>`]
+      .concat(Object.keys(TEAMS).map(c => `<button class="chip" aria-pressed="${filter === c}" data-f="${c}"><img src="${img(c)}" alt="">${TEAMS[c].name}</button>`));
+    document.getElementById('filter').innerHTML = chips.join('');
+  }
+  function side(c, cls, k, d, won) {
+    return `<div class="side ${cls} ${won === true ? 'win' : won === false ? 'lose' : ''}">
+      <div class="portrait"><img src="${img(c)}" alt="">${won ? '<span class="crown">Victoria</span>' : ''}</div>
+      <div class="who"><strong>${TEAMS[c].name}</strong><small>${k != null ? `K ${k} · D ${d}` : TEAMS[c].cap}</small></div></div>`;
+  }
+  function matchCard(m) {
+    const r = m.res, wa = r ? r[0] === m.a : null;
+    const mid = r
+      ? `<div class="mid"><div class="res"><span class="${wa ? 'w' : 'l'}">${wa ? 1 : 0}</span><i>–</i><span class="${wa ? 'l' : 'w'}">${wa ? 0 : 1}</span></div><small>Partido ${m.n}</small></div>`
+      : `<div class="mid"><span class="vs">VS</span><span class="time">${m.time}</span><small>Partido ${m.n}</small></div>`;
+    return `<article class="match ${m.round === nextRound ? 'is-next' : ''}">
+      ${side(m.a, 'a', r?.[1], r?.[2], r ? wa : null)}${mid}${side(m.b, 'b', r?.[3], r?.[4], r ? !wa : null)}</article>`;
+  }
+  function renderDays() {
+    const days = [...new Set(ROUNDS.map(r => r[0]))];
+    document.getElementById('days').innerHTML = days.map(day => {
+      const rounds = ROUNDS.map((r, i) => ({ r, i })).filter(x => x.r[0] === day);
+      const body = rounds.map(({ r, i }) => {
+        const ms = matches.filter(m => m.round === i + 1 && (!filter || m.a === filter || m.b === filter));
+        if (!ms.length) return filter === r[3] ? `<div class="round"><div class="round-head"><b>Ronda ${i + 1}</b><span>${r[1]} h</span><span class="rest">${TEAMS[r[3]].name} descansa</span></div></div>` : '';
+        const done = ms.every(m => m.res);
+        return `<div class="round"><div class="round-head"><b>Ronda ${i + 1}</b><span>${r[1]} – ${String(+r[1].slice(0, 2) + 1).padStart(2, '0')}:00</span>
+          ${i + 1 === nextRound ? '<span class="tag next">Siguiente</span>' : done ? '<span class="tag done">Finalizada</span>' : ''}
+          <span class="rest">Descansa <img src="${img(r[3])}" alt=""> ${TEAMS[r[3]].name}</span></div>
+          <div class="matches">${ms.map(matchCard).join('')}</div></div>`;
+      }).join('');
+      return `<div class="day"><div class="sec"><h2>${DAY_FMT.format(new Date(day))}</h2><span>Fase de grupos</span></div>${body}</div>`;
+    }).join('');
+  }
+
+  // ---- Standings (same rules as the real app: points → K−D → kills)
+  function standings() {
+    const s = Object.fromEntries(Object.keys(TEAMS).map(c => [c, { c, pj: 0, w: 0, l: 0, k: 0, d: 0, form: [] }]));
+    for (const m of matches.filter(m => m.res)) {
+      const [win, k1, d1, k2, d2] = m.res;
+      for (const [c, k, d] of [[m.a, k1, d1], [m.b, k2, d2]]) {
+        const t = s[c]; t.pj++; t.k += k; t.d += d;
+        if (win === c) { t.w++; t.form.push('W'); } else { t.l++; t.form.push('L'); }
+      }
+    }
+    return Object.values(s).sort((x, y) => y.w - x.w || (y.k - y.d) - (x.k - x.d) || y.k - x.k || x.c.localeCompare(y.c));
+  }
+  function renderStandings() {
+    const played = matches.filter(m => m.res).length;
+    document.getElementById('stdSub').textContent = `${played} de ${matches.length} partidos jugados`;
+    document.getElementById('stdBody').innerHTML = standings().map((t, i) => {
+      const diff = t.k - t.d;
+      return `<tr class="${i < 4 ? 'q' : ''} ${i === 3 ? 'cut' : ''}">
+        <td class="pos">${i + 1}</td>
+        <td class="l"><div class="team"><img src="${img(t.c)}" alt=""><div><strong>${TEAMS[t.c].name}</strong><small>${TEAMS[t.c].cap}</small></div></div></td>
+        <td>${t.pj}</td><td>${t.w}</td><td>${t.l}</td><td class="pts">${t.w}</td><td>${t.k}</td><td>${t.d}</td>
+        <td class="${diff > 0 ? 'pos-d' : diff < 0 ? 'neg-d' : ''}">${diff > 0 ? '+' : ''}${diff}</td>
+        <td><span class="form">${t.form.slice(-5).map(f => `<i class="${f}">${f === 'W' ? 'G' : 'P'}</i>`).join('')}</span></td></tr>`;
+    }).join('');
+  }
+
+  // ---- Bracket (projection while groups are in progress)
+  function renderBracket() {
+    const st = standings(), left = matches.filter(m => !m.res).length;
+    document.getElementById('bracketNote').textContent = left
+      ? `Proyección con la tabla actual · faltan ${left} partidos de fase de grupos`
+      : 'Cruces confirmados';
+    const slot = (t, seed) => t
+      ? `<div class="slot"><img src="${img(t.c)}" alt=""><div><strong>${TEAMS[t.c].name}</strong><small>${seed}.º de grupos</small></div></div>`
+      : `<div class="slot tbd"><span class="ph">?</span><div><strong>Por definir</strong><small>${seed}</small></div></div>`;
+    document.getElementById('bracket').innerHTML = `
+      <div class="col">
+        <div class="bm"><header><span>Semifinal 1</span><b>11 Oct · 14:00</b></header>${slot(st[0], 1)}${slot(st[3], 4)}</div>
+        <div class="bm"><header><span>Semifinal 2</span><b>11 Oct · 15:00</b></header>${slot(st[1], 2)}${slot(st[2], 3)}</div>
+      </div>
+      <div class="link"></div>
+      <div class="col"><div class="bm"><header><span>Gran final</span><b>17 Oct</b></header>${slot(null, 'Ganador SF1')}${slot(null, 'Ganador SF2')}</div></div>
+      <div class="link single"></div>
+      <div class="aegis">
+        <svg viewBox="0 0 64 76" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0dcaa"/><stop offset="1" stop-color="#8a6d3b"/></linearGradient></defs>
+          <path d="M32 2 60 12v22c0 18-12 32-28 40C16 66 4 52 4 34V12Z" fill="none" stroke="url(#g)" stroke-width="3"/>
+          <path d="M32 14 48 20v14c0 11-7 20-16 25-9-5-16-14-16-25V20Z" fill="url(#g)" opacity=".85"/></svg>
+        <small>Campeón</small><b>Por definir</b>
+      </div>`;
+  }
+
+  document.addEventListener('click', e => {
+    const tab = e.target.closest('.tab');
+    if (tab) {
+      document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t === tab));
+      document.querySelectorAll('.panel').forEach(p => p.classList.toggle('on', p.id === 'p-' + tab.dataset.tab));
+      return;
+    }
+    const chip = e.target.closest('.chip');
+    if (chip) { filter = chip.dataset.f || null; renderFilter(); renderDays(); }
+  });
+  renderFilter(); renderDays(); renderStandings(); renderBracket();
+</script>
+</body>
+</html>
