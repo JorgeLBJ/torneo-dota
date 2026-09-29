@@ -87,6 +87,7 @@ El servidor lee estas variables de entorno:
 | `/t/:slug` | Página pública de cualquier torneo (archivo); 404 en español si no existe |
 | `/partial`, `/t/:slug/partial` | El contenido de la página como fragmento HTML (se usa para la actualización en vivo) |
 | `/events`, `/t/:slug/events` | Flujo de eventos enviados por el servidor, SSE (`hello`, `change`, `ping`) |
+| `/healthz` | Estado de salud para Docker/monitoreo: `200 {"status":"ok"}` si la base responde, `503` si no |
 | `/admin` | Panel: abre los resultados del torneo activo |
 | `/admin/setup` | Configuración inicial (solo mientras no haya administradores; después, 404) |
 | `/admin/cuenta` | Cambiar tu propia contraseña |
@@ -136,7 +137,7 @@ Define el enlace en **Configuración > Transmisión en vivo**. La pestaña públ
 
 ## Arquitectura
 
-**Tecnologías:** Node.js + TypeScript, [Hono](https://hono.dev) con renderizado en servidor mediante `hono/jsx`, `better-sqlite3` (SQL, sin ORM), JavaScript sin frameworks en el cliente (sin paso de compilación) y Vitest. `tsx` ejecuta el TypeScript directamente, tanto en desarrollo como en `npm start`.
+**Tecnologías:** Node.js + TypeScript, [Hono](https://hono.dev) con renderizado en servidor mediante `hono/jsx`, `better-sqlite3` (SQL, sin ORM), JavaScript sin frameworks en el cliente (sin paso de compilación) y Vitest. En desarrollo `tsx` ejecuta el TypeScript directamente; en producción se compila a `dist/` y se ejecuta con `node`.
 
 ```text
 src/
@@ -151,6 +152,8 @@ src/
   format/             formato de fechas y aritmética de zonas horarias
   data/               lista de héroes
 migrations/           archivos SQL solo hacia adelante: 001_init.sql ... 004_stream.sql
+deploy/               despliegue con Docker: compose, .env de ejemplo, bloque de Caddy y guía
+Dockerfile            imagen de producción (varias etapas, compila a dist/)
 public/               archivos estáticos: CSS, JS del cliente, retratos de héroes, imágenes
 scripts/              datos de ejemplo y descargador de retratos de héroes
 test/                 pruebas con Vitest (SQLite en memoria)
@@ -165,7 +168,8 @@ docs/screenshots/     imágenes usadas en este README
 | Comando | Qué hace |
 | --- | --- |
 | `npm run dev` | Inicia con observación de archivos (`tsx watch`) |
-| `npm start` | Inicia sin observación de archivos |
+| `npm run build` | Compila TypeScript a `dist/` (`tsc -p tsconfig.build.json`) |
+| `npm start` | Inicia la versión compilada (`node dist/server.js`); ejecuta antes `npm run build` |
 | `npm test` | Ejecuta todas las pruebas una vez (`vitest run`) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run seed:oct2026` | Carga el torneo de octubre de 2026 (idempotente) |
@@ -177,17 +181,26 @@ docs/screenshots/     imágenes usadas en este README
 
 ## Despliegue
 
-**Despliegue con Docker: próximamente**, detrás de un proxy inverso Caddy existente. Este repositorio todavía no contiene archivos de Docker. Cuando los tenga, el código de la configuración inicial estará en los registros del contenedor (`docker compose logs`); también puedes definir `ADMIN_PASSWORD` o `ADMIN_SETUP_TOKEN` en el entorno.
+Se despliega con **Docker** detrás de un Caddy existente. La imagen se construye dentro de Docker desde GitHub, así que en el servidor no hace falta instalar node, npm ni git.
 
-Ajustes necesarios detrás de un proxy que termina HTTPS:
+```bash
+# en el servidor, con deploy/compose.yml y un .env (ver deploy/.env.example)
+docker compose up -d --build
+```
 
-| Ajuste | Motivo |
+Guía completa en español, con primer despliegue, actualización, reversión, copias de seguridad y solución de problemas: **[deploy/README.md](deploy/README.md)**.
+
+| Ajuste (en `.env`) | Motivo |
 | --- | --- |
 | `COOKIE_SECURE=1` | La cookie de sesión solo se envía por HTTPS |
 | `TRUST_PROXY=1` | Dirección de cliente correcta para el límite de inicios de sesión y host correcto para Twitch |
-| `DATABASE_PATH` en un volumen persistente | El archivo SQLite es el único estado |
+| `DATABASE_PATH=/data/torneos.db` | El archivo SQLite vive en el volumen `torneo-dota_data` |
 
-**Copias de seguridad:** todo está en el archivo SQLite. La base de datos usa el modo WAL, así que copia `torneos.db` junto con `torneos.db-wal` y `torneos.db-shm` con la aplicación detenida, o bien obtén una copia consistente de una base en ejecución con la API de copia de seguridad de SQLite (con la herramienta de línea de comandos `sqlite3`: `sqlite3 torneos.db ".backup backup.db"`).
+> **Los datos están en el volumen `torneo-dota_data`. `docker compose down -v` los borra.** Sobreviven a reinicios, caídas y actualizaciones; usa siempre `docker compose down` sin `-v`.
+
+El primer código de configuración inicial aparece en `docker compose logs torneo-dota`; también puedes definir `ADMIN_PASSWORD` o `ADMIN_SETUP_TOKEN` en el `.env`. Para probar la imagen en local: `docker compose -f deploy/compose.local.yml up -d --build` (publica solo en `127.0.0.1:3097`).
+
+**Copias de seguridad:** ver `deploy/README.md` (copia consistente con la app en marcha usando la API de copia de SQLite).
 
 ## Créditos y aviso legal
 

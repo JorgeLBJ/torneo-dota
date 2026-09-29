@@ -1,0 +1,6 @@
+torneo-dota.jpsolutions.app {
+	import common
+	reverse_proxy torneo-dota:3000 {
+		flush_interval -1
+	}
+}

@@ -49,6 +49,16 @@ export function createApp({ db, config }: CreateAppOptions) {
     '/assets/*',
     serveStatic({ root: relative(process.cwd(), PUBLIC_DIR) || '.', rewriteRequestPath: (p) => p.replace(/^\/assets/, '') }),
   );
+  // Liveness for Docker/monitors: no auth, never cached; 503 when the database does not answer.
+  app.get('/healthz', (c) => {
+    c.header('Cache-Control', 'no-store');
+    try {
+      db.prepare('SELECT 1').pluck().get();
+      return c.json({ status: 'ok' });
+    } catch {
+      return c.json({ status: 'error' }, 503);
+    }
+  });
   app.get('/favicon.svg', (c) => c.body(FAVICON_SVG, 200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' }));
   app.get('/favicon.ico', (c) => c.body(null, 204));
   app.route('/admin', adminApp({ repo, events, config, limiter, accountLimiter, now }));

@@ -1,0 +1,19 @@
+# Keep the build context small and the image free of local state.
+.git
+.gitignore
+node_modules
+dist
+data
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
+.playwright-mcp
+docs
+odd
+test
+scripts
+deploy
+*.md
+vitest.config.ts

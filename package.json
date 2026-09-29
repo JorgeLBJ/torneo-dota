@@ -6,20 +6,21 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
     "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
+    "start": "node dist/server.js",
     "fetch:heroes": "tsx scripts/fetch-heroes.ts",
     "seed:oct2026": "tsx scripts/seed-october-2026.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.2",
     "better-sqlite3": "^13.0.3",
-    "hono": "^4.13.10",
-    "tsx": "^4.23.15"
+    "hono": "^4.13.10"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.6.3",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.2"
   }
