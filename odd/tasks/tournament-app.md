@@ -43,7 +43,8 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
 ## Stakeholder feedback on mockups (2026-09-29)
 - Rules need their own larger section: backoffice "Rules" screen (points per win/loss, ordered tiebreakers, format, free-text rulebook) + public "Rules" tab. Accepted.
 - Fixture must support more/fewer teams and extra rounds: generator already adapts to N teams; add single/double round-robin option and manual "add round" / "add match" (e.g. tiebreaker match). Accepted.
-- Each team gets a hero emblem (Dota 2 hero portrait) — proposed, pending confirmation.
+- Each team gets a hero emblem picked from the predefined Dota 2 hero list (127 heroes, `odd/mockups/heroes.json`, source OpenDota /api/heroes); one hero per team within a tournament. Confirmed by user.
+- Admin model: single role; extra admin users allowed, all with the same role. Confirmed by user.
 - Proposed in mockup, NOT yet confirmed: BO1/BO3 series, 2/8 qualifiers, allow draws.
 - Public site style: Dota 2 look (Cinzel + Barlow, black/gold, Radiant green vs Dire red). Valve CDN images to be self-hosted in production.
 
@@ -59,6 +60,9 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
 
 ## Delivery
 - Strategy: ask-on-risk. No git remote yet, so no PRs; work-unit commits on `feat/tournament-app`. Chain strategy asked once a remote exists.
+
+## Review log
+- T1–T5 range 4e174f8..022e5ef: risk medium, consent granted, native review APPROVED and acknowledged (lineage review-efbd791797c39cae). Reviewed boundary → 022e5ef. Non-blocking findings folded into T6: winner CHECK bypass when a team is NULL (001_init.sql:34), semifinal winner not validated (playoffs.ts:62-70); suggestions: addMinutes validation (fixture.ts:50-56), bracket ignores qualifiers (playoffs.ts:56-58).
 
 ## Progress / Evidence
 - T1 (9860a63): route delegated writer. RED: migrate.test.ts failed on missing module `src/db/migrate`; GREEN after implementing. Schema tests (schema.test.ts) written alongside 001_init.sql, so no separate RED observed for them. 15 tests.

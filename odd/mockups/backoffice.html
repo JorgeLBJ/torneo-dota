@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Backoffice Torneos</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --bg:#0c0e18; --panel:#141726; --panel-2:#1b1f33; --line:#272c45; --fg:#eceef7; --muted:#8d93b0;
+    --gold:#e6b65f; --gold-soft:rgba(230,182,95,.14); --win:#5fd3a2; --loss:#e57580;
+    --fd:"Saira Condensed","Arial Narrow",sans-serif; --fb:"Figtree","Segoe UI",system-ui,sans-serif;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 var(--fb)}
+  button,input,select{font:inherit;color:inherit}
+  :focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  .mock-nav{position:sticky;top:0;z-index:5;display:flex;gap:6px;flex-wrap:wrap;padding:8px 16px;background:#05060c;border-bottom:1px dashed var(--line);font-size:12px;color:var(--muted)}
+  .mock-nav b{margin-right:6px}
+  .mock-nav button{background:none;border:1px solid var(--line);border-radius:99px;padding:3px 10px;cursor:pointer}
+  .mock-nav button.on{border-color:var(--gold);color:var(--gold)}
+  .screen{display:none}.screen.on{display:block}
+
+  /* Shell */
+  .shell{display:grid;grid-template-columns:230px 1fr;min-height:calc(100vh - 40px)}
+  aside{background:var(--panel);border-right:1px solid var(--line);padding:18px 14px;display:grid;align-content:start;gap:18px}
+  .brand{font-family:var(--fd);font-weight:800;font-size:22px;letter-spacing:.04em;text-transform:uppercase}
+  .brand em{font-style:normal;color:var(--gold)}
+  .tsel{display:grid;gap:4px}
+  .tsel small,.navlbl{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+  select,input{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;width:100%}
+  nav.side{display:grid;gap:2px}
+  nav.side a{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:9px;color:var(--muted);text-decoration:none;cursor:pointer}
+  nav.side a.on{background:var(--panel-2);color:var(--fg);box-shadow:inset 2px 0 0 var(--gold)}
+  nav.side a span{font-size:11px;padding:1px 7px;border-radius:99px;background:var(--gold-soft);color:var(--gold)}
+  main{padding:24px 28px 60px;display:grid;gap:18px;align-content:start;max-width:1100px}
+  .head{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
+  h1{margin:0;font-family:var(--fd);font-weight:800;font-size:34px;line-height:1;text-transform:uppercase}
+  h2{margin:0 0 10px;font-family:var(--fd);font-weight:700;font-size:20px;text-transform:uppercase;letter-spacing:.04em}
+  .sub{color:var(--muted);margin:4px 0 0}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:99px;border:1px solid var(--line);background:transparent;cursor:pointer;font-weight:600}
+  .btn:hover{border-color:var(--gold);color:var(--gold)}
+  .btn.pri{background:var(--gold);border-color:var(--gold);color:#1a1405}
+  .btn.pri:hover{filter:brightness(1.08);color:#1a1405}
+  .btn.sm{padding:4px 10px;font-size:12px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+  label.f{display:grid;gap:4px;font-size:12px;color:var(--muted)}
+  .note{padding:10px 14px;border-radius:10px;background:var(--gold-soft);border:1px solid rgba(230,182,95,.35);color:#f3dcae;font-size:13px}
+  table{width:100%;border-collapse:collapse}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:left;padding:8px;border-bottom:1px solid var(--line)}
+  td{padding:8px;border-bottom:1px solid var(--line)}
+  td input{padding:6px 8px}
+  .badge{--tc:var(--gold);display:inline-grid;place-items:center;width:28px;height:28px;border-radius:8px;font-family:var(--fd);font-weight:800;font-size:16px;color:var(--tc);background:color-mix(in srgb,var(--tc) 16%,transparent);border:1px solid color-mix(in srgb,var(--tc) 45%,transparent)}
+  .pill{padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line);color:var(--muted)}
+  .pill.ok{color:var(--win);border-color:rgba(95,211,162,.4)}
+  .pill.next{color:var(--gold);border-color:rgba(230,182,95,.5);background:var(--gold-soft)}
+  .muted{color:var(--muted)}
+
+  /* Fixture list */
+  .round{display:grid;grid-template-columns:110px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);align-items:start}
+  .round .rh b{font-family:var(--fd);font-size:18px;display:block}
+  .pairs{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .pair{display:inline-flex;align-items:center;gap:6px;padding:5px 10px 5px 6px;border-radius:10px;background:var(--panel-2);border:1px solid var(--line)}
+  .pair.bye{border-style:dashed;background:none;color:var(--muted)}
+
+  /* Result entry */
+  .rcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+  .rc{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:12px}
+  .rc.saved{border-color:rgba(95,211,162,.4)}
+  .rc-top{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted)}
+  .team-row{display:grid;grid-template-columns:1fr 64px 64px;gap:8px;align-items:center}
+  .pick{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;border:1px solid var(--line);background:none;cursor:pointer;text-align:left}
+  .pick.win{border-color:var(--win);background:rgba(95,211,162,.1)}
+  .pick.win::after{content:"GANÓ";margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--win)}
+  .kd-h{display:grid;grid-template-columns:1fr 64px 64px;gap:8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .kd-h span:not(:first-child){text-align:center}
+  .team-row input{text-align:center}
+  .rc-foot{display:flex;justify-content:space-between;gap:8px}
+
+  /* Standings preview */
+  .std td:nth-child(n+3),.std th:nth-child(n+3){text-align:center;font-variant-numeric:tabular-nums}
+  .std tr.cut td{border-bottom:2px solid var(--gold)}
+
+  /* Bracket */
+  .bracket{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:center}
+  .bm{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;display:grid;gap:8px}
+  .bm h3{margin:0;font-family:var(--fd);font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .champ{text-align:center;padding:20px;border-radius:14px;border:1px solid rgba(230,182,95,.5);background:var(--gold-soft)}
+  .champ b{font-family:var(--fd);font-size:28px;color:var(--gold);text-transform:uppercase}
+
+  /* Login */
+  .login{min-height:calc(100vh - 40px);display:grid;place-items:center;padding:16px}
+  .login .card{width:min(360px,100%);display:grid;gap:14px}
+
+  /* Hero picker */
+  .hero-slot{display:grid;place-items:center;width:96px;height:54px;padding:0;border-radius:8px;overflow:hidden;cursor:pointer;background:var(--panel-2);border:1px dashed var(--line);color:var(--muted);font-size:11px}
+  .hero-slot img{width:100%;height:100%;object-fit:cover;display:block}
+  .hero-slot:hover{border-color:var(--gold)}
+  .hero-modal{width:min(900px,calc(100vw - 32px));max-height:85vh;padding:18px;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--fg)}
+  .hero-modal::backdrop{background:rgba(0,0,0,.7)}
+  .hm-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+  .hm-tools{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+  .hm-tools input{flex:1;min-width:200px}
+  .attrs{display:flex;gap:6px;flex-wrap:wrap}
+  .attrs .on{border-color:var(--gold);color:var(--gold)}
+  .hero-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;overflow:auto;max-height:60vh}
+  .hero{display:grid;gap:4px;padding:4px;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer;text-align:center;font-size:11px}
+  .hero img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:5px}
+  .hero:hover{border-color:var(--gold)}
+  .hero.sel{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+  .hero.taken{opacity:.3;cursor:not-allowed}
+
+  @media (max-width:760px){
+    .shell{grid-template-columns:1fr}
+    aside{grid-template-columns:1fr;border-right:0;border-bottom:1px solid var(--line)}
+    nav.side{grid-auto-flow:column;overflow-x:auto}
+    main{padding:18px 16px 48px}
+    .round{grid-template-columns:1fr}
+    .bracket{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<div class="mock-nav"><b>MOCKUP · pantallas:</b>
+  <button data-go="login">Login</button>
+  <button data-go="tournaments">Torneos</button>
+  <button data-go="config">Configuración</button>
+  <button data-go="rules">Reglas</button>
+  <button data-go="teams">Equipos</button>
+  <button data-go="fixture">Fixture</button>
+  <button data-go="results" class="on">Resultados</button>
+  <button data-go="playoffs">Playoffs</button>
+</div>
+
+<!-- LOGIN -->
+<section class="screen" id="s-login">
+  <div class="login"><div class="card">
+    <div class="brand">Torneos <em>Admin</em></div>
+    <label class="f">Usuario<input value="admin"></label>
+    <label class="f">Contraseña<input type="password" value="••••••••"></label>
+    <button class="btn pri" data-go="results">Entrar</button>
+  </div></div>
+</section>
+
+<!-- SHELL (shared by all admin screens) -->
+<section class="screen on" id="s-app">
+<div class="shell">
+  <aside>
+    <div class="brand">Torneos <em>Admin</em></div>
+    <div class="tsel"><small>Torneo activo</small>
+      <select><option>Torneo All vs All · Oct 2026</option><option>+ Nuevo torneo…</option></select>
+    </div>
+    <nav class="side">
+      <span class="navlbl">Gestión</span>
+      <a data-go="tournaments">Torneos</a>
+      <a data-go="config">Configuración</a>
+      <a data-go="rules">Reglas</a>
+      <a data-go="teams">Equipos <span>7</span></a>
+      <a data-go="fixture">Fixture</a>
+      <a data-go="results">Resultados <span>9/21</span></a>
+      <a data-go="playoffs">Playoffs</a>
+    </nav>
+    <a class="btn sm" href="#" title="Abre /t/torneo-oct-2026">↗ Ver página pública</a>
+  </aside>
+
+  <main>
+    <!-- TOURNAMENTS -->
+    <div class="view" id="v-tournaments">
+      <div class="head"><div><h1>Torneos</h1><p class="sub">Cada torneo tiene su propia URL pública.</p></div>
+        <button class="btn pri">+ Nuevo torneo</button></div>
+      <div class="card"><table>
+        <thead><tr><th>Nombre</th><th>URL pública</th><th>Equipos</th><th>Estado</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><b>Torneo All vs All · Oct 2026</b></td><td class="muted">/t/torneo-oct-2026</td><td>7</td><td><span class="pill next">Fase de grupos</span></td><td><button class="btn sm" data-go="results">Abrir</button></td></tr>
+          <tr><td><b>Copa Verano 2026</b></td><td class="muted">/t/copa-verano-2026</td><td>8</td><td><span class="pill ok">Finalizado · Campeón C</span></td><td><button class="btn sm">Abrir</button></td></tr>
+        </tbody></table></div>
+    </div>
+
+    <!-- CONFIG -->
+    <div class="view" id="v-config">
+      <div class="head"><div><h1>Configuración</h1><p class="sub">Datos del torneo y calendario.</p></div><button class="btn pri">Guardar</button></div>
+      <div class="grid2">
+        <div class="card" style="display:grid;gap:12px">
+          <h2>General</h2>
+          <label class="f">Nombre<input value="Torneo All vs All · Oct 2026"></label>
+          <label class="f">URL pública (slug)<input value="torneo-oct-2026"></label>
+          <label class="f">Juego<input value="Dota 2"></label>
+          <p class="muted" style="margin:0;font-size:12px">Puntos, desempates, playoffs y reglamento se editan en <a data-go="rules" style="color:var(--gold);cursor:pointer">Reglas</a>.</p>
+        </div>
+        <div class="card" style="display:grid;gap:12px">
+          <h2>Calendario</h2>
+          <table><thead><tr><th>Fase</th><th>Fecha</th><th>Horarios (1 h c/u)</th></tr></thead><tbody>
+            <tr><td>Grupos día 1</td><td><input type="date" value="2026-10-03"></td><td><input value="14:00, 15:00, 16:00, 17:00"></td></tr>
+            <tr><td>Grupos día 2</td><td><input type="date" value="2026-10-10"></td><td><input value="14:00, 15:00, 16:00"></td></tr>
+            <tr><td>Semifinales</td><td><input type="date" value="2026-10-11"></td><td><input value="14:00, 15:00"></td></tr>
+            <tr><td>Final</td><td><input type="date" value="2026-10-17"></td><td><input value="14:00"></td></tr>
+          </tbody></table>
+          <button class="btn sm" style="justify-self:start">+ Agregar día</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RULES -->
+    <div class="view" id="v-rules">
+      <div class="head"><div><h1>Reglas</h1><p class="sub">La tabla y los playoffs se calculan con estas reglas. El reglamento se publica en la pestaña "Reglas" de la web.</p></div><button class="btn pri">Guardar</button></div>
+      <div class="grid2">
+        <div class="card" style="display:grid;gap:12px;align-content:start">
+          <h2>Puntuación</h2>
+          <div class="grid2" style="grid-template-columns:1fr 1fr">
+            <label class="f">Victoria<input type="number" value="1"></label>
+            <label class="f">Derrota<input type="number" value="0"></label>
+          </div>
+          <label class="f"><span><input type="checkbox" style="width:auto"> Permitir empates</span></label>
+          <h2 style="margin-top:6px">Desempate</h2>
+          <p class="muted" style="margin:-6px 0 0;font-size:12px">Se aplican en este orden. Arrastra para reordenar.</p>
+          <ol style="margin:0;padding-left:20px;display:grid;gap:6px">
+            <li><span class="pair">Diferencia K − D</span></li>
+            <li><span class="pair">Más kills</span></li>
+            <li><span class="pair bye">Si siguen empatados: partida de desempate</span></li>
+          </ol>
+          <button class="btn sm" style="justify-self:start">+ Agregar criterio</button>
+        </div>
+        <div class="card" style="display:grid;gap:12px;align-content:start">
+          <h2>Formato</h2>
+          <label class="f">Fase de grupos<select><option>Todos contra todos · una vuelta</option><option>Todos contra todos · ida y vuelta</option></select></label>
+          <label class="f">Clasifican a playoffs<select><option>4 (semis 1v4 · 2v3 + final)</option><option>2 (final directa)</option><option>8 (cuartos + semis + final)</option></select></label>
+          <label class="f">Serie en playoffs<select><option>Al mejor de 1 (BO1)</option><option>Al mejor de 3 (BO3)</option></select></label>
+          <label class="f">Serie en la final<select><option>Al mejor de 1 (BO1)</option><option selected>Al mejor de 3 (BO3)</option></select></label>
+        </div>
+      </div>
+      <div class="card" style="display:grid;gap:10px">
+        <h2>Reglamento</h2>
+        <p class="muted" style="margin:0;font-size:12px">Texto libre que se muestra en la web pública. Admite títulos y listas.</p>
+        <textarea rows="12" style="background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:12px;font:inherit;color:inherit;resize:vertical">## Generales
+- Cada equipo tiene 5 jugadores titulares y hasta 1 suplente.
+- Tolerancia de 10 minutos; pasado ese tiempo se pierde la partida.
+- Modo de juego: Captains Mode.
+
+## Pausas y desconexiones
+- Máximo 5 minutos de pausa por equipo por partida.
+- Si un jugador se desconecta antes del minuto 5 se puede reiniciar la partida.
+
+## Conducta
+- Prohibido el uso de hacks, scripts o cuentas ajenas: descalificación inmediata.
+- Las decisiones de la organización son finales.</textarea>
+      </div>
+    </div>
+
+    <!-- TEAMS -->
+    <div class="view" id="v-teams">
+      <div class="head"><div><h1>Equipos</h1><p class="sub">Si cambias equipos después de generar el fixture, hay que regenerarlo.</p></div><button class="btn pri">+ Agregar equipo</button></div>
+      <div class="card"><table>
+        <thead><tr><th>Código</th><th>Emblema (héroe)</th><th>Nombre</th><th>Capitán</th><th></th></tr></thead>
+        <tbody id="teamRows"></tbody></table></div>
+      <p class="muted" style="margin:0;font-size:12px">El héroe es el emblema del equipo en la web pública: aparece en tarjetas de partido, tabla y playoffs. Cada héroe solo puede usarlo un equipo.</p>
+      <dialog id="heroModal" class="hero-modal">
+        <div class="hm-head"><h2 style="margin:0">Héroe para <span id="heroTeam" style="color:var(--gold)"></span></h2>
+          <button class="btn sm" onclick="this.closest('dialog').close()">Cerrar</button></div>
+        <div class="hm-tools">
+          <input id="heroSearch" placeholder="Buscar héroe…" autocomplete="off">
+          <div class="attrs">
+            <button class="btn sm on" data-attr="any">Todos</button>
+            <button class="btn sm" data-attr="str">Fuerza</button>
+            <button class="btn sm" data-attr="agi">Agilidad</button>
+            <button class="btn sm" data-attr="int">Inteligencia</button>
+            <button class="btn sm" data-attr="all">Universal</button>
+          </div>
+        </div>
+        <div class="hero-grid" id="heroGrid"></div>
+      </dialog>
+    </div>
+
+    <!-- FIXTURE -->
+    <div class="view" id="v-fixture">
+      <div class="head"><div><h1>Fixture</h1><p class="sub">Se adapta solo a la cantidad de equipos.</p></div>
+        <div style="display:flex;gap:8px"><button class="btn">⟳ Regenerar</button><button class="btn pri">Guardar cambios</button></div></div>
+      <div class="card" style="display:flex;flex-wrap:wrap;gap:12px 24px;align-items:end">
+        <label class="f" style="min-width:240px">Formato<select><option>Una vuelta</option><option>Ida y vuelta</option></select></label>
+        <div style="display:grid;gap:2px"><span class="muted" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase">Resultado</span><b>7 equipos → 7 rondas · 21 partidos · 1 descansa por ronda</b></div>
+        <div class="muted" style="font-size:12px;flex-basis:100%">Referencia: 6 equipos → 5 rondas · 8 equipos → 7 rondas · 10 equipos → 9 rondas. Ida y vuelta duplica las rondas.</div>
+      </div>
+      <div class="note">Generado automáticamente y repartido en el calendario. Puedes mover partidos entre rondas, agregar partidos sueltos o rondas extra (por ejemplo, una partida de desempate).</div>
+      <div class="card" id="fixtureList"></div>
+      <div style="display:flex;gap:8px"><button class="btn">+ Agregar ronda</button><button class="btn">+ Agregar partida de desempate</button></div>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="view" id="v-results">
+      <div class="head"><div><h1>Resultados</h1><p class="sub">Toca el equipo ganador, carga kills y deaths, guarda. La página pública se actualiza al instante.</p></div>
+        <select style="width:auto"><option>Sáb 03 oct</option><option>Sáb 10 oct</option><option>Todos</option></select></div>
+      <div class="rcards" id="resultCards"></div>
+      <h2 style="margin-top:8px">Tabla en vivo</h2>
+      <div class="card"><table class="std">
+        <thead><tr><th>#</th><th>Equipo</th><th>PJ</th><th>G</th><th>P</th><th>Pts</th><th>K</th><th>D</th><th>K−D</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><span class="badge">A</span> Alpha</td><td>3</td><td>3</td><td>0</td><td><b>3</b></td><td>61</td><td>32</td><td>+29</td></tr>
+          <tr><td>2</td><td><span class="badge">D</span> Delta</td><td>3</td><td>2</td><td>1</td><td><b>2</b></td><td>55</td><td>40</td><td>+15</td></tr>
+          <tr><td>3</td><td><span class="badge">C</span> Corsarios</td><td>3</td><td>2</td><td>1</td><td><b>2</b></td><td>48</td><td>41</td><td>+7</td></tr>
+          <tr class="cut"><td>4</td><td><span class="badge">E</span> Eclipse</td><td>2</td><td>1</td><td>1</td><td><b>1</b></td><td>30</td><td>29</td><td>+1</td></tr>
+          <tr><td>5</td><td><span class="badge">G</span> Gorilas</td><td>2</td><td>1</td><td>1</td><td><b>1</b></td><td>27</td><td>30</td><td>−3</td></tr>
+          <tr><td>6</td><td><span class="badge">B</span> Bravos</td><td>2</td><td>0</td><td>2</td><td><b>0</b></td><td>22</td><td>38</td><td>−16</td></tr>
+          <tr><td>7</td><td><span class="badge">F</span> Fénix</td><td>3</td><td>0</td><td>3</td><td><b>0</b></td><td>31</td><td>64</td><td>−33</td></tr>
+        </tbody></table>
+        <p class="muted" style="margin:10px 0 0;font-size:12px">La línea dorada marca el corte de clasificación (top 4).</p></div>
+    </div>
+
+    <!-- PLAYOFFS -->
+    <div class="view" id="v-playoffs">
+      <div class="head"><div><h1>Playoffs</h1><p class="sub">Se arman solos desde la tabla cuando termina la fase de grupos.</p></div></div>
+      <div class="note">Fase de grupos: faltan 12 partidos. Los cruces se completan automáticamente al cargar el último resultado.</div>
+      <div class="bracket">
+        <div style="display:grid;gap:14px">
+          <div class="bm"><h3>Semifinal 1 · 11 oct 14:00</h3>
+            <button class="pick"><span class="badge">A</span> 1.º Alpha</button>
+            <button class="pick"><span class="badge">E</span> 4.º Eclipse</button>
+          </div>
+          <div class="bm"><h3>Semifinal 2 · 11 oct 15:00</h3>
+            <button class="pick"><span class="badge">D</span> 2.º Delta</button>
+            <button class="pick"><span class="badge">C</span> 3.º Corsarios</button>
+          </div>
+        </div>
+        <div style="display:grid;gap:14px">
+          <div class="bm"><h3>Gran final · 17 oct 14:00</h3>
+            <button class="pick"><span class="badge ph">?</span> Ganador SF1</button>
+            <button class="pick"><span class="badge ph">?</span> Ganador SF2</button>
+          </div>
+          <div class="champ"><div class="muted" style="font-size:11px;letter-spacing:.12em">CAMPEÓN</div><b>Por definir</b></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</section>
+
+<script>
+  // Mockup-only navigation and fake data.
+  const teams = [['A','Alpha','Kelvin'],['B','Bravos',''],['C','Corsarios',''],['D','Delta',''],['E','Eclipse',''],['F','Fénix',''],['G','Gorilas','']];
+  const colors = {A:'#e6b65f',B:'#6fa8ff',C:'#5fd3a2',D:'#c58cff',E:'#ff8f6b',F:'#e57580',G:'#62d0e0'};
+  const badge = c => `<span class="badge" style="--tc:${colors[c]}">${c}</span>`;
+  // Hero emblem per team, picked from the predefined Dota 2 hero list.
+  const HERO_CDN = 'https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/';
+  const teamHero = {A:'juggernaut',B:'phantom_assassin',C:'invoker',D:'crystal_maiden',E:'axe',F:'lina',G:null};
+  let HEROES = [], pickingFor = null, attrFilter = 'any';
+  function renderTeams() {
+    document.getElementById('teamRows').innerHTML = teams.map(([c,n,cap]) => {
+      const h = teamHero[c];
+      const hero = h ? HEROES.find(x => x.slug === h) : null;
+      return `<tr><td>${badge(c)}</td>
+        <td><button class="hero-slot" data-pick="${c}" title="Elegir héroe">${h ? `<img src="${HERO_CDN}${h}.png" alt="">` : '<span>+ Elegir héroe</span>'}</button>
+          <div class="muted" style="font-size:11px;margin-top:3px">${hero ? hero.name : 'Sin héroe'}</div></td>
+        <td><input value="${n}"></td><td><input value="${cap}" placeholder="Opcional"></td><td><button class="btn sm">Eliminar</button></td></tr>`;
+    }).join('');
+  }
+  function renderHeroGrid() {
+    const q = document.getElementById('heroSearch').value.trim().toLowerCase();
+    const taken = new Set(Object.entries(teamHero).filter(([c]) => c !== pickingFor).map(([, h]) => h));
+    document.getElementById('heroGrid').innerHTML = HEROES
+      .filter(h => (attrFilter === 'any' || h.attr === attrFilter) && h.name.toLowerCase().includes(q))
+      .map(h => `<button class="hero ${teamHero[pickingFor] === h.slug ? 'sel' : ''} ${taken.has(h.slug) ? 'taken' : ''}" data-hero="${h.slug}" title="${taken.has(h.slug) ? 'Ya lo usa otro equipo' : h.name}">
+        <img loading="lazy" src="${HERO_CDN}${h.slug}.png" alt=""><span>${h.name}</span></button>`).join('');
+  }
+  fetch('heroes.json').then(r => r.json()).then(list => { HEROES = list; renderTeams(); }).catch(() => renderTeams());
+  document.addEventListener('click', e => {
+    const pick = e.target.closest('[data-pick]');
+    if (pick) {
+      pickingFor = pick.dataset.pick;
+      document.getElementById('heroTeam').textContent = teams.find(t => t[0] === pickingFor)[1];
+      document.getElementById('heroSearch').value = '';
+      renderHeroGrid(); document.getElementById('heroModal').showModal(); return;
+    }
+    const attr = e.target.closest('[data-attr]');
+    if (attr) { attrFilter = attr.dataset.attr; document.querySelectorAll('[data-attr]').forEach(b => b.classList.toggle('on', b === attr)); renderHeroGrid(); return; }
+    const hero = e.target.closest('[data-hero]');
+    if (hero && !hero.classList.contains('taken')) { teamHero[pickingFor] = hero.dataset.hero; document.getElementById('heroModal').close(); renderTeams(); }
+  });
+  document.getElementById('heroSearch').addEventListener('input', renderHeroGrid);
+
+  const rounds = [
+    ['03 oct','14:00',[['A','B'],['C','D'],['E','F']],'G'], ['03 oct','15:00',[['B','G'],['C','F'],['D','E']],'A'],
+    ['03 oct','16:00',[['A','E'],['C','G'],['D','F']],'B'], ['03 oct','17:00',[['A','F'],['B','E'],['D','G']],'C'],
+    ['10 oct','14:00',[['A','G'],['B','F'],['C','E']],'D'], ['10 oct','15:00',[['A','D'],['B','C'],['F','G']],'E'],
+    ['10 oct','16:00',[['A','C'],['B','D'],['E','G']],'F'],
+  ];
+  document.getElementById('fixtureList').innerHTML = rounds.map(([d,h,ps,bye],i) =>
+    `<div class="round"><div class="rh"><b>Ronda ${i+1}</b><span class="muted">${d} · ${h}</span></div>
+     <div class="pairs">${ps.map(([a,b]) => `<span class="pair">${badge(a)} vs ${badge(b)} <button class="btn sm" title="Editar">✎</button></span>`).join('')}
+     <span class="pair bye">Descansa ${badge(bye)}</span> <button class="btn sm">+ partido</button></div></div>`).join('');
+
+  const played = {'A-B':['A',22,10,10,22],'C-D':['D',15,14,14,15],'E-F':['E',18,12,12,18]};
+  document.getElementById('resultCards').innerHTML = rounds.slice(0,2).flatMap(([d,h,ps],ri) => ps.map(([a,b],pi) => {
+    const r = played[a+'-'+b];
+    const row = (t,k,de) => `<div class="team-row"><button class="pick ${r&&r[0]===t?'win':''}">${badge(t)} ${teams.find(x=>x[0]===t)[1]}</button><input inputmode="numeric" value="${k??''}" placeholder="K"><input inputmode="numeric" value="${de??''}" placeholder="D"></div>`;
+    return `<div class="rc ${r?'saved':''}"><div class="rc-top"><span>Partido ${ri*3+pi+1} · Ronda ${ri+1} · ${d} ${h}</span>${r?'<span class="pill ok">Guardado</span>':'<span class="pill next">Pendiente</span>'}</div>
+      <div class="kd-h"><span>Ganador</span><span>Kills</span><span>Deaths</span></div>
+      ${row(a,r?.[1],r?.[2])}${row(b,r?.[3],r?.[4])}
+      <div class="rc-foot"><button class="btn sm">${r?'Borrar resultado':'Limpiar'}</button><button class="btn sm pri">Guardar</button></div></div>`;
+  })).join('');
+
+  document.addEventListener('click', e => {
+    const pick = e.target.closest('.rc .pick');
+    if (pick) { pick.closest('.rc').querySelectorAll('.pick').forEach(p => p.classList.toggle('win', p === pick)); return; }
+    const go = e.target.closest('[data-go]')?.dataset.go;
+    if (!go) return;
+    e.preventDefault();
+    document.querySelectorAll('.mock-nav button').forEach(b => b.classList.toggle('on', b.dataset.go === go));
+    document.getElementById('s-login').classList.toggle('on', go === 'login');
+    document.getElementById('s-app').classList.toggle('on', go !== 'login');
+    document.querySelectorAll('.view').forEach(v => v.style.display = v.id === 'v-'+go ? '' : 'none');
+    document.querySelectorAll('nav.side a').forEach(a => a.classList.toggle('on', a.dataset.go === go));
+  });
+  document.querySelector('[data-go="results"]').click();
+</script>
+</body>
+</html>
