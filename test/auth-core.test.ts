@@ -27,25 +27,41 @@ describe('password hashing', () => {
 });
 
 describe('LoginRateLimiter', () => {
-  it('blocks after 5 failures per key within the window and recovers', () => {
+  it('allows 5 attempts per key within the window, then blocks and recovers', () => {
     let now = 1_000;
     const limiter = new LoginRateLimiter({ maxFailures: 5, windowMs: 60_000, now: () => now });
-    for (let i = 0; i < 5; i++) {
-      expect(limiter.isBlocked('1.1.1.1')).toBe(false);
-      limiter.recordFailure('1.1.1.1');
-    }
-    expect(limiter.isBlocked('1.1.1.1')).toBe(true);
-    expect(limiter.isBlocked('2.2.2.2')).toBe(false);
+    for (let i = 0; i < 5; i++) expect(limiter.consume('1.1.1.1')).toBe(true);
+    expect(limiter.consume('1.1.1.1')).toBe(false);
+    expect(limiter.consume('2.2.2.2')).toBe(true);
     now += 60_001;
-    expect(limiter.isBlocked('1.1.1.1')).toBe(false);
+    expect(limiter.consume('1.1.1.1')).toBe(true);
+  });
+
+  it('counts an attempt atomically, before any async work can interleave', () => {
+    const limiter = new LoginRateLimiter({ maxFailures: 3, windowMs: 60_000 });
+    const results = Array.from({ length: 6 }, () => limiter.consume('ip'));
+    expect(results.filter(Boolean)).toHaveLength(3);
   });
 
   it('clears the counter on success', () => {
     const limiter = new LoginRateLimiter({ maxFailures: 2, windowMs: 60_000 });
-    limiter.recordFailure('ip');
+    limiter.consume('ip');
+    limiter.consume('ip');
     limiter.reset('ip');
-    limiter.recordFailure('ip');
-    expect(limiter.isBlocked('ip')).toBe(false);
+    expect(limiter.consume('ip')).toBe(true);
+  });
+
+  it('stays bounded: expired keys are evicted first, then the oldest key', () => {
+    let now = 0;
+    const limiter = new LoginRateLimiter({ maxFailures: 5, windowMs: 1_000, maxKeys: 3, now: () => now });
+    for (const key of ['a', 'b', 'c']) limiter.consume(key);
+    expect(limiter.size).toBe(3);
+    now += 1_001;
+    limiter.consume('d');
+    expect(limiter.size).toBe(1);
+    for (const key of ['e', 'f', 'g', 'h']) limiter.consume(key);
+    expect(limiter.size).toBeLessThanOrEqual(3);
+    expect(limiter.consume('h')).toBe(true);
   });
 });
 

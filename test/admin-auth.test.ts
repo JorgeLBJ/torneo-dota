@@ -170,3 +170,43 @@ describe('users screen', () => {
     expect(t.repo.countAdmins()).toBe(1);
   });
 });
+
+describe('login rate-limit key', () => {
+  const attempt = (app: TestApp, forwardedFor?: string) =>
+    app.send('POST', '/admin/login', {
+      form: { username: 'admin', password: 'bad' },
+      headers: forwardedFor ? { 'x-forwarded-for': forwardedFor } : {},
+    });
+
+  it('ignores X-Forwarded-For unless the proxy is trusted', async () => {
+    for (let i = 0; i < 5; i++) await attempt(t, `10.0.0.${i}, 9.9.9.9`);
+    expect((await attempt(t, '10.0.0.99, 8.8.8.8')).status).toBe(429);
+  });
+
+  it('keys on the right-most (proxy-appended) hop when TRUST_PROXY is on', async () => {
+    const proxied = await makeApp({ trustProxy: true });
+    // Rotating the client-controlled left-most entries must not evade the limit.
+    for (let i = 0; i < 5; i++) await attempt(proxied, `10.0.0.${i}, 9.9.9.9`);
+    expect((await attempt(proxied, '10.0.0.99, 9.9.9.9')).status).toBe(429);
+    // A different real client (different proxy-appended hop) is unaffected.
+    expect((await attempt(proxied, '10.0.0.1, 7.7.7.7')).status).not.toBe(429);
+    proxied.db.close();
+  });
+});
+
+describe('request body cap', () => {
+  it('answers 413 in Spanish when the body exceeds the cap', async () => {
+    const res = await t.app.request('/admin/login', {
+      method: 'POST',
+      headers: { origin: 'http://localhost', 'content-type': 'application/x-www-form-urlencoded' },
+      body: `username=admin&password=${'x'.repeat(70 * 1024)}`,
+    });
+    expect(res.status).toBe(413);
+    expect(await res.text()).toContain('demasiado grande');
+  });
+
+  it('accepts ordinary forms', async () => {
+    const res = await t.post('/admin/login', { username: 'admin', password: 'bad' });
+    expect(res.status).toBe(303);
+  });
+});

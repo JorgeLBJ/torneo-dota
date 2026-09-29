@@ -23,7 +23,8 @@ export function loginRoutes(deps: Deps) {
 
   app.post('/login', async (c) => {
     const key = clientKey(c, deps.config.trustProxy);
-    if (deps.limiter.isBlocked(key)) return c.html(<TooManyAttemptsPage />, 429);
+    // Counted up front (before the slow hash check) so parallel guesses cannot all slip past the limit.
+    if (!deps.limiter.consume(key)) return c.html(<TooManyAttemptsPage />, 429);
 
     const body = await readBody(c);
     const username = str(body, 'username').toLowerCase();
@@ -31,7 +32,6 @@ export function loginRoutes(deps: Deps) {
     const admin = deps.repo.getAdminByUsername(username);
     const valid = await verifyPassword(password, admin?.passwordHash ?? (await getDummyHash()));
     if (!admin || !valid) {
-      deps.limiter.recordFailure(key);
       setFlash(c, 'error', 'Usuario o contraseña incorrectos.');
       return c.redirect('/admin/login', 303);
     }

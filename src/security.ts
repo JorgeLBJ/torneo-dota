@@ -29,11 +29,16 @@ export function sameOriginGuard(options: { trustProxy: boolean }): MiddlewareHan
   };
 }
 
-/** Client address used to key the login rate limiter. */
+/**
+ * Client address used to key the login rate limiter.
+ * Behind a trusted proxy the right-most X-Forwarded-For entry is the one the
+ * proxy itself appended; anything to its left is client-controlled.
+ */
 export function clientKey(c: Context, trustProxy: boolean): string {
   if (trustProxy) {
-    const first = c.req.header('x-forwarded-for')?.split(',')[0]?.trim();
-    if (first) return first;
+    const hops = c.req.header('x-forwarded-for')?.split(',');
+    const last = hops?.[hops.length - 1]?.trim();
+    if (last) return last;
   }
   return c.env?.incoming?.socket?.remoteAddress ?? 'unknown';
 }
