@@ -119,12 +119,31 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, active, admi
               ↗ Ver página pública
             </a>
           ) : null}
-          <form method="post" action="/admin/logout" class="stack">
-            <small class="muted">Sesión: {admin.username}</small>
-            <button class="btn sm" type="submit">
-              Salir
-            </button>
-          </form>
+          <div class="side-foot">
+            <form method="post" action="/admin/logout" class="stack">
+              <small class="muted">Sesión: {admin.username}</small>
+              <button class="btn logout" type="submit" data-logout-open>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <path d="m16 17 5-5-5-5" />
+                  <path d="M21 12H9" />
+                </svg>
+                Cerrar sesión
+              </button>
+              <dialog id="logoutDialog" class="confirm-modal" aria-labelledby="logoutTitle">
+                <h2 id="logoutTitle">¿Cerrar sesión?</h2>
+                <p>Tendrás que volver a ingresar con tu usuario y contraseña.</p>
+                <div class="actions">
+                  <button class="btn" type="button" autofocus data-logout-cancel>
+                    Cancelar
+                  </button>
+                  <button class="btn pri" type="submit">
+                    Cerrar sesión
+                  </button>
+                </div>
+              </dialog>
+            </form>
+          </div>
         </aside>
         <main>
           <FlashMessage flash={flash} />

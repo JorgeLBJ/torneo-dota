@@ -113,3 +113,57 @@ describe('favicon', () => {
     }
   });
 });
+
+describe('logout footer and confirmation', () => {
+  it('pins the session footer at the bottom of the sidebar with an icon button', async () => {
+    const html = await admin('config');
+    expect(html).toMatch(/<div class="side-foot">[\s\S]*Sesión: admin[\s\S]*Cerrar sesión/);
+    expect(html).toContain('data-logout-open');
+    expect(html).toContain('<svg');
+    expect(html).not.toContain('>Salir<');
+    expect(rule(adminCss, '.side-foot')).toContain('margin-top:auto');
+  });
+
+  it('confirms in a themed dialog whose confirm button submits the existing logout form', async () => {
+    const html = await admin('config');
+    const form = html.slice(html.indexOf('<form method="post" action="/admin/logout"'), html.indexOf('</form>', html.indexOf('action="/admin/logout"')));
+    expect(form).toContain('<dialog id="logoutDialog" class="confirm-modal"');
+    expect(form).toContain('¿Cerrar sesión?');
+    expect(form).toContain('Tendrás que volver a ingresar con tu usuario y contraseña.');
+    expect(form).toMatch(/<button[^>]*type="button"[^>]*autofocus[^>]*>\s*Cancelar\s*<\/button>|<button[^>]*autofocus[^>]*type="button"[^>]*>\s*Cancelar\s*<\/button>/);
+    expect(form).toMatch(/<button class="btn pri" type="submit">\s*Cerrar sesión\s*<\/button>/);
+    // Without JavaScript the visible button is a plain submit of the same form.
+    expect(form).toMatch(/<button class="btn logout" type="submit" data-logout-open/);
+    expect(adminCss).toContain('.confirm-modal::backdrop');
+    const js = readFileSync(new URL('../public/admin.js', import.meta.url), 'utf8');
+    expect(js).toContain('logoutDialog');
+    expect(js).toContain('showModal');
+  });
+
+  it('still rejects a logout POST without a same-origin Origin', async () => {
+    const res = await t.send('POST', '/admin/logout', { cookie, headers: { origin: 'http://evil.example' } });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('public credit footer', () => {
+  it('ends every public page with the jpsolutions credit that opens in a new tab', async () => {
+    t.db.prepare('UPDATE tournaments SET is_active = 0').run();
+    const pages = ['/t/cup', '/t/nope', '/'];
+    t.repo.setActiveTournament(tournament.id);
+    pages.push('/');
+    for (const path of pages) {
+      const html = await (await t.get(path)).text();
+      expect(html).toContain('Dota 2 es una marca de Valve Corporation');
+      expect(html).toContain('<a href="https://jpsolutions.app" target="_blank" rel="noopener">jpsolutions</a>');
+      expect(html).toMatch(/torneo-dota · powered by <a href="https:\/\/jpsolutions\.app"/);
+      expect(html.indexOf('powered by')).toBeGreaterThan(html.indexOf('<footer'));
+    }
+    t.db.prepare('UPDATE tournaments SET is_active = 0').run();
+    expect(await (await t.get('/')).text()).toContain('powered by');
+  });
+
+  it('styles it subtly with a gold hover', () => {
+    expect(siteCss).toMatch(/\.credit a:hover[^{]*\{[^}]*color: var\(--gold\)/);
+  });
+});

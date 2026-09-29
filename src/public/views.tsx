@@ -53,7 +53,15 @@ export const PublicDocument: FC<PropsWithChildren<{ title: string; links?: PageL
         <div id="app" data-events={links?.events} data-partial={links?.partial}>
           {children}
         </div>
-        <footer>Resultados oficiales del torneo · Dota 2 es una marca de Valve Corporation</footer>
+        <footer>
+          <div>Resultados oficiales del torneo · Dota 2 es una marca de Valve Corporation</div>
+          <div class="credit">
+            torneo-dota · powered by{' '}
+            <a href="https://jpsolutions.app" target="_blank" rel="noopener">
+              jpsolutions
+            </a>
+          </div>
+        </footer>
         <script src={assetUrl('site-core.js')} defer></script>
         <script src={assetUrl('site.js')} defer></script>
       </body>

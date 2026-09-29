@@ -97,6 +97,10 @@ main { padding: 30px 16px 70px; }
 .empty { margin: 0; text-align: center; color: var(--muted); font: 500 16px/1.4 var(--fl); letter-spacing: .06em; }
 footer { text-align: center; padding: 26px 16px 40px; font: 500 12px/1.5 var(--fl); letter-spacing: .14em; text-transform: uppercase; color: #6b6964; border-top: 1px solid var(--line); }
 
+footer .credit { margin-top: 8px; font-size: 11px; letter-spacing: .2em; color: #55534f; }
+.credit a { color: inherit; text-decoration: none; border-bottom: 1px solid transparent; transition: color .2s; }
+.credit a:hover, .credit a:focus-visible { color: var(--gold); border-bottom-color: var(--gold); }
+
 /* ---------- Section titles ---------- */
 .sec { display: flex; align-items: center; gap: 16px; }
 .sec h2 { margin: 0; font: 800 26px/1 var(--fd); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
