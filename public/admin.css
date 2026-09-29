@@ -2,12 +2,15 @@
   --bg:#0c0e18; --panel:#141726; --panel-2:#1b1f33; --line:#272c45; --fg:#eceef7; --muted:#8d93b0;
   --gold:#e6b65f; --gold-soft:rgba(230,182,95,.14); --win:#5fd3a2; --loss:#e57580;
   --fd:"Saira Condensed","Arial Narrow",sans-serif; --fb:"Figtree","Segoe UI",system-ui,sans-serif;
+  --control-h:40px; --control-h-sm:32px;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 var(--fb)}
 button,input,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+/* One focus style everywhere: the outline. Bordered controls hide their own border so the ring is never doubled. */
+input:focus-visible,select:focus-visible,textarea:focus-visible,.btn:focus-visible,.hero-slot:focus-visible,.pick:focus-visible,label.pick:has(input:focus-visible),.chip:focus-visible{border-color:transparent}
 
 /* Shell */
 .shell{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
@@ -16,29 +19,29 @@ aside{background:var(--panel);border-right:1px solid var(--line);padding:18px 14
 .brand em{font-style:normal;color:var(--gold)}
 .tsel{display:grid;gap:4px}
 .tsel small,.navlbl{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
-select,input{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;width:100%}
+select,input{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:0 12px;width:100%;height:var(--control-h);line-height:1.2}
+input[type=checkbox],input[type=radio]{height:auto;padding:0}
 nav.side{display:grid;gap:2px}
 nav.side a{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:9px;color:var(--muted);text-decoration:none;cursor:pointer}
 nav.side a.on{background:var(--panel-2);color:var(--fg);box-shadow:inset 2px 0 0 var(--gold)}
 nav.side a span{font-size:11px;padding:1px 7px;border-radius:99px;background:var(--gold-soft);color:var(--gold)}
-main{padding:24px 28px 60px;display:grid;gap:18px;align-content:start;max-width:1100px}
+main{padding:24px 32px 60px;display:grid;gap:18px;align-content:start;min-width:0}
 .head{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
 h1{margin:0;font-family:var(--fd);font-weight:800;font-size:34px;line-height:1;text-transform:uppercase}
 h2{margin:0 0 10px;font-family:var(--fd);font-weight:700;font-size:20px;text-transform:uppercase;letter-spacing:.04em}
 .sub{color:var(--muted);margin:4px 0 0}
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:99px;border:1px solid var(--line);background:transparent;cursor:pointer;font-weight:600}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--control-h);padding:0 16px;line-height:1;white-space:nowrap;border-radius:99px;border:1px solid var(--line);background:transparent;cursor:pointer;font-weight:600}
 .btn:hover{border-color:var(--gold);color:var(--gold)}
 .btn.pri{background:var(--gold);border-color:var(--gold);color:#1a1405}
 .btn.pri:hover{filter:brightness(1.08);color:#1a1405}
-.btn.sm{padding:4px 10px;font-size:12px}
+.btn.sm{height:var(--control-h-sm);padding:0 12px;font-size:12px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
 label.f{display:grid;gap:4px;font-size:12px;color:var(--muted)}
 .note{padding:10px 14px;border-radius:10px;background:var(--gold-soft);border:1px solid rgba(230,182,95,.35);color:#f3dcae;font-size:13px}
 table{width:100%;border-collapse:collapse}
-th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:left;padding:8px;border-bottom:1px solid var(--line)}
-td{padding:8px;border-bottom:1px solid var(--line)}
-td input{padding:6px 8px}
+th{vertical-align:middle;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:left;padding:8px;border-bottom:1px solid var(--line)}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
 .badge{--tc:var(--gold);display:inline-grid;place-items:center;width:28px;height:28px;border-radius:8px;font-family:var(--fd);font-weight:800;font-size:16px;color:var(--tc);background:color-mix(in srgb,var(--tc) 16%,transparent);border:1px solid color-mix(in srgb,var(--tc) 45%,transparent)}
 .pill{padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line);color:var(--muted)}
 .pill.ok{color:var(--win);border-color:rgba(95,211,162,.4)}
@@ -49,7 +52,7 @@ td input{padding:6px 8px}
 .round{display:grid;grid-template-columns:110px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);align-items:start}
 .round .rh b{font-family:var(--fd);font-size:18px;display:block}
 .pairs{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.pair{display:inline-flex;align-items:center;gap:6px;padding:5px 10px 5px 6px;border-radius:10px;background:var(--panel-2);border:1px solid var(--line)}
+.pair{display:inline-flex;align-items:center;gap:6px;min-height:calc(var(--control-h-sm) + 12px);padding:5px 10px 5px 6px;border-radius:10px;background:var(--panel-2);border:1px solid var(--line)}
 .pair.bye{border-style:dashed;background:none;color:var(--muted)}
 
 /* Result entry */
@@ -58,7 +61,7 @@ td input{padding:6px 8px}
 .rc.saved{border-color:rgba(95,211,162,.4)}
 .rc-top{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted)}
 .team-row{display:grid;grid-template-columns:1fr 64px 64px;gap:8px;align-items:center}
-.pick{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;border:1px solid var(--line);background:none;cursor:pointer;text-align:left}
+.pick{display:flex;align-items:center;gap:8px;min-height:var(--control-h);padding:0 8px;border-radius:10px;border:1px solid var(--line);background:none;cursor:pointer;text-align:left}
 .pick.win{border-color:var(--win);background:rgba(95,211,162,.1)}
 .pick.win::after{content:"GANÓ";margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--win)}
 .kd-h{display:grid;grid-template-columns:1fr 64px 64px;gap:8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
@@ -82,13 +85,13 @@ td input{padding:6px 8px}
 .login .card{width:min(360px,100%);display:grid;gap:14px}
 
 /* Hero picker */
-.hero-slot{display:grid;place-items:center;width:96px;height:54px;padding:0;border-radius:8px;overflow:hidden;cursor:pointer;background:var(--panel-2);border:1px dashed var(--line);color:var(--muted);font-size:11px}
+.hero-slot{display:grid;place-items:center;flex:none;width:72px;height:var(--control-h);padding:0;border-radius:8px;overflow:hidden;cursor:pointer;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1}
 .hero-slot img{width:100%;height:100%;object-fit:cover;display:block}
 .hero-slot:hover{border-color:var(--gold)}
 .hero-modal{width:min(900px,calc(100vw - 32px));max-height:85vh;padding:18px;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--fg)}
 .hero-modal::backdrop{background:rgba(0,0,0,.7)}
 .hm-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
-.hm-tools{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.hm-tools{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px}
 .hm-tools input{flex:1;min-width:200px}
 .attrs{display:flex;gap:6px;flex-wrap:wrap}
 .attrs .on{border-color:var(--gold);color:var(--gold)}
@@ -127,7 +130,6 @@ label.pick:has(input:checked){border-color:var(--win);background:rgba(95,211,162
 label.pick:has(input:checked)::after{content:"GANÓ";margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--win)}
 label.pick:has(input:focus-visible){outline:2px solid var(--gold);outline-offset:2px}
 .pick.static{cursor:default}
-.hero-slot.filled{width:96px}
 .tb-list{margin:0;padding-left:20px;display:grid;gap:6px}
 .tb-list li{display:flex;gap:8px;align-items:center}
 .tag-row td{vertical-align:middle}
@@ -177,3 +179,10 @@ table.cal select,table.cal input{min-width:0;text-overflow:ellipsis}
   table.cal td:nth-child(3),table.cal td:nth-child(5){grid-column:1 / -1}
   table.cal td[colspan]{grid-column:1 / -1}
 }
+
+/* Controls keep their height and natural width inside grid and flex parents. */
+.stack>.btn,.stack>button{justify-self:start}
+.hero-cell{display:flex;align-items:center;gap:8px;min-width:0}
+.hero-cell .hero-name{min-width:0;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.code-cell{display:flex;align-items:center;gap:6px}
+.code-cell input{width:70px;flex:none}

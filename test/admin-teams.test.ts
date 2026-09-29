@@ -121,4 +121,14 @@ describe('teams screen', () => {
     await t.post(url, { code: 'A', name: 'Alpha' }, cookie);
     expect(fired).toBe(1);
   });
+
+  it('keeps the hero thumbnail, its name and the other controls on one row', async () => {
+    t.repo.createTeam(tournament.id, { code: 'A', name: 'Alpha', hero: 'axe' });
+    const html = await (await t.get(url, cookie)).text();
+    expect(html).toContain('class="hero-cell"');
+    expect(html).toContain('class="code-cell"');
+    // Both the existing row and the "new team" row use the same compact slot.
+    expect(html.match(/class="hero-slot/g)).toHaveLength(2);
+    expect(html).toContain('+ Héroe');
+  });
 });

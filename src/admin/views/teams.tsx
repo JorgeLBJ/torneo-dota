@@ -19,7 +19,7 @@ const inlineJson = (value: unknown): string =>
 const HeroSlot: FC<{ formId: string; team?: Team }> = ({ formId, team }) => {
   const hero = team?.hero ? getHero(team.hero) : undefined;
   return (
-    <>
+    <div class="hero-cell">
       <input type="hidden" name="hero" form={formId} value={team?.hero ?? ''} data-hero-input />
       <button
         type="button"
@@ -29,12 +29,12 @@ const HeroSlot: FC<{ formId: string; team?: Team }> = ({ formId, team }) => {
         data-team-label={team ? team.name : 'el nuevo equipo'}
         title="Elegir héroe"
       >
-        {hero ? <img src={heroImage(hero.slug)} alt="" /> : <span>+ Elegir héroe</span>}
+        {hero ? <img src={heroImage(hero.slug)} alt="" /> : <span>+ Héroe</span>}
       </button>
-      <div class="muted" style="font-size:11px;margin-top:3px" data-hero-name>
+      <span class="muted hero-name" data-hero-name>
         {hero ? hero.name : 'Sin héroe'}
-      </div>
-    </>
+      </span>
+    </div>
   );
 };
 
@@ -73,8 +73,10 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
               return (
                 <tr>
                   <td>
-                    <TeamBadge team={team} />
-                    <input name="code" form={formId} value={team.code} maxlength={4} aria-label="Código" style="width:70px;margin-left:6px" />
+                    <div class="code-cell">
+                      <TeamBadge team={team} />
+                      <input name="code" form={formId} value={team.code} maxlength={4} aria-label="Código" />
+                    </div>
                   </td>
                   <td>
                     <HeroSlot formId={formId} team={team} />
@@ -104,7 +106,9 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
             })}
             <tr>
               <td>
-                <input name="code" form="team-new" maxlength={4} placeholder="Ej. A" aria-label="Código del nuevo equipo" style="width:90px" required />
+                <div class="code-cell">
+                  <input name="code" form="team-new" maxlength={4} placeholder="Ej. A" aria-label="Código del nuevo equipo" required />
+                </div>
               </td>
               <td>
                 <HeroSlot formId="team-new" />
