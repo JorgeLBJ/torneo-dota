@@ -35,7 +35,7 @@ describe('003_timezone', () => {
   it('adds the zone with the Lima default and converts the schedule to UTC instants', () => {
     const db = versionTwo();
     migrate(db, MIGRATIONS_DIR);
-    expect(db.pragma('user_version', { simple: true })).toBe(3);
+    expect(db.pragma('user_version', { simple: true })).toBeGreaterThanOrEqual(3);
     expect(db.prepare('SELECT timezone FROM tournaments').pluck().get()).toBe('America/Lima');
     const rows = db.prepare('SELECT match_number AS n, starts_at AS s, ends_at AS e FROM matches ORDER BY id').all();
     expect(rows).toEqual([

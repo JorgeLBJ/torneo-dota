@@ -7,6 +7,8 @@ export interface AppConfig {
   heartbeatMs?: number;
   /** Caps on concurrent SSE connections: in total and per client address. */
   sseLimits?: { global: number; perIp: number };
+  /** Ancestor hosts Twitch embeds must name (STREAM_PARENT_HOSTS). Empty: request host + sites.google.com. */
+  streamParentHosts?: string[];
   /** Clock override for tests. */
   now?: () => Date;
 }
@@ -17,5 +19,6 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return {
     secureCookies: flag(env.COOKIE_SECURE),
     trustProxy: flag(env.TRUST_PROXY),
+    streamParentHosts: (env.STREAM_PARENT_HOSTS ?? '').split(',').map((h) => h.trim()).filter(Boolean),
   };
 }

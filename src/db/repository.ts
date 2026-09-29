@@ -21,6 +21,8 @@ export interface Tournament {
   rulesText: string;
   /** IANA zone that wall-clock schedule inputs are read in and admin times are shown in. */
   timezone: string;
+  /** A Kick/Twitch/YouTube page URL as the admin entered it (validated); the embed is derived from it. */
+  streamUrl: string | null;
   isActive: boolean;
   createdAt: string;
 }
@@ -116,7 +118,7 @@ export interface Session {
 export const TIEBREAKER_KEYS = ['kd', 'kills'] as const;
 
 const TOURNAMENT_COLS = `id, name, slug, qualifiers, game, points_win AS pointsWin, points_loss AS pointsLoss,
-  tiebreakers, group_legs AS groupLegs, rules_text AS rulesText, timezone, is_active AS isActive, created_at AS createdAt`;
+  tiebreakers, group_legs AS groupLegs, rules_text AS rulesText, timezone, stream_url AS streamUrl, is_active AS isActive, created_at AS createdAt`;
 const TEAM_COLS = 'id, tournament_id AS tournamentId, code, name, captain, hero';
 const MATCH_COLS = `m.id, m.tournament_id AS tournamentId, m.phase, m.round, m.match_number AS matchNumber,
   m.starts_at AS startsAt, m.ends_at AS endsAt, t.timezone AS timezone,
@@ -151,7 +153,7 @@ export function createRepository(db: Database.Database) {
     updateTournament: db.prepare(
       `UPDATE tournaments SET name = @name, slug = @slug, qualifiers = @qualifiers, game = @game,
          points_win = @pointsWin, points_loss = @pointsLoss, tiebreakers = @tiebreakers,
-         group_legs = @groupLegs, rules_text = @rulesText, timezone = @timezone WHERE id = @id`,
+         group_legs = @groupLegs, rules_text = @rulesText, timezone = @timezone, stream_url = @streamUrl WHERE id = @id`,
     ),
     activeTournament: db.prepare(`SELECT ${TOURNAMENT_COLS} FROM tournaments WHERE is_active = 1`),
     clearActive: db.prepare('UPDATE tournaments SET is_active = 0 WHERE is_active = 1'),

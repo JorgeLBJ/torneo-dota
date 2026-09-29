@@ -44,3 +44,9 @@ export function clientKey(c: Context, trustProxy: boolean): string {
   }
   return c.env?.incoming?.socket?.remoteAddress ?? 'unknown';
 }
+
+/** Host the visitor used to reach the app (the first X-Forwarded-Host behind a trusted proxy). */
+export function requestHost(c: Context, trustProxy: boolean): string {
+  const forwarded = trustProxy ? c.req.header('x-forwarded-host')?.split(',')[0]?.trim() : undefined;
+  return forwarded || c.req.header('host') || new URL(c.req.url).host;
+}

@@ -8,6 +8,7 @@ import { playoffRoutes } from './routes/playoffs.js';
 import { resultRoutes } from './routes/results.js';
 import { rulesRoutes } from './routes/rules.js';
 import { tournamentScope } from './routes/scope.js';
+import { streamRoutes } from './routes/stream.js';
 import { teamRoutes } from './routes/teams.js';
 import { tournamentListRoutes } from './routes/tournaments.js';
 import { userRoutes } from './routes/users.js';
@@ -28,6 +29,6 @@ export function adminApp(deps: Deps) {
   app.use('/t/:tid/*', tournamentScope(deps));
   app.route('/', userRoutes(deps));
   app.route('/', tournamentListRoutes(deps));
-  for (const routes of [configRoutes, rulesRoutes, teamRoutes, fixtureRoutes, resultRoutes, playoffRoutes]) app.route('/t/:tid', routes(deps));
+  for (const routes of [configRoutes, streamRoutes, rulesRoutes, teamRoutes, fixtureRoutes, resultRoutes, playoffRoutes]) app.route('/t/:tid', routes(deps));
   return app;
 }

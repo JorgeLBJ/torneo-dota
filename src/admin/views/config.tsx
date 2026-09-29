@@ -1,5 +1,6 @@
 import type { FC } from 'hono/jsx';
 import type { ScheduleDay, Tournament } from '../../db/repository.js';
+import type { StreamView } from '../../domain/stream.js';
 import { TIMEZONE_CHOICES } from '../../format/timezone.js';
 import { PageHead, Select } from './parts.js';
 
@@ -9,7 +10,8 @@ export const PHASE_LABELS: Record<ScheduleDay['phase'], string> = {
   final: 'Final',
 };
 
-export const ConfigView: FC<{ tournament: Tournament; days: ScheduleDay[] }> = ({ tournament, days }) => (
+export const ConfigView: FC<{ tournament: Tournament; days: ScheduleDay[]; stream: StreamView | null }> = ({ tournament, days, stream }) => (
+  <>
   <form method="post" action={`/admin/t/${tournament.id}/config`} class="stack">
     {/* First submit button = default action for the Enter key. */}
     <button type="submit" name="action" value="save" class="sr-only" tabindex={-1} aria-hidden="true">
@@ -114,4 +116,69 @@ export const ConfigView: FC<{ tournament: Tournament; days: ScheduleDay[] }> = (
       </button>
     </div>
   </form>
+  <form class="card stack stream-card" method="post" action={`/admin/t/${tournament.id}/stream`}>
+    <h2>Transmisión en vivo</h2>
+    <p class="muted" style="margin:0;font-size:12px">
+      Un enlace por torneo, que se muestra en la pestaña "En vivo" de la web. Acepta Kick, Twitch y YouTube.
+    </p>
+    <div class="stream-row">
+      <label class="f">
+        Enlace de la transmisión
+        <input
+          name="stream_url"
+          type="text"
+          value={tournament.streamUrl ?? ''}
+          placeholder="https://kick.com/tu-canal"
+          maxlength={300}
+          autocomplete="off"
+          spellcheck={false}
+        />
+      </label>
+      <div class="actions">
+        <button class="btn pri" type="submit" name="action" value="save">
+          Guardar
+        </button>
+        {stream ? (
+          <button class="btn danger" type="submit" name="action" value="clear" data-confirm-open="streamClearDialog">
+            Quitar stream
+          </button>
+        ) : null}
+      </div>
+    </div>
+    {stream ? (
+      <div class="stream-preview">
+        <p style="margin:0">
+          Plataforma detectada: <b>{stream.label}</b> ·{' '}
+          <a href={stream.openUrl} target="_blank" rel="noopener">
+            Abrir en {stream.label}
+          </a>
+        </p>
+        <div class="stream-frame">
+          <iframe
+            src={stream.embedUrl}
+            title={`Vista previa de la transmisión en ${stream.label}`}
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowfullscreen
+            loading="lazy"
+            referrerpolicy="strict-origin-when-cross-origin"
+          ></iframe>
+        </div>
+      </div>
+    ) : null}
+    {stream ? (
+      <dialog id="streamClearDialog" class="confirm-modal" aria-labelledby="streamClearTitle">
+        <h2 id="streamClearTitle">¿Quitar la transmisión?</h2>
+        <p>La pestaña "En vivo" de la web volverá a mostrar "Transmisión no disponible".</p>
+        <div class="actions">
+          <button class="btn" type="button" autofocus data-confirm-cancel>
+            Cancelar
+          </button>
+          <button class="btn pri" type="submit" name="action" value="clear">
+            Quitar stream
+          </button>
+        </div>
+      </dialog>
+    ) : null}
+  </form>
+  </>
 );

@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import type { Phase, ScheduleDay } from '../../db/repository.js';
 import { isValidTime } from '../../domain/fixture.js';
+import { describeStream, parentHostsFor } from '../../domain/stream.js';
+import { requestHost } from '../../security.js';
 import { isValidTimeZone } from '../../format/timezone.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { isDate, positiveInt, readBody, str, strList, type Body } from '../form.js';
@@ -61,7 +63,11 @@ export function configRoutes(deps: Deps) {
       c,
       deps,
       { title: 'Configuración', active: 'config', tournament },
-      <ConfigView tournament={tournament} days={repo.listScheduleDays(tournament.id)} />,
+      <ConfigView
+        tournament={tournament}
+        days={repo.listScheduleDays(tournament.id)}
+        stream={describeStream(tournament.streamUrl, parentHostsFor(requestHost(c, deps.config.trustProxy), deps.config.streamParentHosts))}
+      />,
     );
   });
 

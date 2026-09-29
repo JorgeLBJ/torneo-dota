@@ -138,3 +138,19 @@ export function parentHostsFor(requestHost: string, configured?: readonly string
   const host = requestHost.replace(/:\d+$/, '');
   return clean([host, 'sites.google.com']);
 }
+
+export interface StreamView {
+  platform: StreamPlatform;
+  label: string;
+  embedUrl: string;
+  openUrl: string;
+}
+
+/** What to render for a stored stream URL, or null when there is none (or it is no longer valid). */
+export function describeStream(stored: string | null, parentHosts: readonly string[]): StreamView | null {
+  if (!stored) return null;
+  const parsed = parseStream(stored);
+  if (!parsed.ok) return null;
+  const { platform, label, openUrl } = parsed.value;
+  return { platform, label, openUrl, embedUrl: embedUrl(parsed.value, parentHosts) };
+}

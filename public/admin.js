@@ -101,19 +101,24 @@
   if (close) close.addEventListener('click', function () { modal.close(); });
 })();
 
-// Logout confirmation. Without JavaScript the button simply submits the form.
+// Confirmation dialogs. Without JavaScript the trigger simply submits its form.
 (function () {
-  var dialog = document.getElementById('logoutDialog');
-  var open = document.querySelector('[data-logout-open]');
-  if (!dialog || !open || typeof dialog.showModal !== 'function') return;
-  open.addEventListener('click', function (event) {
-    event.preventDefault();
-    dialog.showModal();
-  });
-  var cancel = dialog.querySelector('[data-logout-cancel]');
-  if (cancel) cancel.addEventListener('click', function () { dialog.close(); });
-  // A click on the backdrop lands on the dialog element itself.
-  dialog.addEventListener('click', function (event) {
-    if (event.target === dialog) dialog.close();
+  function wire(trigger, dialogId) {
+    var dialog = document.getElementById(dialogId);
+    if (!dialog || !trigger || typeof dialog.showModal !== 'function') return;
+    trigger.addEventListener('click', function (event) {
+      event.preventDefault();
+      dialog.showModal();
+    });
+    var cancel = dialog.querySelector('[data-logout-cancel], [data-confirm-cancel]');
+    if (cancel) cancel.addEventListener('click', function () { dialog.close(); });
+    // A click on the backdrop lands on the dialog element itself.
+    dialog.addEventListener('click', function (event) {
+      if (event.target === dialog) dialog.close();
+    });
+  }
+  wire(document.querySelector('[data-logout-open]'), 'logoutDialog');
+  document.querySelectorAll('[data-confirm-open]').forEach(function (button) {
+    wire(button, button.getAttribute('data-confirm-open'));
   });
 })();

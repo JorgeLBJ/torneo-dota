@@ -234,3 +234,10 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;overflow:hidde
 }
 
 .tsel small{display:flex;align-items:center;gap:8px}
+
+/* Stream card */
+.stream-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end}
+.stream-preview{display:grid;gap:10px}
+.stream-frame{position:relative;width:min(720px,100%);aspect-ratio:16/9;background:#000;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.stream-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+@media (max-width:760px){.stream-row{grid-template-columns:1fr}}
