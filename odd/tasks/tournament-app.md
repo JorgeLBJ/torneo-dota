@@ -36,7 +36,7 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
 - [x] T4 Playoff bracket (seeding, winners, champion) (TDD) — route: delegated writer
 - [x] T5 Repository module (SQL) with in-memory DB tests — route: delegated writer
 - [x] T6 Backoffice: auth, tournaments, teams, fixture, results, playoffs — route: delegated writer
-- [ ] T6.1 Hardening + polish from T6 review and visual check — route: delegated writer
+- [x] T6.1 Hardening + polish from T6 review and visual check — route: delegated writer
   - Rate limit keyed on spoofable X-Forwarded-For (src/security.ts:34-36): only trust the proxy-appended hop when TRUST_PROXY=1.
   - Login limiter: bounded map + eviction (src/auth/rate-limit.ts), check-and-increment without TOCTOU (src/admin/routes/auth.tsx:25-34).
   - Unbounded request body in form parsing (src/admin/form.ts:5-7): cap body size.
@@ -44,8 +44,8 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
   - Tiebreak match ordering (src/admin/routes/fixture.tsx:165-167); end-before-start and unbounded round param (fixture.tsx:97-103, 149-151); tautological tie test (test/services.test.ts:164).
   - Migration comment says "exactly one" active but index allows zero (002:10-12); labels "URL pública"/"Torneo activo" wording (tournaments.tsx:45-46, layout.tsx:84); tournaments.tsx:47-51 edge case.
   - Visual: calendar table columns collapse (phase select and times input too narrow); mobile nav shows a raw horizontal scrollbar.
-- [ ] T7 Public site `/t/:slug` + SSE live updates, mockup design — route: delegated writer
-- [ ] T8 Seed script for the current tournament (7 teams, sheet fixture, Oct 3/10/11/17) — route: delegated writer
+- [x] T7 Public site `/t/:slug` + SSE live updates, mockup design — route: delegated writer
+- [x] T8 Seed script for the current tournament (7 teams, sheet fixture, Oct 3/10/11/17) — route: delegated writer
 - [ ] T9 Dockerfile + docker-compose (+ Caddy once domain known) — route: delegated writer
 
 ## Stakeholder feedback on mockups (2026-09-29)
@@ -88,5 +88,10 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
 - T6 (66992c7, 25533b7, 0aa2783, 4a2d13e, ebcfe49): route delegated writer, 5 work-unit commits. RED then GREEN per unit: migration 002 + winner triggers (8 failing schema tests), domain (10 failing: double round-robin, per-day slot minutes, time validation, semifinal winner validation, configurable points/tiebreakers), repository (10 failing), heroes, auth core (missing module), admin auth/users/tournaments/active tournament (missing module), config/rules/teams (16 failing), services (missing module), fixture/results/playoffs routes (30 failing). Total 244 tests in 19 files; `tsc --noEmit` clean. Smoke test with a temp DB: login page 200, unauthenticated /admin 303 to login, login POST sets HttpOnly SameSite=Lax cookie, POST without Origin 403, torneos/config/reglas/equipos/fixture/resultados/playoffs/usuarios all 200, server refuses to start without ADMIN_PASSWORD on an empty DB. Review findings folded in: winner triggers in 002 (NULL-team bypass), semifinal/final winner validation, addMinutes validation. Layout was not checked visually in a browser (CSS is the mockup's).
 - T6 assumptions: migration 002 was edited in place to add `is_active` (unreleased, never applied outside tests); the first created tournament becomes active automatically; a tiebreak match is a normal group-phase match (its result counts in the standings); regenerating the fixture also deletes semifinal/final matches; playoff matches are created lazily (first result or manual pick) and store the bracket's teams at that moment; qualifiers stay fixed at 4 and BO3 / draws / 2-or-8 qualifiers were left out (not confirmed); tsx moved to dependencies so `npm start` works in production; 127 hero portraits (8.7 MB) committed under public/heroes; fonts still load from Google Fonts.
 
+- T6.1 (c1..: 3d79f91 excluded) commits: security (limiter/proxy hop/413), validation and wording fixes (also un-ignored `src/data/` which `.gitignore` `data/` had hidden: heroes.ts/json were untracked), calendar and mobile nav CSS, then coordinator follow-ups: full-width admin, single control height (40/32px), one focus ring, compact hero slot, chip spacing, DD/MM/YYYY HH:mm:ss helper `src/format/datetime.ts`. Route: delegated writer. RED then GREEN per unit (CSS units were written before their presence tests).
+- T7 route delegated writer: view model (`src/public/model.ts`), SSR views/routes, `public/site.css|js`, SSE (`/events`, `/t/:slug/events`, `/partial`), hero bg self-hosted (100 KB). Browser check with Playwright at 390 px: no horizontal overflow, hash tab + team filter work, live swap keeps tab and filter, live pill on.
+- T8 route delegated writer: `npm run seed:oct2026`, idempotent, exact sheet fixture; test asserts 21 unique pairs, one bye per team and the schedule.
+- Totals: 332 tests in 27 files, `tsc --noEmit` clean. Smoke on temp DB (PORT 3098): `/` 200 with name, `/t/torneo-oct-2026` 200, `/t/nope` 404, axe.png 200, public has no X-Frame-Options, `/admin/login` sends DENY + frame-ancestors none, SSE streams hello and a change after saving a result.
+
 ## Next step
-T7 (public site: `/` = active tournament, `/t/:slug`, SSE on `tournament:<id>:changed` from src/events.ts; reuse `renderRulebook`, `StandingsTable` pieces and `/assets/*` static serving).
+T9: Dockerfile + docker-compose (node:22-slim, SQLite volume, `TRUST_PROXY=1`, `COOKIE_SECURE=1`). The VPS already runs Caddy, so no Caddy in our compose; the Caddy site block needs no special SSE config (text/event-stream is flushed immediately). Nothing runs on the VPS without authorization.
