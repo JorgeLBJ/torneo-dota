@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import { isHeroSlug } from '../data/heroes.js';
+import { isValidTimeZone, utcToZoned, zonedToUtc } from '../format/timezone.js';
 
 // All SQL of the application lives in this module.
 
@@ -18,6 +19,8 @@ export interface Tournament {
   tiebreakers: TiebreakerKey[];
   groupLegs: 1 | 2;
   rulesText: string;
+  /** IANA zone that wall-clock schedule inputs are read in and admin times are shown in. */
+  timezone: string;
   isActive: boolean;
   createdAt: string;
 }
@@ -49,6 +52,10 @@ export interface Match {
   phase: Phase;
   round: number;
   matchNumber: number;
+  /** Start and end as ISO UTC instants (the stored truth). */
+  startsAt: string | null;
+  endsAt: string | null;
+  /** The same schedule as wall-clock values in the tournament's time zone (derived, never stored). */
   scheduledDate: string | null;
   startTime: string | null;
   endTime: string | null;
@@ -109,16 +116,25 @@ export interface Session {
 export const TIEBREAKER_KEYS = ['kd', 'kills'] as const;
 
 const TOURNAMENT_COLS = `id, name, slug, qualifiers, game, points_win AS pointsWin, points_loss AS pointsLoss,
-  tiebreakers, group_legs AS groupLegs, rules_text AS rulesText, is_active AS isActive, created_at AS createdAt`;
+  tiebreakers, group_legs AS groupLegs, rules_text AS rulesText, timezone, is_active AS isActive, created_at AS createdAt`;
 const TEAM_COLS = 'id, tournament_id AS tournamentId, code, name, captain, hero';
-const MATCH_COLS = `id, tournament_id AS tournamentId, phase, round, match_number AS matchNumber,
-  scheduled_date AS scheduledDate, start_time AS startTime, end_time AS endTime,
-  team1_id AS team1Id, team2_id AS team2Id, winner_id AS winnerId,
-  team1_kills AS team1Kills, team1_deaths AS team1Deaths, team2_kills AS team2Kills, team2_deaths AS team2Deaths`;
+const MATCH_COLS = `m.id, m.tournament_id AS tournamentId, m.phase, m.round, m.match_number AS matchNumber,
+  m.starts_at AS startsAt, m.ends_at AS endsAt, t.timezone AS timezone,
+  m.team1_id AS team1Id, m.team2_id AS team2Id, m.winner_id AS winnerId,
+  m.team1_kills AS team1Kills, m.team1_deaths AS team1Deaths, m.team2_kills AS team2Kills, m.team2_deaths AS team2Deaths`;
+const MATCH_FROM = 'FROM matches m JOIN tournaments t ON t.id = m.tournament_id';
 const ADMIN_COLS = 'id, username, password_hash AS passwordHash, created_at AS createdAt';
 const SESSION_COLS = 'id, admin_id AS adminId, expires_at AS expiresAt';
 
 type TournamentRow = Omit<Tournament, 'tiebreakers' | 'isActive'> & { tiebreakers: string; isActive: number };
+type MatchRow = Omit<Match, 'scheduledDate' | 'startTime' | 'endTime'> & { timezone: string };
+
+function toMatch({ timezone, ...row }: MatchRow): Match {
+  const start = row.startsAt ? utcToZoned(row.startsAt, timezone) : null;
+  const end = row.endsAt ? utcToZoned(row.endsAt, timezone) : null;
+  return { ...row, scheduledDate: start?.date ?? null, startTime: start?.time ?? null, endTime: end?.time ?? null };
+}
+
 type ScheduleDayRow = Omit<ScheduleDay, 'startTimes'> & { startTimes: string };
 
 function toTournament(row: TournamentRow): Tournament {
@@ -135,7 +151,7 @@ export function createRepository(db: Database.Database) {
     updateTournament: db.prepare(
       `UPDATE tournaments SET name = @name, slug = @slug, qualifiers = @qualifiers, game = @game,
          points_win = @pointsWin, points_loss = @pointsLoss, tiebreakers = @tiebreakers,
-         group_legs = @groupLegs, rules_text = @rulesText WHERE id = @id`,
+         group_legs = @groupLegs, rules_text = @rulesText, timezone = @timezone WHERE id = @id`,
     ),
     activeTournament: db.prepare(`SELECT ${TOURNAMENT_COLS} FROM tournaments WHERE is_active = 1`),
     clearActive: db.prepare('UPDATE tournaments SET is_active = 0 WHERE is_active = 1'),
@@ -166,22 +182,23 @@ export function createRepository(db: Database.Database) {
       .pluck(),
 
     insertMatch: db.prepare(
-      `INSERT INTO matches (tournament_id, phase, round, match_number, scheduled_date, start_time, end_time, team1_id, team2_id)
-       VALUES (@tournamentId, @phase, @round, @matchNumber, @scheduledDate, @startTime, @endTime, @team1Id, @team2Id)`,
+      `INSERT INTO matches (tournament_id, phase, round, match_number, starts_at, ends_at, team1_id, team2_id)
+       VALUES (@tournamentId, @phase, @round, @matchNumber, @startsAt, @endsAt, @team1Id, @team2Id)`,
     ),
-    matchById: db.prepare(`SELECT ${MATCH_COLS} FROM matches WHERE id = ?`),
-    listMatches: db.prepare(`SELECT ${MATCH_COLS} FROM matches WHERE tournament_id = ? ORDER BY match_number`),
+    matchById: db.prepare(`SELECT ${MATCH_COLS} ${MATCH_FROM} WHERE m.id = ?`),
+    tournamentZone: db.prepare('SELECT timezone FROM tournaments WHERE id = ?').pluck(),
+    listMatches: db.prepare(`SELECT ${MATCH_COLS} ${MATCH_FROM} WHERE m.tournament_id = ? ORDER BY m.match_number`),
     listMatchesByPhase: db.prepare(
-      `SELECT ${MATCH_COLS} FROM matches WHERE tournament_id = ? AND phase = ? ORDER BY match_number`,
+      `SELECT ${MATCH_COLS} ${MATCH_FROM} WHERE m.tournament_id = ? AND m.phase = ? ORDER BY m.match_number`,
     ),
     deleteMatchesByPhase: db.prepare('DELETE FROM matches WHERE tournament_id = ? AND phase = ?'),
     deleteMatch: db.prepare('DELETE FROM matches WHERE id = ?'),
     updateMatch: db.prepare(
-      `UPDATE matches SET round = @round, scheduled_date = @scheduledDate, start_time = @startTime,
-         end_time = @endTime, team1_id = @team1Id, team2_id = @team2Id WHERE id = @id`,
+      `UPDATE matches SET round = @round, starts_at = @startsAt, ends_at = @endsAt,
+         team1_id = @team1Id, team2_id = @team2Id WHERE id = @id`,
     ),
     updateSchedule: db.prepare(
-      'UPDATE matches SET scheduled_date = @scheduledDate, start_time = @startTime, end_time = @endTime WHERE id = @id',
+      'UPDATE matches SET starts_at = @startsAt, ends_at = @endsAt WHERE id = @id',
     ),
     updateMatchTeams: db.prepare('UPDATE matches SET team1_id = @team1Id, team2_id = @team2Id WHERE id = @id'),
     recordResult: db.prepare(
@@ -219,7 +236,20 @@ export function createRepository(db: Database.Database) {
     return row && toTournament(row);
   };
   const teamById = (id: number) => q.teamById.get(id) as Team | undefined;
-  const matchById = (id: number) => q.matchById.get(id) as Match | undefined;
+  const matchById = (id: number): Match | undefined => {
+    const row = q.matchById.get(id) as MatchRow | undefined;
+    return row && toMatch(row);
+  };
+  /** Wall-clock schedule (read in the tournament's zone) -> stored UTC instants. */
+  const instants = (tournamentId: number, s: { scheduledDate?: string | null; startTime?: string | null; endTime?: string | null }) => {
+    const zone = q.tournamentZone.get(tournamentId) as string;
+    const { scheduledDate: date, startTime: start, endTime: end } = s;
+    const startsAt = date && start ? zonedToUtc(date, start, zone) : null;
+    let endsAt = date && end ? zonedToUtc(date, end, zone) : null;
+    // An end that is not after the start belongs to the next day (a slot running past midnight).
+    if (startsAt && endsAt && endsAt <= startsAt) endsAt = new Date(Date.parse(endsAt) + 86_400_000).toISOString().replace('.000Z', 'Z');
+    return { startsAt, endsAt };
+  };
   const requireHero = (hero: string | null | undefined): void => {
     if (hero != null && !isHeroSlug(hero)) throw new Error(`Unknown hero "${hero}"`);
   };
@@ -229,12 +259,10 @@ export function createRepository(db: Database.Database) {
   };
 
   const withDefaults = (m: NewMatch) => ({
-    scheduledDate: null,
-    startTime: null,
-    endTime: null,
     team1Id: null,
     team2Id: null,
     ...m,
+    ...instants(m.tournamentId, m),
   });
 
   const insertMatchesTx = db.transaction((matches: NewMatch[]) => {
@@ -288,6 +316,7 @@ export function createRepository(db: Database.Database) {
     listTournaments: () => (q.listTournaments.all() as TournamentRow[]).map(toTournament),
     updateTournament(id: number, patch: TournamentPatch): Tournament {
       const next = { ...requireRow(tournamentById(id), 'Tournament'), ...patch, id };
+      if (!isValidTimeZone(next.timezone)) throw new Error(`Invalid time zone "${next.timezone}"`);
       q.updateTournament.run({ ...next, tiebreakers: next.tiebreakers.join(',') });
       return requireRow(tournamentById(id), 'Tournament');
     },
@@ -353,7 +382,7 @@ export function createRepository(db: Database.Database) {
     },
     getMatch: matchById,
     listMatches(tournamentId: number, phase?: Phase): Match[] {
-      return (phase ? q.listMatchesByPhase.all(tournamentId, phase) : q.listMatches.all(tournamentId)) as Match[];
+      return ((phase ? q.listMatchesByPhase.all(tournamentId, phase) : q.listMatches.all(tournamentId)) as MatchRow[]).map(toMatch);
     },
     maxRound: (tournamentId: number, phase: Phase): number => q.maxRound.get(tournamentId, phase) as number,
     hasResults: (tournamentId: number): boolean => q.hasResults.get(tournamentId) === 1,
@@ -364,11 +393,13 @@ export function createRepository(db: Database.Database) {
       q.deleteMatch.run(id);
     },
     updateMatch(id: number, edit: MatchEdit): Match {
-      q.updateMatch.run({ ...edit, id });
+      const current = requireRow(matchById(id), 'Match');
+      q.updateMatch.run({ ...edit, ...instants(current.tournamentId, edit), id });
       return requireRow(matchById(id), 'Match');
     },
     updateMatchSchedule(id: number, schedule: Schedule): Match {
-      q.updateSchedule.run({ ...schedule, id });
+      const current = requireRow(matchById(id), 'Match');
+      q.updateSchedule.run({ ...instants(current.tournamentId, schedule), id });
       return requireRow(matchById(id), 'Match');
     },
     updateMatchTeams(id: number, team1Id: number | null, team2Id: number | null): Match {
