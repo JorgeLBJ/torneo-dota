@@ -40,4 +40,14 @@ describe('admin stylesheet', () => {
   it('spaces a chip from the text before it', () => {
     expect(rule('.pill:not(:first-child)')).toMatch(/margin-left:\s*8px/);
   });
+
+  it('styles every select: one custom chevron, room for the text, themed list where supported', () => {
+    const select = css.split(String.fromCharCode(10)).find((line) => line.startsWith('select{appearance:none')) ?? '';
+    expect(select).toContain('padding-right:36px');
+    expect(select).toContain('background-position:right 12px center');
+    expect(select).toContain('text-overflow:ellipsis');
+    expect(css).toMatch(/@supports \(appearance: base-select\)\{[\s\S]*::picker\(select\)\{[^}]*border-radius:10px/);
+    // Only one chevron: the built-in picker icon is hidden when the custom one is in use.
+    expect(css).toContain('select::picker-icon{display:none}');
+  });
 });

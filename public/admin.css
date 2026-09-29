@@ -196,3 +196,15 @@ aside .btn{width:100%}
   .row-form{grid-template-columns:1fr 1fr auto;align-items:end;gap:12px 14px}
   .row-form h2{grid-column:1 / -1}
 }
+
+/* Selects: one custom chevron, no overlap with the text; the native list is themed where the browser supports it. */
+select{appearance:none;-webkit-appearance:none;padding-right:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23e6b65f' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:12px 8px}
+@supports (appearance: base-select){
+  select,::picker(select){appearance:base-select}
+  select::picker-icon{display:none}
+  ::picker(select){background:var(--panel-2);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.5);padding:6px;margin-top:4px}
+  select option{padding:8px 12px;border-radius:6px;color:var(--fg)}
+  select option:hover,select option:focus{background:var(--gold-soft)}
+  select option:checked{color:var(--gold)}
+  select option::checkmark{color:var(--gold)}
+}
