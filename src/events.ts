@@ -4,11 +4,18 @@ import { EventEmitter } from 'node:events';
 export function createEvents() {
   const emitter = new EventEmitter();
   emitter.setMaxListeners(0);
+  const ANY = 'tournament:any:changed';
   const name = (tournamentId: number) => `tournament:${tournamentId}:changed`;
   return {
     emitter,
     tournamentChanged(tournamentId: number): void {
       emitter.emit(name(tournamentId), tournamentId);
+      emitter.emit(ANY, tournamentId);
+    },
+    /** Fires for every tournament; used by the site root, which follows whichever tournament is active. */
+    onAnyChanged(listener: (tournamentId: number) => void): () => void {
+      emitter.on(ANY, listener);
+      return () => emitter.off(ANY, listener);
     },
     /** Returns an unsubscribe function. */
     onTournamentChanged(tournamentId: number, listener: () => void): () => void {

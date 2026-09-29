@@ -15,6 +15,12 @@ import { userRoutes } from './routes/users.js';
 /** Everything mounted under /admin. */
 export function adminApp(deps: Deps) {
   const app = new Hono<AdminEnv>();
+  // The backoffice must never be framed (clickjacking); the public site, embedded in Google Sites, may be.
+  app.use('*', async (c, next) => {
+    await next();
+    c.res.headers.set('X-Frame-Options', 'DENY');
+    c.res.headers.set('Content-Security-Policy', "frame-ancestors 'none'");
+  });
   app.use('*', sameOriginGuard({ trustProxy: deps.config.trustProxy }));
   app.route('/', loginRoutes(deps));
   app.use('*', requireAdmin(deps));

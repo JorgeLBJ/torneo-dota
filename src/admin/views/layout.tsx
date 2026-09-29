@@ -1,5 +1,6 @@
 import type { FC, PropsWithChildren } from 'hono/jsx';
 import { raw } from 'hono/html';
+import { assetUrl } from '../../assets.js';
 import type { Admin, Team, Tournament } from '../../db/repository.js';
 import type { Flash } from '../flash.js';
 
@@ -59,11 +60,11 @@ const Document: FC<PropsWithChildren<{ title: string }>> = ({ title, children })
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{title} · Torneos Admin</title>
         <link rel="stylesheet" href={FONTS} />
-        <link rel="stylesheet" href="/assets/admin.css" />
+        <link rel="stylesheet" href={assetUrl('admin.css')} />
       </head>
       <body>
         {children}
-        <script src="/assets/admin.js" defer></script>
+        <script src={assetUrl('admin.js')} defer></script>
       </body>
     </html>
   </>
