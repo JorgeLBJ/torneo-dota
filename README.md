@@ -1,198 +1,198 @@
 # torneo-dota
 
-A lightweight, multi-tournament web app for Dota 2 leagues. Set up a round-robin fixture, enter results in a backoffice, and let players follow **live standings, playoffs and a stream** on a public page that can be embedded in Google Sites.
+Aplicación web ligera y multitorneo para ligas de Dota 2. Genera un fixture de todos contra todos, registra los resultados en un panel de administración y permite que los jugadores sigan **la tabla en vivo, los playoffs y la transmisión** en una página pública que se puede incrustar en Google Sites.
 
-![Public page: matches](docs/screenshots/public-matches.png)
+![Página pública: partidos](docs/screenshots/public-matches.png)
 
-## What you get
+## Qué incluye
 
-- **Fixture generator**: single or double round-robin for any number of teams, with one bye per round for odd counts. Manual edits: move matches, add rounds or matches, add a tiebreak match.
-- **Results and standings**: admins record the winner and kills/deaths; the table is always derived from results (nothing is stored as points).
-- **Playoffs**: top 4 qualify, semifinals 1st vs 4th and 2nd vs 3rd, final, champion.
-- **Live public page** in a Dota 2 look (Spanish UI): Partidos, En vivo, Posiciones, Playoffs, Reglas. Updates without reloading.
-- **Live stream tab**: one Kick, Twitch or YouTube link per tournament, embedded on the public page.
-- **Multiple tournaments**: one is *active* and shown at `/`; every tournament also has its own URL for the archive.
-- **Time zones**: match times are stored in UTC; visitors see their own local time.
-- **Backoffice** (password login, several admins, all with the same role): tournaments, rules, teams with hero emblems (127 heroes, portraits self-hosted), fixture, results, playoffs, users.
+- **Generador de fixture**: todos contra todos a una o dos vueltas, para cualquier número de equipos, con un descanso por ronda cuando el número es impar. Ediciones manuales: mover partidos, agregar rondas o partidos y agregar un partido de desempate.
+- **Resultados y posiciones**: los administradores registran el ganador y las kills/deaths; la tabla siempre se calcula a partir de los resultados (no se guardan puntos).
+- **Playoffs**: clasifican los 4 primeros, semifinales 1.º vs 4.º y 2.º vs 3.º, final y campeón.
+- **Página pública en vivo** con estética de Dota 2 (interfaz en español): Partidos, En vivo, Posiciones, Playoffs, Reglas. Se actualiza sin recargar.
+- **Pestaña de transmisión**: un enlace de Kick, Twitch o YouTube por torneo, incrustado en la página pública.
+- **Varios torneos**: uno está *activo* y se muestra en `/`; además, cada torneo tiene su propia URL para el archivo histórico.
+- **Zonas horarias**: las horas de los partidos se guardan en UTC; cada visitante ve su hora local.
+- **Panel de administración** (acceso con contraseña, varios administradores, todos con el mismo rol): torneos, reglas, equipos con emblema de héroe (127 héroes, retratos alojados en el propio proyecto), fixture, resultados, playoffs y usuarios.
 
-## Screenshots
+## Capturas de pantalla
 
-| Public, on a phone | Backoffice: results |
+| Página pública en un teléfono | Panel: resultados |
 | --- | --- |
-| ![Standings on a phone](docs/screenshots/public-standings-phone.png) | ![Admin results](docs/screenshots/admin-results.png) |
+| ![Posiciones en un teléfono](docs/screenshots/public-standings-phone.png) | ![Resultados en el panel de administración](docs/screenshots/admin-results.png) |
 
-![Admin: hero picker](docs/screenshots/admin-hero-picker.png)
+![Panel: selector de héroe](docs/screenshots/admin-hero-picker.png)
 
-## Quick start
+## Inicio rápido
 
-**Prerequisites:** Node.js 22 or newer and npm. It was developed and tested on Node 24; there is no `engines` field.
+**Requisitos previos:** Node.js 22 o superior y npm. Se desarrolló y probó con Node 24; no hay un campo `engines`.
 
 ```bash
 npm ci
 npm run dev
 ```
 
-Then open:
+Luego abre:
 
-| URL | What |
+| URL | Contenido |
 | --- | --- |
-| <http://localhost:3000/> | Public page of the active tournament ("Próximamente" until one is active) |
-| <http://localhost:3000/admin> | Backoffice. On a fresh database it sends you to the first-run setup |
+| <http://localhost:3000/> | Página pública del torneo activo ("Próximamente" hasta que haya uno activo) |
+| <http://localhost:3000/admin> | Panel de administración. Con una base de datos nueva, te lleva a la configuración inicial |
 
-**First run: create the first admin.** Pick one:
+**Primer arranque: crear el primer administrador.** Elige una opción:
 
-| Way | How |
+| Opción | Cómo |
 | --- | --- |
-| Setup page (default) | Start the server. It prints `Setup required: open /admin/setup and use code: <code>`. Open `/admin/setup`, enter a username, a password (8 to 200 characters, confirmed) and that code |
-| `ADMIN_PASSWORD` | Start with `ADMIN_PASSWORD='choose-a-password' npm run dev`: the admin `admin` is created at startup and setup is never shown |
+| Página de configuración inicial (por defecto) | Inicia el servidor. Imprime `Setup required: open /admin/setup and use code: <código>`. Abre `/admin/setup` e ingresa un usuario, una contraseña (de 8 a 200 caracteres, con confirmación) y ese código |
+| `ADMIN_PASSWORD` | Inicia con `ADMIN_PASSWORD='elige-una-contraseña' npm run dev`: el administrador `admin` se crea al arrancar y nunca se muestra la configuración inicial |
 
-- The generated setup code is random (192 bits), printed **once** in the server output, and different on every start. To use your own, set `ADMIN_SETUP_TOKEN`.
-- `/admin/setup` exists only while there are no admins; afterwards it returns 404. Attempts are rate-limited like the login.
-- Afterwards manage users in the backoffice (**Usuarios**). Each admin can change their own password from the sidebar (**Cambiar contraseña**), which also signs out their other sessions.
-- The SQLite database is created at `./data/torneos.db` on first run and migrated automatically.
-- Optional demo data: `npm run seed:oct2026` creates *Torneo All vs All · Oct 2026* (7 teams, 21 matches) and makes it active. It is safe to run twice (it does nothing if the tournament exists).
+- El código de configuración generado es aleatorio (192 bits), se imprime **una sola vez** en la salida del servidor y cambia en cada arranque. Para usar uno propio, define `ADMIN_SETUP_TOKEN`.
+- `/admin/setup` solo existe mientras no haya administradores; después responde 404. Los intentos tienen límite de frecuencia, igual que el inicio de sesión.
+- Después, gestiona los usuarios en el panel (**Usuarios**). Cada administrador puede cambiar su propia contraseña desde la barra lateral (**Cambiar contraseña**), lo que además cierra sus otras sesiones.
+- La base de datos SQLite se crea en `./data/torneos.db` en el primer arranque y se migra automáticamente.
+- Datos de demostración opcionales: `npm run seed:oct2026` crea *Torneo All vs All · Oct 2026* (7 equipos, 21 partidos) y lo deja activo. Se puede ejecutar dos veces sin problema (no hace nada si el torneo ya existe).
 
-New tournament checklist (in the backoffice):
+Lista de pasos para un torneo nuevo (en el panel):
 
-- [ ] **Torneos**: create the tournament and mark it active
-- [ ] **Configuración**: name, slug, game, time zone, calendar days and start times
-- [ ] **Reglas**: points, tiebreakers, format (single/double round-robin), rulebook text
-- [ ] **Equipos**: add teams and pick a hero emblem for each
-- [ ] **Fixture**: generate, then adjust by hand if needed
-- [ ] **Resultados**: enter results as matches finish
+- [ ] **Torneos**: crear el torneo y marcarlo como activo
+- [ ] **Configuración**: nombre, slug, juego, zona horaria, días del calendario y horas de inicio
+- [ ] **Reglas**: puntos, criterios de desempate, formato (una o dos vueltas), texto del reglamento
+- [ ] **Equipos**: agregar los equipos y elegir un emblema de héroe para cada uno
+- [ ] **Fixture**: generarlo y, si hace falta, ajustarlo a mano
+- [ ] **Resultados**: registrar los resultados a medida que terminan los partidos
 
-## Configuration
+## Configuración
 
-The server reads these environment variables:
+El servidor lee estas variables de entorno:
 
-| Variable | Default | Purpose |
+| Variable | Valor por defecto | Propósito |
 | --- | --- | --- |
-| `PORT` | `3000` | HTTP port |
-| `DATABASE_PATH` | `./data/torneos.db` | SQLite file (its folder is created if missing) |
-| `ADMIN_PASSWORD` | none | Optional. If set and there are no admins, creates the admin `admin` with this password at startup. Without it, the first admin is created on `/admin/setup` |
-| `ADMIN_SETUP_TOKEN` | random per start | Code required by `/admin/setup`. If unset, a random one is generated and printed once at startup (see the server output; with Docker, the container logs) |
-| `COOKIE_SECURE` | off | `1` or `true`: mark the session cookie `Secure`. Set it when served over HTTPS |
-| `TRUST_PROXY` | off | `1` or `true`: trust `X-Forwarded-For` / `X-Forwarded-Host` from a reverse proxy (see below) |
-| `STREAM_PARENT_HOSTS` | empty | Comma-separated hosts allowed to frame the Twitch player. Empty means the request host plus `sites.google.com` |
+| `PORT` | `3000` | Puerto HTTP |
+| `DATABASE_PATH` | `./data/torneos.db` | Archivo SQLite (su carpeta se crea si no existe) |
+| `ADMIN_PASSWORD` | ninguno | Opcional. Si está definida y no hay administradores, crea al arrancar el administrador `admin` con esta contraseña. Sin ella, el primer administrador se crea en `/admin/setup` |
+| `ADMIN_SETUP_TOKEN` | aleatorio en cada arranque | Código que exige `/admin/setup`. Si no se define, se genera uno aleatorio y se imprime una sola vez al arrancar (consulta la salida del servidor; con Docker, los registros del contenedor) |
+| `COOKIE_SECURE` | desactivado | `1` o `true`: marca la cookie de sesión como `Secure`. Actívalo cuando se sirva por HTTPS |
+| `TRUST_PROXY` | desactivado | `1` o `true`: confía en `X-Forwarded-For` / `X-Forwarded-Host` de un proxy inverso (ver más abajo) |
+| `STREAM_PARENT_HOSTS` | vacío | Hosts, separados por comas, autorizados a incrustar el reproductor de Twitch. Vacío significa el host de la solicitud más `sites.google.com` |
 
-`TRUST_PROXY` assumes **exactly one** trusted proxy in front (for example Caddy on the same host). The login rate limiter then keys on the right-most `X-Forwarded-For` entry, the one the proxy appended.
+`TRUST_PROXY` supone **exactamente un** proxy de confianza delante (por ejemplo, Caddy en el mismo servidor). El limitador de intentos de inicio de sesión usa entonces la entrada más a la derecha de `X-Forwarded-For`, la que agregó el proxy.
 
-## How it works
+## Cómo funciona
 
-### Routes
+### Rutas
 
-| Route | Description |
+| Ruta | Descripción |
 | --- | --- |
-| `/` | Public page of the active tournament |
-| `/t/:slug` | Public page of any tournament (archive); Spanish 404 if unknown |
-| `/partial`, `/t/:slug/partial` | The page content as an HTML fragment (used for live refresh) |
-| `/events`, `/t/:slug/events` | Server-sent events stream (`hello`, `change`, `ping`) |
-| `/admin` | Backoffice: opens the active tournament's results |
-| `/admin/setup` | First-run setup (only while there are no admins; otherwise 404) |
-| `/admin/cuenta` | Change your own password |
-| `/admin/torneos`, `/admin/usuarios` | Tournaments list, admin users |
-| `/admin/t/:id/{config,reglas,equipos,fixture,resultados,playoffs}` | Per-tournament screens |
-| `/assets/*` | CSS, JS, images and hero portraits |
+| `/` | Página pública del torneo activo |
+| `/t/:slug` | Página pública de cualquier torneo (archivo); 404 en español si no existe |
+| `/partial`, `/t/:slug/partial` | El contenido de la página como fragmento HTML (se usa para la actualización en vivo) |
+| `/events`, `/t/:slug/events` | Flujo de eventos enviados por el servidor, SSE (`hello`, `change`, `ping`) |
+| `/admin` | Panel: abre los resultados del torneo activo |
+| `/admin/setup` | Configuración inicial (solo mientras no haya administradores; después, 404) |
+| `/admin/cuenta` | Cambiar tu propia contraseña |
+| `/admin/torneos`, `/admin/usuarios` | Lista de torneos y usuarios administradores |
+| `/admin/t/:id/{config,reglas,equipos,fixture,resultados,playoffs}` | Pantallas de cada torneo |
+| `/assets/*` | CSS, JS, imágenes y retratos de héroes |
 
-Public pages send no framing headers, so they render inside a Google Sites iframe. The backoffice sends `X-Frame-Options: DENY` and `frame-ancestors 'none'`.
+Las páginas públicas no envían cabeceras que impidan incrustarlas, por lo que se muestran dentro de un iframe de Google Sites. El panel envía `X-Frame-Options: DENY` y `frame-ancestors 'none'`.
 
-### Rules
+### Reglas
 
-- Points per win/loss are configurable per tournament (default **win 1, loss 0**; no draws).
-- Ranking: points, then the configured tiebreakers, by default **kill difference (K−D)** then **total kills**. A tie that remains is flagged as unresolved; resolve it with a tiebreak match (admin: Fixture) or by choosing the semifinal teams by hand.
-- **Top 4** advance. Semifinals: 1st vs 4th and 2nd vs 3rd. The winners meet in the final.
-- While the group stage is running, the Playoffs tab shows a *projection* from the current table.
+- Los puntos por victoria y por derrota se configuran en cada torneo (por defecto **victoria 1, derrota 0**; no hay empates).
+- Clasificación: puntos y, después, los criterios de desempate configurados; por defecto, **diferencia de kills (K−D)** y luego **total de kills**. Si persiste un empate, se marca como sin resolver; se resuelve con un partido de desempate (en el panel: Fixture) o eligiendo a mano los equipos de las semifinales.
+- Avanzan los **4 primeros**. Semifinales: 1.º vs 4.º y 2.º vs 3.º. Los ganadores juegan la final.
+- Mientras la fase de grupos está en curso, la pestaña Playoffs muestra una *proyección* con la tabla actual.
 
-### Time zones
+### Zonas horarias
 
-| Where | Behaviour |
+| Dónde | Comportamiento |
 | --- | --- |
-| Storage | Match start and end are ISO UTC instants |
-| Backoffice | Inputs and labels are in the **tournament's time zone** (default `America/Lima`, editable in Configuración) |
-| Public page | Times and day headings use the **visitor's** zone, with a note such as "Horarios en tu hora local (Europe/Madrid)". Without JavaScript the server shows the tournament zone |
+| Almacenamiento | El inicio y el fin de cada partido son instantes ISO en UTC |
+| Panel de administración | Los campos y las etiquetas usan la **zona horaria del torneo** (por defecto `America/Lima`, editable en Configuración) |
+| Página pública | Las horas y los encabezados de día usan la zona del **visitante**, con una nota como "Horarios en tu hora local (Europe/Madrid)". Sin JavaScript, el servidor muestra la zona del torneo |
 
-Changing a tournament's zone keeps existing matches at the same instant; only how they are read changes. "En juego" and "Siguiente" are computed from real instants.
+Cambiar la zona de un torneo mantiene los partidos existentes en el mismo instante; solo cambia cómo se leen. "En juego" y "Siguiente" se calculan con instantes reales.
 
-### Real time
+### Tiempo real
 
-- Saving in the backoffice emits an in-process event. Connected public pages receive `change` over SSE, re-fetch `/partial` and swap it in, keeping the selected tab and team filter.
-- A heartbeat is sent every 25 s. Connections are capped (500 total, 10 per client; more get `503`). The client reconnects with capped exponential backoff.
-- **Run a single instance.** Events live in memory, so a second Node process would not notify the first one's visitors.
+- Al guardar en el panel se emite un evento dentro del proceso. Las páginas públicas conectadas reciben `change` por SSE, vuelven a pedir `/partial` y lo reemplazan, conservando la pestaña seleccionada y el filtro de equipo.
+- Se envía un latido cada 25 s. Las conexiones tienen un tope (500 en total y 10 por cliente; las demás reciben `503`). El cliente se reconecta con retroceso exponencial acotado.
+- **Ejecuta una sola instancia.** Los eventos viven en memoria, así que un segundo proceso de Node no avisaría a los visitantes del primero.
 
-### Live stream
+### Transmisión en vivo
 
-Set the link in **Configuración > Transmisión en vivo**. The public "En vivo" tab embeds it (a red dot marks the tab while a stream is set).
+Define el enlace en **Configuración > Transmisión en vivo**. La pestaña pública "En vivo" lo incrusta (un punto rojo marca la pestaña mientras haya transmisión configurada).
 
-| Platform | Accepted links |
+| Plataforma | Enlaces aceptados |
 | --- | --- |
-| Kick | `kick.com/<channel>` |
-| Twitch | `twitch.tv/<channel>`, `twitch.tv/videos/<id>` |
-| YouTube | `watch?v=`, `youtu.be/`, `/live/<id>`, `/embed/<id>`, `/channel/UC…/live` (`@handle` links cannot be embedded) |
+| Kick | `kick.com/<canal>` |
+| Twitch | `twitch.tv/<canal>`, `twitch.tv/videos/<id>` |
+| YouTube | `watch?v=`, `youtu.be/`, `/live/<id>`, `/embed/<id>`, `/channel/UC…/live` (los enlaces con `@usuario` no se pueden incrustar) |
 
-- Only `https` links are accepted; the embed URL is rebuilt from the validated parts, never from the raw input.
-- **Twitch parent hosts:** Twitch only plays in pages whose host it was told about. By default this app passes the request host and `sites.google.com`. If Twitch does not play inside your Google Sites page, the framing host may be a `*.googleusercontent.com` subdomain: add it to `STREAM_PARENT_HOSTS`.
-- **Ad blockers** can block embedded players. The tab tells visitors to disable theirs or open the channel page.
-- Twitch documents a minimum player size of 400×300 px. The frame is a responsive 16:9, so on very narrow phones it can be smaller than that.
+- Solo se aceptan enlaces `https`; la URL de incrustación se reconstruye a partir de las partes validadas, nunca desde el texto original.
+- **Hosts padre de Twitch:** Twitch solo reproduce en páginas cuyo host se le indicó. Por defecto, esta aplicación le informa el host de la solicitud y `sites.google.com`. Si Twitch no se reproduce dentro de tu página de Google Sites, el host que la incrusta puede ser un subdominio de `*.googleusercontent.com`: agrégalo a `STREAM_PARENT_HOSTS`.
+- Los **bloqueadores de anuncios** pueden bloquear los reproductores incrustados. La pestaña indica a los visitantes que lo desactiven o que abran la página del canal.
+- Twitch documenta un tamaño mínimo de reproductor de 400×300 px. El marco es un 16:9 adaptable, así que en teléfonos muy estrechos puede ser más pequeño que eso.
 
-## Architecture
+## Arquitectura
 
-**Stack:** Node.js + TypeScript, [Hono](https://hono.dev) with `hono/jsx` server-side rendering, `better-sqlite3` (SQL, no ORM), vanilla JS on the client (no build step), Vitest. `tsx` runs the TypeScript directly, in development and in `npm start`.
+**Tecnologías:** Node.js + TypeScript, [Hono](https://hono.dev) con renderizado en servidor mediante `hono/jsx`, `better-sqlite3` (SQL, sin ORM), JavaScript sin frameworks en el cliente (sin paso de compilación) y Vitest. `tsx` ejecuta el TypeScript directamente, tanto en desarrollo como en `npm start`.
 
 ```text
 src/
-  server.ts, app.ts   entry point and app wiring
-  config.ts, clock.ts environment flags, injectable clock
-  db/                 migrations runner, connection, repository (all SQL lives here)
-  domain/             pure logic: fixture, standings, playoffs, stream links
-  services/           use cases combining repository and domain
-  admin/              backoffice routes and views
-  public/             public model (view data), routes, views, SSE
-  auth/               passwords, sessions, login rate limiter
-  format/             date formatting and time zone arithmetic
-  data/               hero list
-migrations/           forward-only SQL files: 001_init.sql ... 004_stream.sql
-public/               static files: CSS, client JS, hero portraits, images
-scripts/              seed and hero-portrait downloader
-test/                 Vitest tests (in-memory SQLite)
-odd/                  feature plan, mockups and review log
-docs/screenshots/     images used in this README
+  server.ts, app.ts   punto de entrada y composición de la aplicación
+  config.ts, clock.ts opciones de entorno, reloj inyectable
+  db/                 ejecutor de migraciones, conexión, repositorio (todo el SQL vive aquí)
+  domain/             lógica pura: fixture, posiciones, playoffs, enlaces de transmisión
+  services/           casos de uso que combinan repositorio y dominio
+  admin/              rutas y vistas del panel
+  public/             modelo público (datos de la vista), rutas, vistas, SSE
+  auth/               contraseñas, sesiones, limitador de inicio de sesión
+  format/             formato de fechas y aritmética de zonas horarias
+  data/               lista de héroes
+migrations/           archivos SQL solo hacia adelante: 001_init.sql ... 004_stream.sql
+public/               archivos estáticos: CSS, JS del cliente, retratos de héroes, imágenes
+scripts/              datos de ejemplo y descargador de retratos de héroes
+test/                 pruebas con Vitest (SQLite en memoria)
+odd/                  plan de la funcionalidad, maquetas y registro de revisiones
+docs/screenshots/     imágenes usadas en este README
 ```
 
-**Migrations:** `migrations/NNN_name.sql` files are applied in order at startup, one transaction each, and the version is kept in `PRAGMA user_version`. The app refuses to start if one fails. They are forward-only: **never edit a migration that has been applied**; add a new file instead.
+**Migraciones:** los archivos `migrations/NNN_name.sql` se aplican en orden al arrancar, cada uno en una transacción, y la versión se guarda en `PRAGMA user_version`. La aplicación no arranca si alguna falla. Son solo hacia adelante: **nunca edites una migración que ya se aplicó**; agrega un archivo nuevo.
 
-## Development
+## Desarrollo
 
-| Command | What it does |
+| Comando | Qué hace |
 | --- | --- |
-| `npm run dev` | Start with file watching (`tsx watch`) |
-| `npm start` | Start without watching |
-| `npm test` | Run all tests once (`vitest run`) |
+| `npm run dev` | Inicia con observación de archivos (`tsx watch`) |
+| `npm start` | Inicia sin observación de archivos |
+| `npm test` | Ejecuta todas las pruebas una vez (`vitest run`) |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm run seed:oct2026` | Seed the October 2026 tournament (idempotent) |
-| `npm run fetch:heroes` | Download missing hero portraits into `public/heroes/` (they are already committed; use `-- --force` to refetch) |
+| `npm run seed:oct2026` | Carga el torneo de octubre de 2026 (idempotente) |
+| `npm run fetch:heroes` | Descarga los retratos de héroes que falten en `public/heroes/` (ya están incluidos en el repositorio; usa `-- --force` para volver a descargarlos) |
 
-- **TDD:** write the failing test first, then the code. Route tests use `app.request()` against an in-memory database.
-- **Commits:** [Conventional Commits](https://www.conventionalcommits.org) (`feat:`, `fix:`, `docs:`, ...), one reviewable change each, with its tests.
-- Test runners are capped at two workers on purpose (`VITEST_MAX_WORKERS`); do not raise it on a shared machine.
+- **TDD:** primero se escribe la prueba que falla y después el código. Las pruebas de rutas usan `app.request()` sobre una base de datos en memoria.
+- **Commits:** [Conventional Commits](https://www.conventionalcommits.org) (`feat:`, `fix:`, `docs:`, ...), un cambio revisable por commit, con sus pruebas.
+- Los ejecutores de pruebas están limitados a dos procesos de trabajo a propósito (`VITEST_MAX_WORKERS`); no lo aumentes en una máquina compartida.
 
-## Deployment
+## Despliegue
 
-**Docker deployment: coming soon**, behind an existing Caddy reverse proxy. This repository does not contain Docker files yet. Once it does, the first-run setup code will be in the container logs (`docker compose logs`); alternatively set `ADMIN_PASSWORD` or `ADMIN_SETUP_TOKEN` in the environment.
+**Despliegue con Docker: próximamente**, detrás de un proxy inverso Caddy existente. Este repositorio todavía no contiene archivos de Docker. Cuando los tenga, el código de la configuración inicial estará en los registros del contenedor (`docker compose logs`); también puedes definir `ADMIN_PASSWORD` o `ADMIN_SETUP_TOKEN` en el entorno.
 
-Settings needed behind a proxy that terminates HTTPS:
+Ajustes necesarios detrás de un proxy que termina HTTPS:
 
-| Setting | Why |
+| Ajuste | Motivo |
 | --- | --- |
-| `COOKIE_SECURE=1` | Session cookie is only sent over HTTPS |
-| `TRUST_PROXY=1` | Correct client address for the login rate limit and the right host for Twitch |
-| `DATABASE_PATH` on a persistent volume | The SQLite file is the only state |
+| `COOKIE_SECURE=1` | La cookie de sesión solo se envía por HTTPS |
+| `TRUST_PROXY=1` | Dirección de cliente correcta para el límite de inicios de sesión y host correcto para Twitch |
+| `DATABASE_PATH` en un volumen persistente | El archivo SQLite es el único estado |
 
-**Backups:** everything is in the SQLite file. The database runs in WAL mode, so copy `torneos.db` together with `torneos.db-wal` and `torneos.db-shm` while the app is stopped, or take a consistent copy of a running database with SQLite's backup API (with the `sqlite3` command-line tool: `sqlite3 torneos.db ".backup backup.db"`).
+**Copias de seguridad:** todo está en el archivo SQLite. La base de datos usa el modo WAL, así que copia `torneos.db` junto con `torneos.db-wal` y `torneos.db-shm` con la aplicación detenida, o bien obtén una copia consistente de una base en ejecución con la API de copia de seguridad de SQLite (con la herramienta de línea de comandos `sqlite3`: `sqlite3 torneos.db ".backup backup.db"`).
 
-## Credits and legal
+## Créditos y aviso legal
 
-Built by **jpsolutions**: <https://jpsolutions.app>
+Hecho por **jpsolutions** — <https://jpsolutions.app>
 
-Dota 2 and hero artwork are trademarks and copyright of Valve Corporation. This project is not affiliated with or endorsed by Valve.
+Dota 2 y las ilustraciones de héroes son marcas/copyright de Valve Corporation; este proyecto no está afiliado ni respaldado por Valve.
 
-License: TBD.
+Licencia: por definir.
