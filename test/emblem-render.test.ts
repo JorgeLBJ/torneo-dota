@@ -120,6 +120,16 @@ describe('crop dialog', () => {
     expect(body).not.toMatch(/https?:\/\/[^"]*cropper/);
   });
 
+  it('offers fit-whole-image, rotate and a background choice that defaults to blurred', async () => {
+    const body = await (await t.get(`/admin/t/${tournament.id}/equipos`, cookie)).text();
+    expect(body).toContain('id="cropFit"');
+    expect(body).toContain('Ajustar completa');
+    expect(body).toContain('Girar 90°');
+    const radios = [...body.matchAll(/<input type="radio" name="cropBg" value="(\w+)"( checked)?/g)].map((m) => [m[1], Boolean(m[2])]);
+    expect(radios).toEqual([['blur', true], ['dark', false], ['clear', false]]);
+    for (const label of ['Desenfocado', 'Oscuro', 'Transparente', 'Fondo']) expect(body).toContain(label);
+  });
+
   it('serves the vendored files and their license', async () => {
     for (const file of ['cropper.min.js', 'cropper.min.css', 'LICENSE']) {
       expect((await t.get(`/assets/vendor/cropperjs/${file}`)).status).toBe(200);

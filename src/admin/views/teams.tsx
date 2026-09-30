@@ -124,22 +124,41 @@ const ImageModal: FC = () => (
       <p class="flash error" id="imageError" role="alert" hidden></p>
       <div class="im-layout" id="imageEditor">
         <div class="im-stage">
+          <div class="im-fill" id="cropFill" hidden></div>
           <img id="cropImage" alt="Imagen que se va a recortar" />
         </div>
         <div class="im-side">
           <p class="muted" style="margin:0;font-size:12px">
-            Arrastra para encuadrar. Acerca con la rueda, pellizcando o con el control. El recorte es 16:9, como el
-            espacio del héroe.
+            Arrastra para encuadrar. Acerca o aleja con la rueda, pellizcando o con el control. El recorte es 16:9, como
+            el espacio del héroe; lo que la imagen no cubra se rellena con el fondo.
           </p>
           <label class="im-zoom">
             <span>Zoom</span>
             <input type="range" id="cropZoom" min="0" max="100" value="0" step="1" />
           </label>
           <div class="actions">
+            <button class="btn sm" type="button" id="cropFit">
+              Ajustar completa
+            </button>
             <button class="btn sm" type="button" id="cropRotate">
               Girar 90°
             </button>
           </div>
+          <fieldset class="im-bg">
+            <legend>Fondo</legend>
+            <label>
+              <input type="radio" name="cropBg" value="blur" checked />
+              <span>Desenfocado</span>
+            </label>
+            <label>
+              <input type="radio" name="cropBg" value="dark" />
+              <span>Oscuro</span>
+            </label>
+            <label>
+              <input type="radio" name="cropBg" value="clear" />
+              <span>Transparente</span>
+            </label>
+          </fieldset>
           <div class="im-previews" aria-hidden="true">
             <div class="im-prev-item">
               <div class="im-preview im-preview-lg"></div>

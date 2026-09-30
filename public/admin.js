@@ -160,21 +160,29 @@
   var TYPES = ['image/jpeg', 'image/png', 'image/webp'];
   var WRONG = 'La imagen debe ser JPG, PNG o WebP de hasta 5 MB.';
   var OUT = { width: 1024, height: 576 };
+  var DARK = '#0f1114'; // the public site's panel colour
+  var BLUR_PX = 24; // at 1024 px wide; scaled for smaller renders
+  var SOURCE_MAX = 1600; // longest side of the copy used for the blurred backdrop
 
   var image = document.getElementById('cropImage');
   var editor = document.getElementById('imageEditor');
   var errorBox = document.getElementById('imageError');
   var teamLabel = document.getElementById('imageTeam');
   var zoom = document.getElementById('cropZoom');
+  var fillBox = document.getElementById('cropFill');
   var saveButton = document.getElementById('cropSave');
   var cancelButton = document.getElementById('cropCancel');
   var rotateButton = document.getElementById('cropRotate');
+  var fitButton = document.getElementById('cropFit');
   var cropper = null;
   var objectUrl = null;
   var uploadUrl = null;
-  var baseRatio = 1;
   var saving = false;
   var loadToken = 0;
+  var rotation = 0;
+  var sources = {};
+  var lastFit = 'cover';
+  var bgMode = 'blur';
 
   function showError(message) {
     errorBox.textContent = message || '';
@@ -196,12 +204,142 @@
     if (cropper) { cropper.destroy(); cropper = null; }
     if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
     image.removeAttribute('src');
+    sources = {};
+    rotation = 0;
+    lastFit = 'cover';
+    fillBox.hidden = true;
+    modal.style.removeProperty('--fill');
     idle();
   }
 
-  function setZoomFromSlider() {
+  // ---------- Background fill (the area of the 16:9 frame the picture does not cover) ----------
+
+  /** The picture with the chosen rotation, capped in size; used for the blurred backdrop. */
+  function rotatedSource() {
+    if (sources[rotation]) return sources[rotation];
+    var nw = image.naturalWidth;
+    var nh = image.naturalHeight;
+    var scale = Math.min(1, SOURCE_MAX / Math.max(nw, nh));
+    var w = Math.max(1, Math.round(nw * scale));
+    var h = Math.max(1, Math.round(nh * scale));
+    var odd = rotation % 180 !== 0;
+    var canvas = document.createElement('canvas');
+    canvas.width = odd ? h : w;
+    canvas.height = odd ? w : h;
+    var ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(rotation * Math.PI / 180);
+    ctx.drawImage(image, -w / 2, -h / 2, w, h);
+    sources[rotation] = canvas;
+    return canvas;
+  }
+
+  /** The same picture scaled to COVER the frame, blurred and slightly darkened. */
+  function drawBackdrop(ctx, width, height) {
+    var src = rotatedSource();
+    var blur = BLUR_PX * width / OUT.width;
+    var margin = blur * 2.5; // draw past the edges so the blur does not fade into transparency there
+    var scale = Math.max((width + margin * 2) / src.width, (height + margin * 2) / src.height);
+    var dw = src.width * scale;
+    var dh = src.height * scale;
+    var dx = (width - dw) / 2;
+    var dy = (height - dh) / 2;
+    if ('filter' in ctx) {
+      ctx.filter = 'blur(' + blur + 'px)';
+      ctx.drawImage(src, dx, dy, dw, dh);
+      ctx.filter = 'none';
+    } else {
+      // No canvas filter (older Safari): shrink a lot, then stretch back smoothly.
+      var tiny = document.createElement('canvas');
+      tiny.width = 48;
+      tiny.height = Math.round(48 * height / width);
+      var tctx = tiny.getContext('2d');
+      tctx.drawImage(src, (dx / width) * tiny.width, (dy / height) * tiny.height, (dw / width) * tiny.width, (dh / height) * tiny.height);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(tiny, 0, 0, width, height);
+    }
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  /** Shows the chosen fill behind the crop frame and in the three previews. */
+  function applyFill() {
+    modal.setAttribute('data-bg', bgMode);
+    if (bgMode !== 'blur' || !image.naturalWidth) {
+      modal.style.removeProperty('--fill');
+      return;
+    }
+    var canvas = document.createElement('canvas');
+    canvas.width = 480;
+    canvas.height = 270;
+    drawBackdrop(canvas.getContext('2d'), canvas.width, canvas.height);
+    modal.style.setProperty('--fill', 'url("' + canvas.toDataURL('image/jpeg', 0.7) + '")');
+  }
+
+  /** The fill layer follows the crop frame. */
+  function placeFill() {
     if (!cropper) return;
-    cropper.zoomTo(baseRatio * (1 + (Number(zoom.value) / 100) * 4));
+    var box = cropper.getCropBoxData();
+    fillBox.style.left = box.left + 'px';
+    fillBox.style.top = box.top + 'px';
+    fillBox.style.width = box.width + 'px';
+    fillBox.style.height = box.height + 'px';
+    fillBox.hidden = false;
+  }
+
+  modal.querySelectorAll('input[name="cropBg"]').forEach(function (radio) {
+    radio.addEventListener('change', function () {
+      if (!radio.checked) return;
+      bgMode = radio.value;
+      applyFill();
+    });
+  });
+
+  // ---------- Zoom, fit, rotate ----------
+
+  /** Zoom ratios (canvas width / natural width): from half of "whole image fits" up to a few times "covers". */
+  function limits() {
+    var box = cropper.getCropBoxData();
+    var canvas = cropper.getCanvasData();
+    var contain = Math.min(box.width / canvas.naturalWidth, box.height / canvas.naturalHeight);
+    var cover = Math.max(box.width / canvas.naturalWidth, box.height / canvas.naturalHeight);
+    return { contain: contain, cover: cover, min: contain * 0.5, max: Math.max(cover * 5, contain * 2) };
+  }
+
+  function sliderToRatio(value) {
+    var l = limits();
+    return l.min * Math.pow(l.max / l.min, value / 100);
+  }
+
+  function syncSlider(ratio) {
+    var l = limits();
+    var value = 100 * Math.log(ratio / l.min) / Math.log(l.max / l.min);
+    zoom.value = Math.max(0, Math.min(100, value));
+  }
+
+  /** 'contain': the whole picture inside the frame. 'cover': the frame filled. Either way, centred. */
+  function fit(kind) {
+    if (!cropper) return;
+    lastFit = kind;
+    var l = limits();
+    var box = cropper.getCropBoxData();
+    cropper.zoomTo(kind === 'contain' ? l.contain : l.cover);
+    var canvas = cropper.getCanvasData();
+    cropper.setCanvasData({
+      left: box.left + (box.width - canvas.width) / 2,
+      top: box.top + (box.height - canvas.height) / 2,
+    });
+    syncSlider(kind === 'contain' ? l.contain : l.cover);
+  }
+
+  /** The frame is the largest 16:9 area of the stage, fixed; the picture moves and scales inside it. */
+  function sizeFrame() {
+    var c = cropper.getContainerData();
+    var width = Math.min(c.width - 16, (c.height - 16) * 16 / 9);
+    var height = width * 9 / 16;
+    cropper.setCropBoxData({ left: (c.width - width) / 2, top: (c.height - height) / 2, width: width, height: height });
+    placeFill();
   }
 
   function startCropper() {
@@ -213,12 +351,13 @@
     }
     cropper = new window.Cropper(image, {
       aspectRatio: 16 / 9,
-      viewMode: 1,
+      viewMode: 0, // the picture may be smaller than the frame
       dragMode: 'move',
       autoCropArea: 1,
       cropBoxMovable: false,
       cropBoxResizable: false,
       toggleDragModeOnDblclick: false,
+      modal: false, // the area outside the frame is dimmed by CSS, so the fill stays visible inside it
       background: false,
       guides: false,
       center: false,
@@ -226,15 +365,20 @@
       responsive: true,
       preview: modal.querySelectorAll('.im-preview'),
       ready: function () {
-        var data = cropper.getImageData();
-        baseRatio = data.width / data.naturalWidth;
-        zoom.value = 0;
+        sizeFrame();
+        fit('cover');
+        applyFill();
       },
       zoom: function (event) {
-        if (!baseRatio) return;
-        var value = ((event.detail.ratio / baseRatio) - 1) / 4 * 100;
-        zoom.value = Math.max(0, Math.min(100, value));
+        var l = limits();
+        var ratio = event.detail.ratio;
+        if (ratio < l.min - 1e-6 || ratio > l.max + 1e-6) {
+          event.preventDefault();
+          return;
+        }
+        syncSlider(ratio);
       },
+      cropmove: function () { lastFit = null; },
     });
   }
 
@@ -283,9 +427,21 @@
     });
   });
 
-  zoom.addEventListener('input', setZoomFromSlider);
+  zoom.addEventListener('input', function () {
+    if (!cropper) return;
+    lastFit = null;
+    cropper.zoomTo(sliderToRatio(Number(zoom.value)));
+  });
+  fitButton.addEventListener('click', function () { fit('contain'); });
   rotateButton.addEventListener('click', function () {
-    if (cropper) cropper.rotate(90);
+    if (!cropper) return;
+    rotation = (rotation + 90) % 360;
+    cropper.rotate(90);
+    fit(lastFit || 'cover');
+    applyFill();
+  });
+  window.addEventListener('resize', function () {
+    if (cropper) setTimeout(placeFill, 80);
   });
 
   cancelButton.addEventListener('click', function () {
@@ -293,6 +449,25 @@
   });
   modal.addEventListener('cancel', function (event) { if (saving) event.preventDefault(); });
   modal.addEventListener('close', cleanup);
+
+  /** 1024x576: the fill underneath, the framed picture on top. Null when nothing of the picture is inside the frame. */
+  function renderOutput() {
+    var crop = cropper.getCroppedCanvas({
+      width: OUT.width,
+      height: OUT.height,
+      fillColor: bgMode === 'dark' ? DARK : 'transparent',
+      imageSmoothingQuality: 'high',
+    });
+    if (!crop) return null;
+    if (bgMode !== 'blur') return crop;
+    var out = document.createElement('canvas');
+    out.width = OUT.width;
+    out.height = OUT.height;
+    var ctx = out.getContext('2d');
+    drawBackdrop(ctx, OUT.width, OUT.height);
+    ctx.drawImage(crop, 0, 0);
+    return out;
+  }
 
   function toBlob(canvas) {
     return new Promise(function (resolve) {
@@ -315,8 +490,8 @@
       idle();
       showError(message);
     };
-    var canvas = cropper.getCroppedCanvas({ width: OUT.width, height: OUT.height, imageSmoothingQuality: 'high' });
-    if (!canvas) return failed('No se pudo recortar la imagen.');
+    var canvas = renderOutput();
+    if (!canvas) return failed('La imagen quedó fuera del recuadro. Acércala o pulsa «Ajustar completa».');
     toBlob(canvas).then(function (blob) {
       if (!blob) return failed('No se pudo preparar la imagen.');
       if (blob.size > MAX_BYTES) return failed(WRONG);

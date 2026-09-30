@@ -44,7 +44,7 @@ export async function processTeamImage(input: Uint8Array): Promise<Checked<Proce
       .png({ compressionLevel: 0 })
       .toBuffer();
     // ...and encode both sizes from it (sharp writes no metadata unless asked).
-    const webp = { quality: 82, effort: 5 } as const;
+    const webp = { quality: 82, alphaQuality: 90, effort: 5 } as const; // transparency (logos) is preserved
     const x2 = await sharp(master).webp(webp).toBuffer();
     const x1 = await sharp(master).resize(SIZES.x1.width, SIZES.x1.height).webp(webp).toBuffer();
     return ok({ x1, x2 });

@@ -116,3 +116,65 @@ describe('rejecting what is not a usable image', () => {
     expect(result).toEqual({ ok: false, error: 'La imagen es demasiado grande: el máximo es 8000 px por lado y 25 megapíxeles.' });
   });
 });
+
+describe('what the cropper sends: a 1024x576 picture, possibly with transparency', () => {
+  const rgba = async (buf: Buffer) => sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const at = (img: { data: Buffer; info: { width: number } }, x: number, y: number) => {
+    const i = (y * img.info.width + x) * 4;
+    return [img.data[i]!, img.data[i + 1]!, img.data[i + 2]!, img.data[i + 3]!];
+  };
+
+  // A logo letterboxed in 16:9: transparent margins, an opaque red square in the middle, a half-transparent stripe.
+  const logo = async () =>
+    sharp({ create: { width: 1024, height: 576, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+      .composite([
+        { input: { create: { width: 400, height: 576, channels: 4, background: { r: 255, g: 0, b: 0, alpha: 1 } } }, left: 312, top: 0 },
+        { input: { create: { width: 100, height: 576, channels: 4, background: { r: 0, g: 0, b: 255, alpha: 0.5 } } }, left: 0, top: 0 },
+      ])
+      .png()
+      .toBuffer();
+
+  it('keeps the alpha channel in both WebP files', async () => {
+    const { x1, x2 } = await ok(await logo());
+    for (const [file, scale] of [[x2, 1], [x1, 0.5]] as const) {
+      const meta = await sharp(file).metadata();
+      expect(meta.hasAlpha).toBe(true);
+      const img = await rgba(file);
+      expect(at(img, Math.round(200 * scale), Math.round(300 * scale))[3]).toBe(0); // transparent margin
+      expect(at(img, Math.round(512 * scale), Math.round(300 * scale))[3]).toBe(255); // opaque logo
+      const stripe = at(img, Math.round(40 * scale), Math.round(300 * scale))[3];
+      expect(stripe).toBeGreaterThan(110);
+      expect(stripe).toBeLessThan(150);
+    }
+  });
+
+  it('does not crop or shift a picture that is already 16:9', async () => {
+    const edges = await sharp({ create: { width: 1024, height: 576, channels: 3, background: '#808080' } })
+      .composite([
+        { input: { create: { width: 1024, height: 4, channels: 3, background: '#ff0000' } }, left: 0, top: 0 },
+        { input: { create: { width: 1024, height: 4, channels: 3, background: '#0000ff' } }, left: 0, top: 572 },
+        { input: { create: { width: 4, height: 576, channels: 3, background: '#00ff00' } }, left: 0, top: 0 },
+      ])
+      .png()
+      .toBuffer();
+    const { x2 } = await ok(edges);
+    const img = await rgba(x2);
+    expect(img.info).toMatchObject({ width: 1024, height: 576 });
+    const top = at(img, 600, 1);
+    const bottom = at(img, 600, 574);
+    const left = at(img, 1, 300);
+    expect(top[0]).toBeGreaterThan(200);
+    expect(top[2]).toBeLessThan(60);
+    expect(bottom[2]).toBeGreaterThan(200);
+    expect(bottom[0]).toBeLessThan(60);
+    expect(left[1]).toBeGreaterThan(200);
+    expect(left[0]).toBeLessThan(60);
+  });
+
+  it('opaque inputs stay opaque and small', async () => {
+    const { x1 } = await ok(await photo(1024, 576, 'png'));
+    const img = await rgba(x1);
+    expect(at(img, 10, 10)[3]).toBe(255);
+    expect(x1.length).toBeLessThan(40 * 1024);
+  });
+});
