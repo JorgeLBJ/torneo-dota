@@ -53,6 +53,12 @@ describe('rounds as grid cells', () => {
     expect(css).toMatch(/\.panel:not\(\[data-panel="partidos"\]\) \{[^}]*width: min\(1080px, 100%\)/);
   });
 
+  it('gives every round header the height of one with a tag, so cards in a row line up', () => {
+    // .tag is 11px text + 2x4px padding + 2x1px border = 21px; the header never gets shorter than that.
+    expect(css).toMatch(/\.round-head \{[^}]*min-height: 21px/);
+    expect(css).toMatch(/\.round-head \{[^}]*align-items: center/);
+  });
+
   it('lets the header of a narrow cell wrap, with "Descansa" on its own line under the title', () => {
     expect(css).toMatch(/\.round\[data-matches="1"\] \.rest \{[^}]*flex-basis: 100%/);
     expect(css).toMatch(/\.round-head \{[^}]*flex-wrap: wrap/);
