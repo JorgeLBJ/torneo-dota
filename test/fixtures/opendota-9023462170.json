@@ -1,0 +1,328 @@
+{
+ "match_id": 9023462170,
+ "duration": 3966,
+ "radiant_win": true,
+ "radiant_score": 42,
+ "dire_score": 41,
+ "first_blood_time": 0,
+ "start_time": 1790791891,
+ "game_mode": 2,
+ "players": [
+  {
+   "player_slot": 0,
+   "isRadiant": true,
+   "account_id": 898754153,
+   "personaname": "NothingToGay",
+   "name": "Ame",
+   "hero_id": 114,
+   "kills": 16,
+   "deaths": 8,
+   "assists": 16,
+   "level": 30,
+   "gold_per_min": 866,
+   "xp_per_min": 1088,
+   "last_hits": 869,
+   "denies": 18,
+   "hero_damage": 61119
+  },
+  {
+   "player_slot": 1,
+   "isRadiant": true,
+   "account_id": 157475523,
+   "personaname": "狙击鸭才是最强的",
+   "name": "XinQ",
+   "hero_id": 9,
+   "kills": 7,
+   "deaths": 3,
+   "assists": 30,
+   "level": 29,
+   "gold_per_min": 500,
+   "xp_per_min": 888,
+   "last_hits": 303,
+   "denies": 5,
+   "hero_damage": 40993
+  },
+  {
+   "player_slot": 2,
+   "isRadiant": true,
+   "account_id": 147767183,
+   "personaname": "wsm",
+   "name": "zeal",
+   "hero_id": 69,
+   "kills": 6,
+   "deaths": 7,
+   "assists": 22,
+   "level": 28,
+   "gold_per_min": 646,
+   "xp_per_min": 839,
+   "last_hits": 475,
+   "denies": 7,
+   "hero_damage": 28829
+  },
+  {
+   "player_slot": 3,
+   "isRadiant": true,
+   "account_id": 113457795,
+   "personaname": "欸嘿",
+   "name": "MooN",
+   "hero_id": 49,
+   "kills": 8,
+   "deaths": 12,
+   "assists": 27,
+   "level": 27,
+   "gold_per_min": 540,
+   "xp_per_min": 733,
+   "last_hits": 401,
+   "denies": 12,
+   "hero_damage": 45576
+  },
+  {
+   "player_slot": 4,
+   "isRadiant": true,
+   "account_id": 207829314,
+   "personaname": "电鳗发电机",
+   "name": "BoBoKa",
+   "hero_id": 58,
+   "kills": 5,
+   "deaths": 11,
+   "assists": 17,
+   "level": 28,
+   "gold_per_min": 434,
+   "xp_per_min": 773,
+   "last_hits": 225,
+   "denies": 0,
+   "hero_damage": 20886
+  },
+  {
+   "player_slot": 128,
+   "isRadiant": false,
+   "account_id": 93526520,
+   "personaname": "♦",
+   "name": "bb3px",
+   "hero_id": 78,
+   "kills": 12,
+   "deaths": 4,
+   "assists": 22,
+   "level": 30,
+   "gold_per_min": 603,
+   "xp_per_min": 1088,
+   "last_hits": 473,
+   "denies": 18,
+   "hero_damage": 41703
+  },
+  {
+   "player_slot": 129,
+   "isRadiant": false,
+   "account_id": 196482746,
+   "personaname": "adbadbadbad",
+   "name": "darkniA",
+   "hero_id": 120,
+   "kills": 8,
+   "deaths": 3,
+   "assists": 28,
+   "level": 30,
+   "gold_per_min": 765,
+   "xp_per_min": 1194,
+   "last_hits": 744,
+   "denies": 9,
+   "hero_damage": 50689
+  },
+  {
+   "player_slot": 130,
+   "isRadiant": false,
+   "account_id": 1092267175,
+   "personaname": "strong",
+   "name": "WoE",
+   "hero_id": 56,
+   "kills": 13,
+   "deaths": 11,
+   "assists": 19,
+   "level": 30,
+   "gold_per_min": 769,
+   "xp_per_min": 1010,
+   "last_hits": 718,
+   "denies": 17,
+   "hero_damage": 70210
+  },
+  {
+   "player_slot": 131,
+   "isRadiant": false,
+   "account_id": 206097366,
+   "personaname": "unconscious state",
+   "name": "queezy",
+   "hero_id": 86,
+   "kills": 4,
+   "deaths": 8,
+   "assists": 24,
+   "level": 26,
+   "gold_per_min": 403,
+   "xp_per_min": 649,
+   "last_hits": 204,
+   "denies": 0,
+   "hero_damage": 30691
+  },
+  {
+   "player_slot": 132,
+   "isRadiant": false,
+   "account_id": 340421206,
+   "personaname": "Мечта.",
+   "name": "Htrd",
+   "hero_id": 105,
+   "kills": 4,
+   "deaths": 17,
+   "assists": 29,
+   "level": 25,
+   "gold_per_min": 414,
+   "xp_per_min": 531,
+   "last_hits": 175,
+   "denies": 4,
+   "hero_damage": 67587
+  }
+ ],
+ "picks_bans": [
+  {
+   "is_pick": false,
+   "hero_id": 33,
+   "team": 1,
+   "order": 0
+  },
+  {
+   "is_pick": false,
+   "hero_id": 55,
+   "team": 1,
+   "order": 1
+  },
+  {
+   "is_pick": false,
+   "hero_id": 155,
+   "team": 0,
+   "order": 2
+  },
+  {
+   "is_pick": false,
+   "hero_id": 112,
+   "team": 0,
+   "order": 3
+  },
+  {
+   "is_pick": false,
+   "hero_id": 62,
+   "team": 1,
+   "order": 4
+  },
+  {
+   "is_pick": false,
+   "hero_id": 119,
+   "team": 0,
+   "order": 5
+  },
+  {
+   "is_pick": false,
+   "hero_id": 107,
+   "team": 0,
+   "order": 6
+  },
+  {
+   "is_pick": true,
+   "hero_id": 78,
+   "team": 1,
+   "order": 7
+  },
+  {
+   "is_pick": true,
+   "hero_id": 69,
+   "team": 0,
+   "order": 8
+  },
+  {
+   "is_pick": false,
+   "hero_id": 3,
+   "team": 1,
+   "order": 9
+  },
+  {
+   "is_pick": false,
+   "hero_id": 90,
+   "team": 1,
+   "order": 10
+  },
+  {
+   "is_pick": false,
+   "hero_id": 80,
+   "team": 0,
+   "order": 11
+  },
+  {
+   "is_pick": true,
+   "hero_id": 9,
+   "team": 0,
+   "order": 12
+  },
+  {
+   "is_pick": true,
+   "hero_id": 105,
+   "team": 1,
+   "order": 13
+  },
+  {
+   "is_pick": true,
+   "hero_id": 86,
+   "team": 1,
+   "order": 14
+  },
+  {
+   "is_pick": true,
+   "hero_id": 58,
+   "team": 0,
+   "order": 15
+  },
+  {
+   "is_pick": true,
+   "hero_id": 114,
+   "team": 0,
+   "order": 16
+  },
+  {
+   "is_pick": true,
+   "hero_id": 56,
+   "team": 1,
+   "order": 17
+  },
+  {
+   "is_pick": false,
+   "hero_id": 13,
+   "team": 1,
+   "order": 18
+  },
+  {
+   "is_pick": false,
+   "hero_id": 74,
+   "team": 0,
+   "order": 19
+  },
+  {
+   "is_pick": false,
+   "hero_id": 106,
+   "team": 1,
+   "order": 20
+  },
+  {
+   "is_pick": false,
+   "hero_id": 17,
+   "team": 0,
+   "order": 21
+  },
+  {
+   "is_pick": true,
+   "hero_id": 120,
+   "team": 1,
+   "order": 22
+  },
+  {
+   "is_pick": true,
+   "hero_id": 49,
+   "team": 0,
+   "order": 23
+  }
+ ]
+}
