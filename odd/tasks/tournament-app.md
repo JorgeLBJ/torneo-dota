@@ -54,6 +54,7 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
 - [x] T7.6 Stream follow-ups (clearable invalid link, 300-char cap, server-clock boundaries, robust player-preserving patch) — route: delegated writer
 - [x] T7.7 First-run setup and change password — route: delegated writer
 - [x] T7.8 Review follow-ups (separate change-password limiter, message wording, one stream-length constant, page patch guard, fresh server-time stamp) — route: delegated writer
+- [x] T11 Public Partidos as a responsive grid of rounds — route: delegated writer
 - [x] T10 Share previews (Open Graph) — route: delegated writer
 - [x] T9 Docker deployment (Dockerfile, healthz, graceful shutdown, VPS compose, Caddy block, Spanish guide) — route: delegated writer
 
@@ -129,5 +130,7 @@ The current sheet mixes schedule, detail and standings with hand-typed points, h
   - Verified with a temp server driven through every state (curl of the head), image served as `image/jpeg` 88122 bytes with immutable cache and no cookies, crawler user agent gets the tags, Chromium loads it at 1200x630.
   - Social caches keep old previews for days; the `?v=` on the image changes when the file does, the text updates when the page is fetched again.
 
+- T11 (branch `feat/rounds-grid`, not pushed): production tournament has one match per round, so each round used a whole row. Now `.days` is a grid (`repeat(auto-fill, minmax(340px, 1fr))`); day headings and rounds with 2+ matches (`data-matches` != 1) take the full row and keep their inner card grid; a one-match round is a single cell whose "Descansa" wraps under the title. The list stays flat under `.days`, so the viewer-timezone regrouping, the team filter and the iframe-preserving patch needed no change. The Partidos panel gets `main.wrap` up to 1440 px (other panels stay at 1080 px). Verified in Chromium with a production-like DB (7 teams, 21 single-match rounds on the real slot times): 3 columns at 1280, 4 at 1920, 1 at 390, no header overflow or horizontal scroll; a 3-match round with a bye spans the row; team filter still hides rounds and day headings; a Madrid viewer regroups the evening matches under the next day with the grid intact. Admin Resultados untouched.
+
 ## Next step
-Merge `feat/og-meta`, set `PUBLIC_BASE_URL` in the VPS `.env` and redeploy (`docker compose build --pull && docker compose up -d`), then test a shared link in WhatsApp (and Meta's sharing debugger to refresh caches).
+Merge `feat/rounds-grid`, redeploy (`docker compose build --pull && docker compose up -d`) and check https://torneo-dota.jpsolutions.app/ at desktop widths.

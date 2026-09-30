@@ -106,6 +106,9 @@ html[data-live="on"] .live { display: inline-flex; }
 .stream-empty span { font: 500 16px/1.4 var(--fl); letter-spacing: .06em; color: var(--muted); }
 
 main { padding: 30px 16px 70px; }
+/* The matches grid gets room for 3 columns at 1280 px and 4 at 1920 px; the other tabs keep a readable width. */
+main.wrap { width: min(1440px, 100%); }
+.panel:not([data-panel="partidos"]) { width: min(1080px, 100%); margin-inline: auto; }
 .panel { display: none; gap: 26px; }
 .panel.on { display: grid; }
 .empty { margin: 0; text-align: center; color: var(--muted); font: 500 16px/1.4 var(--fl); letter-spacing: .06em; }
@@ -142,7 +145,10 @@ footer .credit { margin-top: 8px; font-size: 11px; letter-spacing: .2em; color: 
 .chip[aria-pressed="true"] { border-color: var(--gold); color: var(--gold-hi); background: linear-gradient(180deg, rgba(200,170,110,.14), rgba(200,170,110,.03)); }
 
 /* ---------- Rounds & matches ---------- */
-.days { display: grid; gap: 22px; }
+.days { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px 16px; align-items: start; }
+/* Day headings, the placeholder and rounds with several matches take a whole row; a round with one match is one cell. */
+.day-head, .days > .empty { grid-column: 1 / -1; }
+.round:not([data-matches="1"]) { grid-column: 1 / -1; }
 .day-head { margin-top: 18px; }
 .day-head:first-child { margin-top: 0; }
 .tznote { margin: 0; text-align: center; color: var(--muted); font: 500 13px/1.3 var(--fl); letter-spacing: .08em; text-transform: uppercase; }
@@ -155,6 +161,8 @@ footer .credit { margin-top: 8px; font-size: 11px; letter-spacing: .2em; color: 
 .tag.live { color: #fff; border-color: var(--crimson); background: rgba(194,60,42,.35); }
 .match.is-live { border-color: var(--crimson); box-shadow: 0 0 0 1px rgba(194,60,42,.35); }
 .rest { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+/* In a narrow cell the bye moves under the title instead of squeezing the header. */
+.round[data-matches="1"] .rest { margin-left: 0; flex-basis: 100%; }
 
 .matches { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
 .match {

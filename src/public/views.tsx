@@ -212,7 +212,7 @@ const MatchCard: FC<{ match: PublicMatch; time: string | null; live: boolean }> 
 };
 
 const RoundBlock: FC<{ round: PublicRound }> = ({ round }) => (
-  <div class="round" data-bye={round.bye?.id} data-start={round.startsAt ?? undefined}>
+  <div class="round" data-matches={round.matches.length} data-bye={round.bye?.id} data-start={round.startsAt ?? undefined}>
     <div class="round-head">
       <b>Ronda {round.number}</b>
       {round.startTime ? (
