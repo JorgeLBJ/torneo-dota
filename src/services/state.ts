@@ -6,7 +6,12 @@ export interface TournamentState {
   tournament: Tournament;
   teams: Team[];
   teamsById: Map<number, Team>;
+  /** Regular group matches only: the fixture proper. */
   groupMatches: Match[];
+  /** Extra games played to break ties. */
+  tiebreakMatches: Match[];
+  /** Both, in match order. */
+  allGroupMatches: Match[];
   playoffMatches: Match[];
   standings: StandingRow[];
   bracket: Bracket;
@@ -19,9 +24,11 @@ export interface TournamentState {
 export function loadState(repo: Repository, tournament: Tournament): TournamentState {
   const teams = repo.listTeams(tournament.id);
   const all = repo.listMatches(tournament.id);
-  const groupMatches = all.filter((m) => m.phase === 'group');
+  const allGroupMatches = all.filter((m) => m.phase === 'group');
+  const groupMatches = allGroupMatches.filter((m) => !m.isTiebreak);
+  const tiebreakMatches = allGroupMatches.filter((m) => m.isTiebreak);
   const playoffMatches = all.filter((m) => m.phase !== 'group');
-  const standings = computeStandings(teams, groupMatches, tournament.qualifiers, {
+  const standings = computeStandings(teams, allGroupMatches, tournament.qualifiers, {
     pointsWin: tournament.pointsWin,
     pointsLoss: tournament.pointsLoss,
     tiebreakers: tournament.tiebreakers,
@@ -45,6 +52,8 @@ export function loadState(repo: Repository, tournament: Tournament): TournamentS
     teams,
     teamsById: new Map(teams.map((t) => [t.id, t])),
     groupMatches,
+    tiebreakMatches,
+    allGroupMatches,
     playoffMatches,
     standings,
     bracket,

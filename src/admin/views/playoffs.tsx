@@ -15,6 +15,9 @@ interface PlayoffsViewProps {
 export const PlayoffsView: FC<PlayoffsViewProps> = ({ tournament, state, slots }) => {
   const { bracket, teamsById, teams } = state;
   const base = `/admin/t/${tournament.id}/playoffs`;
+  // Semifinal teams saved on the matches themselves (a manual pick), as opposed to teams derived from the table.
+  const manualStored = state.playoffMatches.some((m) => m.phase === 'semifinal' && (m.team1Id !== null || m.team2Id !== null));
+  const hasPlayoffResults = state.playoffMatches.some((m) => m.winnerId !== null);
   const team = (id: number | null): Team | null => (id === null ? null : (teamsById.get(id) ?? null));
   const seedPrefix = (t: Team): string => {
     const seed = bracket.seeds.indexOf(t.id);
@@ -103,9 +106,38 @@ export const PlayoffsView: FC<PlayoffsViewProps> = ({ tournament, state, slots }
               </label>
             ))}
           </div>
-          <button class="btn pri" type="submit" style="justify-self:start">
-            Guardar cruces
-          </button>
+          <p class="muted" style="margin:0;font-size:12px">
+            {hasPlayoffResults
+              ? 'Hay resultados de playoffs: para volver al cálculo automático usa "Quitar cruces manuales" (borra esos resultados).'
+              : `Para volver al cálculo automático deja los cuatro vacíos y guarda${manualStored ? ', o usa "Quitar cruces manuales"' : ''}.`}
+          </p>
+          <div class="actions">
+            <button class="btn pri" type="submit">
+              Guardar cruces
+            </button>
+            {manualStored ? (
+              <button class="btn danger" type="submit" name="action" value="reset" data-confirm-open="resetCrossesDialog">
+                Quitar cruces manuales
+              </button>
+            ) : null}
+          </div>
+          {manualStored ? (
+            <dialog id="resetCrossesDialog" class="confirm-modal" aria-labelledby="resetCrossesTitle">
+              <h2 id="resetCrossesTitle">¿Quitar los cruces manuales?</h2>
+              <p>
+                Los cruces volverán a calcularse automáticamente desde la tabla.
+                {hasPlayoffResults ? ' Se borrarán los resultados de semifinales y final.' : ''}
+              </p>
+              <div class="actions">
+                <button class="btn" type="button" autofocus data-confirm-cancel>
+                  Cancelar
+                </button>
+                <button class="btn pri" type="submit" name="action" value="reset">
+                  Quitar cruces manuales
+                </button>
+              </div>
+            </dialog>
+          ) : null}
         </form>
       </details>
     </>

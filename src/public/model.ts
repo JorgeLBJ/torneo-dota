@@ -60,6 +60,8 @@ export interface PublicMatch {
   kills: [number, number] | null;
   deaths: [number, number] | null;
   isNext: boolean;
+  /** An extra game to break a tie (shown tagged, never counted in the progress). */
+  isTiebreak: boolean;
 }
 
 export interface PublicRound {
@@ -158,9 +160,15 @@ export interface PublicModel {
 const TIEBREAK_LONG: Record<TiebreakerKey, string> = {
   kd: 'Diferencia de kills y deaths (K − D)',
   kills: 'Mayor cantidad de kills',
-  h2h: 'Resultado directo entre los equipos empatados',
+  h2h: 'Resultado jugado entre los equipos empatados',
+  extra: 'Juego adicional entre los equipos empatados',
 };
-const TIEBREAK_SHORT: Record<TiebreakerKey, string> = { kd: 'K−D', kills: 'kills', h2h: 'resultado directo' };
+const TIEBREAK_SHORT: Record<TiebreakerKey, string> = {
+  kd: 'K−D',
+  kills: 'kills',
+  h2h: 'resultado jugado entre los empatados',
+  extra: 'juego adicional',
+};
 
 const DEFAULT_SLOT_MS = 60 * 60_000;
 
@@ -188,7 +196,8 @@ export function liveAndNext(matches: Match[], now: Date): { live: Set<number>; n
 }
 
 function buildDays(state: TournamentState, live: Set<number>, nextRound: number | undefined): PublicDay[] {
-  const { teams, teamsById, groupMatches } = state;
+  const { teams, teamsById } = state;
+  const groupMatches = state.allGroupMatches;
   const toMatch = (m: Match): PublicMatch => ({
     id: m.id,
     number: m.matchNumber,
@@ -201,6 +210,7 @@ function buildDays(state: TournamentState, live: Set<number>, nextRound: number 
     kills: m.winnerId === null ? null : [m.team1Kills ?? 0, m.team2Kills ?? 0],
     deaths: m.winnerId === null ? null : [m.team1Deaths ?? 0, m.team2Deaths ?? 0],
     isNext: m.round === nextRound,
+    isTiebreak: m.isTiebreak,
   });
 
   const byDate = new Map<string | null, Match[]>();
@@ -226,7 +236,7 @@ function buildDays(state: TournamentState, live: Set<number>, nextRound: number 
           startsAt: timed?.startsAt ?? null,
           endsAt: timed?.endsAt ?? null,
           // A bye exists only in a complete round of an odd-sized group: exactly one team sits out.
-          bye: complete && resting.length === 1 ? resting[0]! : null,
+          bye: complete && resting.length === 1 && !list.every((m) => m.isTiebreak) ? resting[0]! : null,
           status: live.has(number) ? 'live' : number === nextRound ? 'next' : done ? 'done' : 'pending',
           matches: list.map(toMatch),
         };
@@ -373,7 +383,7 @@ function buildRules(state: TournamentState): PublicModel['rules'] {
 export function buildPublicModel(state: TournamentState, scheduleDays: ScheduleDay[], options: { now?: Date; parentHosts?: readonly string[] } = {}): PublicModel {
   const { tournament, groupMatches } = state;
   const now = options.now ?? new Date();
-  const { live, next: nextRound } = liveAndNext(groupMatches, now);
+  const { live, next: nextRound } = liveAndNext(state.allGroupMatches, now);
   const played = groupMatches.length - state.pendingGroup;
   const first = scheduleDays.map((d) => d.date).sort()[0];
   const kicker = first

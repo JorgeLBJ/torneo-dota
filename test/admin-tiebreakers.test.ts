@@ -48,7 +48,7 @@ describe('the Desempate editor', () => {
 
   it('no longer promises a tiebreak match; explains what happens instead', async () => {
     const html = await page();
-    expect(html).not.toContain('partida de desempate');
+    expect(html).not.toContain('Si siguen empatados: partida de desempate');
     expect(html).toContain('Si siguen empatados, el torneo queda con empate sin resolver y los cruces de semifinales se eligen a mano.');
   });
 
@@ -61,9 +61,9 @@ describe('the Desempate editor', () => {
 
   it('offers only the criteria not in use in the "add" select, and hides it when none is left', async () => {
     let html = await page(); // kd, kills in use
-    expect(html).toMatch(/<select[^>]*name="new_tiebreaker"[\s\S]*?<option value="h2h"/);
+    expect(html).toMatch(/<select[^>]*name="new_tiebreaker"[\s\S]*?<option value="h2h"[\s\S]*?<option value="extra"/);
     expect(html.match(/<option value="(kd|kills)">/g) ?? []).toHaveLength(0);
-    t.repo.updateTournament(tournament.id, { tiebreakers: ['kd', 'kills', 'h2h'] });
+    t.repo.updateTournament(tournament.id, { tiebreakers: ['kd', 'kills', 'h2h', 'extra'] });
     html = await page();
     expect(html).not.toContain('name="new_tiebreaker"');
     expect(html).not.toContain('value="add"');
@@ -75,7 +75,7 @@ describe('the Desempate editor', () => {
     expect(html).not.toContain('<ol class="tb-list">');
     expect(html).toContain('Sin criterios');
     expect(html).toContain('empate sin resolver');
-    expect(html.match(/<option value="(kd|kills|h2h)">/g)).toHaveLength(3);
+    expect(html.match(/<option value="(kd|kills|h2h|extra)">/g)).toHaveLength(4);
   });
 
   it('uses the same control heights and styles as the rest of the admin', async () => {

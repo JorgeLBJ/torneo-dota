@@ -320,10 +320,10 @@ describe('tiebreaker rules on the public page', () => {
   it('lists the configured criteria in order, in the legend and in the Reglas tab', async () => {
     t.repo.updateTournament(tournament.id, { tiebreakers: ['kd', 'h2h'] });
     const body = await html('/');
-    expect(body).toContain('<b>Desempate:</b> K−D, luego resultado directo');
+    expect(body).toContain('<b>Desempate:</b> K−D, luego resultado jugado entre los empatados');
     const rules = body.slice(body.indexOf('<h3>Desempate</h3>'));
     expect(rules.indexOf('Diferencia de kills y deaths (K − D)')).toBeGreaterThan(-1);
-    expect(rules.indexOf('Resultado directo entre los equipos empatados')).toBeGreaterThan(rules.indexOf('Diferencia de kills'));
+    expect(rules.indexOf('Resultado jugado entre los equipos empatados')).toBeGreaterThan(rules.indexOf('Diferencia de kills'));
     expect(body).not.toContain('Mayor cantidad de kills');
   });
 

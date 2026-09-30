@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { assignSemifinalTeams, clearPlayoffResult, phaseSlots, recordPlayoffResult } from '../../services/playoffs.js';
+import { assignSemifinalTeams, clearPlayoffResult, phaseSlots, recordPlayoffResult, resetPlayoffs } from '../../services/playoffs.js';
 import { loadState } from '../../services/state.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { readBody, str } from '../form.js';
@@ -32,9 +32,24 @@ export function playoffRoutes(deps: Deps) {
     const tournament = c.get('tournament');
     const back = `/admin/t/${tournament.id}/playoffs`;
     const body = await readBody(c);
-    const ids = ['sf1_a', 'sf1_b', 'sf2_a', 'sf2_b'].map((key) => Number(str(body, key) || Number.NaN));
+    const raw = ['sf1_a', 'sf1_b', 'sf2_a', 'sf2_b'].map((key) => str(body, key));
+    // Undo: the "Quitar cruces manuales" button, or the form sent with all four selects empty.
+    const allEmpty = raw.every((value) => value === '');
+    const hasResults = repo.listMatches(tournament.id).some((m) => m.phase !== 'group' && m.winnerId !== null);
+    // An empty form is a reset only while no playoff result would be lost; deleting results needs the confirm dialog.
+    if (allEmpty && hasResults && str(body, 'action') !== 'reset') {
+      setFlash(c, 'error', 'Hay resultados de playoffs cargados: usa «Quitar cruces manuales» para confirmar el borrado.');
+      return c.redirect(back, 303);
+    }
+    if (str(body, 'action') === 'reset' || allEmpty) {
+      resetPlayoffs(repo, tournament);
+      deps.events.tournamentChanged(tournament.id);
+      setFlash(c, 'ok', 'Cruces manuales quitados: los cruces se calculan desde la tabla.');
+      return c.redirect(back, 303);
+    }
+    const ids = raw.map((value) => Number(value || Number.NaN));
     if (!ids.every((id) => Number.isInteger(id))) {
-      setFlash(c, 'error', 'Elige los cuatro equipos de las semifinales.');
+      setFlash(c, 'error', 'Elige los cuatro equipos o deja los cuatro vacíos para volver al cálculo automático.');
       return c.redirect(back, 303);
     }
     const checked = assignSemifinalTeams(repo, tournament, ids as [number, number, number, number]);

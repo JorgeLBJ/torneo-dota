@@ -128,8 +128,8 @@ describe('playoffs screen', () => {
   it('validates manual picks', async () => {
     const dup = await t.post(`${base}/cruces`, { sf1_a: String(teams[0]!.id), sf1_b: String(teams[0]!.id), sf2_a: String(teams[1]!.id), sf2_b: String(teams[2]!.id) }, cookie);
     expect(await flashText(t, dup, cookie)).toContain('distintos');
-    const missing = await t.post(`${base}/cruces`, { sf1_a: '', sf1_b: '', sf2_a: '', sf2_b: '' }, cookie);
-    expect(await flashText(t, missing, cookie)).toContain('equipos');
+    const partial = await t.post(`${base}/cruces`, { sf1_a: String(teams[0]!.id), sf1_b: '', sf2_a: '', sf2_b: '' }, cookie);
+    expect(await flashText(t, partial, cookie)).toContain('Elige los cuatro equipos o deja los cuatro vacíos');
   });
 
   it('emits a change event after recording a playoff result', async () => {

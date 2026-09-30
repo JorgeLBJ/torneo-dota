@@ -5,10 +5,17 @@ import { PageHead, Rulebook, Select } from './parts.js';
 export const TIEBREAKER_LABELS: Record<TiebreakerKey, string> = {
   kd: 'Diferencia K − D',
   h2h: 'Resultado directo',
+  extra: 'Juego adicional',
   kills: 'Más kills',
 };
 
-const ALL_CRITERIA: TiebreakerKey[] = ['kd', 'h2h', 'kills'];
+const ALL_CRITERIA: TiebreakerKey[] = ['kd', 'h2h', 'kills', 'extra'];
+
+/** Short explanations shown as a tooltip and under the list. */
+const HELP: Partial<Record<TiebreakerKey, string>> = {
+  h2h: 'partido jugado entre los empatados',
+  extra: 'partido extra entre los empatados (Fixture > Agregar partida de desempate)',
+};
 
 export const RulesView: FC<{ tournament: Tournament }> = ({ tournament }) => {
   const order = tournament.tiebreakers;
@@ -49,7 +56,9 @@ export const RulesView: FC<{ tournament: Tournament }> = ({ tournament }) => {
             <ol class="tb-list">
               {order.map((key, i) => (
                 <li>
-                  <span class="pair">{TIEBREAKER_LABELS[key]}</span>
+                  <span class="pair" title={HELP[key]}>
+                    {TIEBREAKER_LABELS[key]}
+                  </span>
                   <button
                     class="btn sm"
                     type="submit"
@@ -99,6 +108,9 @@ export const RulesView: FC<{ tournament: Tournament }> = ({ tournament }) => {
               </button>
             </div>
           ) : null}
+          <p class="muted" style="margin:0;font-size:12px">
+            Resultado directo: {HELP.h2h}. Juego adicional: {HELP.extra}.
+          </p>
           <p class="muted" style="margin:0;font-size:12px">
             Si siguen empatados, el torneo queda con empate sin resolver y los cruces de semifinales se eligen a mano.
           </p>

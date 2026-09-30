@@ -87,7 +87,7 @@ export const ResultCard: FC<ResultCardProps> = ({ action, header, team1, team2, 
           </button>
         ) : (
           <button class="btn sm" type="reset">
-            Limpiar
+            Deshacer cambios
           </button>
         )}
         <button class="btn sm pri" type="submit" name="action" value="save">
@@ -190,7 +190,12 @@ export const ResultsView: FC<ResultsViewProps> = ({ tournament, cards, dates, ha
       {cards.map(({ match, team1, team2 }) => (
         <ResultCard
           action={`/admin/t/${tournament.id}/resultados/${match.id}`}
-          header={`Partido ${match.matchNumber} · Ronda ${match.round} · ${scheduleLabel(match)}`}
+          header={
+            <>
+              {`Partido ${match.matchNumber} · Ronda ${match.round} · ${scheduleLabel(match)}`}
+              {match.isTiebreak ? <span class="pill next">Juego adicional</span> : null}
+            </>
+          }
           team1={team1}
           team2={team2}
           match={match}
