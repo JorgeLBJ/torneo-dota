@@ -179,7 +179,7 @@ const MatchSide: FC<{ team: Team | null; side: 'a' | 'b'; match: PublicMatch; in
         {result === 'win' ? <span class="crown">Victoria</span> : null}
       </div>
       <div class="who">
-        <strong>{teamName(team)}</strong>
+        <strong title={teamName(team)}>{teamName(team)}</strong>
         <small>{detail}</small>
       </div>
     </div>
@@ -348,7 +348,7 @@ const StandingRowView: FC<{ row: PublicStandingRow }> = ({ row }) => {
         <div class="team">
           <Portrait team={row.team} />
           <div>
-            <strong>{row.team.name}</strong>
+            <strong title={row.team.name}>{row.team.name}</strong>
             {status ? (
               <small class={`st ${row.status}`}>{status}</small>
             ) : row.team.captain ? (
@@ -427,7 +427,7 @@ const BracketSlot: FC<{ slot: BracketSlotView }> = ({ slot }) =>
     <div class={`slot ${slot.isWinner ? 'win' : ''}`}>
       <Portrait team={slot.team} />
       <div>
-        <strong>{slot.team.name}</strong>
+        <strong title={slot.team.name}>{slot.team.name}</strong>
         <small>{slot.isWinner ? 'Victoria' : slot.seedLabel}</small>
       </div>
     </div>
