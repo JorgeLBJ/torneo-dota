@@ -68,6 +68,7 @@
 
   document.querySelectorAll('[data-hero-pick]').forEach(function (button) {
     button.addEventListener('click', function () {
+      if (window.teamRows.busy) return;
       var cell = button.closest('[data-emblem-cell]');
       current = { cell: cell, input: cell.querySelector('[data-hero-input]') };
       label.textContent = window.teamRows.nameOf(cell);
@@ -472,11 +473,73 @@
     return payload;
   }
 
+  var region = document.querySelector('[data-busy-region]');
+  var overlay = region && region.querySelector('[data-busy]');
+  var busyText = overlay && overlay.querySelector('[data-busy-text]');
+  var progress = overlay && overlay.querySelector('[data-busy-progress]');
+  var progressFill = overlay && overlay.querySelector('[data-busy-fill]');
+  var frozen = [];
+
+  /** While saving, nothing on the table can be touched; the sidebar and the page stay usable. */
   function setSaving(on) {
     saving = on;
+    api.busy = on;
     saveButton.disabled = on;
     discardButton.disabled = on;
+    saveButton.classList.toggle('is-busy', on);
     saveButton.querySelector('[data-save-label]').textContent = on ? 'Guardando…' : 'Guardar cambios';
+    if (!region) return;
+    var table = region.querySelector('table');
+    region.classList.toggle('is-saving', on);
+    overlay.hidden = !on;
+    if (on) {
+      region.setAttribute('aria-busy', 'true');
+      if (table) table.setAttribute('aria-busy', 'true');
+    } else {
+      region.removeAttribute('aria-busy');
+      if (table) table.removeAttribute('aria-busy');
+    }
+    if ('inert' in region) {
+      region.querySelector('.card').inert = on;
+    } else if (on) {
+      // No inert support: disable every control that is still enabled, and restore exactly those afterwards.
+      frozen = Array.prototype.filter.call(region.querySelectorAll('input, button, select, textarea, summary'), function (el) { return !el.disabled; });
+      frozen.forEach(function (el) { el.disabled = true; });
+    } else {
+      frozen.forEach(function (el) { el.disabled = false; });
+      frozen = [];
+    }
+  }
+
+  function showProgress(images) {
+    progress.hidden = images === 0;
+    progressFill.style.width = '0%';
+    busyText.textContent = images > 0 ? 'Subiendo ' + images + (images === 1 ? ' imagen…' : ' imágenes…') : 'Guardando cambios…';
+  }
+
+  function handleSaved(status, body, redirected) {
+    setSaving(false);
+    if (status >= 200 && status < 300 && body.teams) {
+      body.teams.forEach(function (team) {
+        var row = document.querySelector('[data-team-row][data-team-id="' + team.id + '"]');
+        if (row) applySaved(stateOf(row.querySelector('[data-emblem-cell]')), team);
+      });
+      barNote(body.message || 'Cambios guardados.', 'ok');
+    } else if (body.errors) {
+      var first = null;
+      Object.keys(body.errors).forEach(function (id) {
+        var row = document.querySelector('[data-team-row][data-team-id="' + id + '"]');
+        if (!row) return;
+        message(stateOf(row.querySelector('[data-emblem-cell]')), body.errors[id], 'error');
+        if (!first) first = row;
+      });
+      barNote('No se guardó nada: corrige las filas marcadas y vuelve a guardar. Tus cambios siguen aquí.', 'error');
+      if (first && first.scrollIntoView) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    } else if (status === 401 || status === 403 || redirected) {
+      barNote('La sesión caducó. Recarga la página e inicia sesión de nuevo; tus cambios siguen aquí hasta entonces.', 'error');
+    } else {
+      barNote(body.error || 'No se pudieron guardar los cambios. Inténtalo de nuevo.', 'error');
+    }
   }
 
   function saveAll() {
@@ -485,46 +548,43 @@
     if (!dirty.length) return;
     rowStates.forEach(function (state) { message(state, ''); });
     barNote('', '');
-    setSaving(true);
     var data = new FormData();
     data.set('rows', JSON.stringify(dirty.map(rowPayload)));
+    var images = 0;
     dirty.forEach(function (state) {
       if (state.blob) {
+        images++;
         var id = state.row.getAttribute('data-team-id');
         data.set('image_' + id, state.blob, state.blob.type === 'image/png' ? 'equipo.png' : 'equipo.webp');
       }
     });
-    fetch(bar.getAttribute('data-batch-url'), { method: 'POST', body: data, credentials: 'same-origin', headers: { Accept: 'application/json' } })
-      .then(function (res) {
-        return res.json().catch(function () { return {}; }).then(function (body) {
-          setSaving(false);
-          if (res.ok && body.teams) {
-            body.teams.forEach(function (team) {
-              var row = document.querySelector('[data-team-row][data-team-id="' + team.id + '"]');
-              if (row) applySaved(stateOf(row.querySelector('[data-emblem-cell]')), team);
-            });
-            barNote(body.message || 'Cambios guardados.', 'ok');
-          } else if (body.errors) {
-            var first = null;
-            Object.keys(body.errors).forEach(function (id) {
-              var row = document.querySelector('[data-team-row][data-team-id="' + id + '"]');
-              if (!row) return;
-              message(stateOf(row.querySelector('[data-emblem-cell]')), body.errors[id], 'error');
-              if (!first) first = row;
-            });
-            barNote('No se guardó nada: corrige las filas marcadas y vuelve a guardar. Tus cambios siguen aquí.', 'error');
-            if (first && first.scrollIntoView) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
-          } else if (res.status === 401 || res.status === 403 || res.redirected) {
-            barNote('La sesión caducó. Recarga la página e inicia sesión de nuevo; tus cambios siguen aquí hasta entonces.', 'error');
-          } else {
-            barNote(body.error || 'No se pudieron guardar los cambios. Inténtalo de nuevo.', 'error');
-          }
-        });
-      })
-      .catch(function () {
-        setSaving(false);
-        barNote('No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.', 'error');
-      });
+    setSaving(true);
+    showProgress(images);
+    // XMLHttpRequest, not fetch: it reports how much of the upload has been sent.
+    var url = bar.getAttribute('data-batch-url');
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.setRequestHeader('Accept', 'application/json');
+    xhr.upload.onprogress = function (event) {
+      if (!images || !event.lengthComputable) return;
+      var percent = Math.round(100 * event.loaded / event.total);
+      progressFill.style.width = percent + '%';
+      busyText.textContent = 'Subiendo ' + images + (images === 1 ? ' imagen… ' : ' imágenes… ') + percent + '%';
+    };
+    xhr.upload.onload = function () {
+      progress.hidden = true;
+      busyText.textContent = 'Guardando cambios…';
+    };
+    xhr.onload = function () {
+      var body = {};
+      try { body = JSON.parse(xhr.responseText); } catch (error) { body = {}; }
+      handleSaved(xhr.status, body, Boolean(xhr.responseURL) && xhr.responseURL.indexOf(url) === -1);
+    };
+    xhr.onerror = xhr.ontimeout = function () {
+      setSaving(false);
+      barNote('No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.', 'error');
+    };
+    xhr.send(data);
   }
 
   function discardAll() {
@@ -573,6 +633,10 @@
   var leaving = false;
   document.addEventListener('submit', function (event) {
     var form = event.target;
+    if (saving) {
+      event.preventDefault();
+      return;
+    }
     if (form && form.matches && form.matches('#team-new') && !dirtyStates().length) {
       leaving = true;
       setTimeout(function () { leaving = false; }, 0);
@@ -849,7 +913,10 @@
 
   document.querySelectorAll('[data-image-pick]').forEach(function (button) {
     var input = button.parentElement.querySelector('[data-image-file]');
-    button.addEventListener('click', function () { input.click(); });
+    button.addEventListener('click', function () {
+      if (window.teamRows.busy) return;
+      input.click();
+    });
     input.addEventListener('change', function () {
       var file = input.files && input.files[0];
       if (!file) return;
@@ -1008,6 +1075,7 @@
     var pendingCell = null;
     document.querySelectorAll('[data-remove-image]').forEach(function (button) {
       button.addEventListener('click', function () {
+        if (window.teamRows.busy) return;
         pendingCell = button.closest('[data-emblem-cell]');
         removeDialog.querySelector('[data-remove-team]').textContent = window.teamRows.nameOf(pendingCell);
         removeDialog.showModal();
@@ -1040,6 +1108,7 @@
   document.addEventListener('click', function (event) {
     var thumb = event.target.closest('[data-emblem-view]');
     if (!thumb || thumb.disabled || !thumb.getAttribute('data-full')) return;
+    if (window.teamRows && window.teamRows.busy) return;
     opener = thumb;
     var fallback = thumb.getAttribute('data-fallback');
     picture.onerror = fallback && picture.src !== fallback ? function () { picture.onerror = null; picture.src = fallback; } : null;

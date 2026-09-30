@@ -271,6 +271,7 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
       <noscript>
         <p class="flash warn">Para guardar cambios en los equipos hace falta JavaScript.</p>
       </noscript>
+      <div class="table-region" data-busy-region>
       <div class="card scroll-x">
         <table class="cards teams">
           <thead>
@@ -345,6 +346,16 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
             </tr>
           </tbody>
         </table>
+      </div>
+      <div class="busy-overlay" data-busy hidden role="status" aria-live="polite">
+        <div class="busy-box">
+          <span class="spinner" aria-hidden="true"></span>
+          <p data-busy-text>Guardando cambios…</p>
+          <div class="busy-progress" data-busy-progress hidden>
+            <span data-busy-fill></span>
+          </div>
+        </div>
+      </div>
       </div>
       <p class="muted" style="margin:0;font-size:12px">
         El emblema del equipo aparece en la web pública (tarjetas de partido, tabla y playoffs) y es un héroe o su propia

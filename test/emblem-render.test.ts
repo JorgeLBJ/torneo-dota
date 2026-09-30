@@ -239,3 +239,31 @@ describe('one global save', () => {
     expect(script).toMatch(/var hero = finalHero\(state\);\s*if \(hero\) taken\[hero\] = api\.nameOf\(state\.cell\);/);
   });
 });
+
+describe('while a save is running', () => {
+  const script = readFileSync(new URL('../public/admin.js', import.meta.url), 'utf8');
+
+  it('the table sits in a region with a themed busy overlay next to it, hidden until a save starts', async () => {
+    const body = await (await t.get(`/admin/t/${tournament.id}/equipos`, cookie)).text();
+    expect(body).toContain('<div class="table-region" data-busy-region="true">');
+    expect(body).toContain('<div class="busy-overlay" data-busy="true" hidden="" role="status"');
+    expect(body).toContain('Guardando cambios…');
+    expect(body).toContain('data-busy-progress');
+    expect(body.indexOf('data-busy-region')).toBeLessThan(body.indexOf('class="cards teams"'));
+  });
+
+  it('uploads with XMLHttpRequest to report progress, and blocks the table, dialogs and Enter while it runs', () => {
+    expect(script).toContain('xhr.upload.onprogress');
+    expect(script).toContain("region.setAttribute('aria-busy', 'true')");
+    expect(script).toContain("region.querySelector('.card').inert = on");
+    expect(script).toContain('api.busy = on');
+    // the picker, the crop dialog, the removal confirm and the lightbox all refuse to open mid-save
+    expect(script.match(/window\.teamRows\.busy\) return/g)!.length).toBeGreaterThanOrEqual(4);
+    // Enter in the new-team row must not submit while saving
+    expect(script).toMatch(/if \(saving\) \{\s*event\.preventDefault\(\);/);
+  });
+
+  it('the leave warning stays on during the save (it checks the staged state, not the saving flag)', () => {
+    expect(script).toMatch(/window\.addEventListener\('beforeunload', function \(event\) \{\s*if \(leaving \|\| !states\.some\(isDirty\)\) return;/);
+  });
+});
