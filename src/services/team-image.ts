@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
-import { fail, ok, type Checked } from '../checked.js';
 import { retinaKey } from '../domain/emblem.js';
 import type { Repository, Team } from '../db/repository.js';
-import { processTeamImage } from '../images/process.js';
+import { planTeamBatch, type BatchRow } from '../domain/team-batch.js';
+import { processTeamImage, type ProcessedImage } from '../images/process.js';
 import type { ImageStore } from '../storage/image-store.js';
 
 const IMMUTABLE = 'public, max-age=31536000, immutable';
@@ -25,61 +25,83 @@ async function discard(store: ImageStore, keys: string[]): Promise<void> {
 
 export const imageKeys = (key: string): string[] => [key, retinaKey(key)];
 
-export interface TeamFields {
-  code: string;
-  name: string;
-  captain: string | null;
-  hero: string | null;
-}
-
-export interface EmblemChange {
-  /** A new picture (the cropped 1024x576 upload). It wins over `clear`. */
-  image?: Uint8Array;
-  /** Drop the custom image (the hero or the code tile shows again). */
-  clear?: boolean;
-}
+export type BatchResult = { ok: true; teams: Team[] } | { ok: false; errors: Record<number, string> };
 
 /**
- * Saves a team row in one go: the fields plus, optionally, a new or cleared custom image.
- * Order matters for safety: the image is validated and stored first (a failure changes nothing), then the fields
- * and the image key are committed in one transaction that also reads the key being replaced, and only then are the
- * old objects deleted. Concurrent saves therefore each delete a distinct object and only the last swap stays.
+ * Saves the whole Equipos screen. Order matters for safety:
+ *  1. validate every row against the final state (nothing is touched if any row is wrong);
+ *  2. decode every staged image (a bad file is an error on its row);
+ *  3. store all new images; a failure deletes what was stored and changes nothing;
+ *  4. commit all rows in ONE transaction (which also reads the image keys being replaced); if it fails, the new
+ *     objects are deleted again;
+ *  5. only then delete the replaced or cleared objects (best effort).
+ * Concurrent saves therefore each delete a distinct object and only the last commit's images stay.
  */
-export async function saveTeam(
+export async function saveTeamBatch(
   repo: Repository,
   store: ImageStore | null,
-  team: Team,
-  fields: TeamFields,
-  change: EmblemChange,
-): Promise<Checked<Team>> {
-  let newImageKey: string | null | undefined;
-  if (change.image) {
+  tournamentId: number,
+  rows: readonly BatchRow[],
+  files: ReadonlyMap<string, Uint8Array>,
+): Promise<BatchResult> {
+  const planned = planTeamBatch(repo.listTeams(tournamentId), rows, new Set(files.keys()));
+  if (!planned.ok) return planned;
+
+  const teams = new Map(repo.listTeams(tournamentId).map((team) => [team.id, team]));
+  const errors: Record<number, string> = {};
+  const processed = new Map<number, ProcessedImage>();
+  for (const change of planned.changes) {
+    if (change.image !== 'set') continue;
     if (!store) throw new ImageStorageError('no image store');
-    const processed = await processTeamImage(change.image);
-    if (!processed.ok) return fail(processed.error);
-    const key = newKey(team);
-    try {
-      await store.put(key, processed.value.x1, 'image/webp', IMMUTABLE);
-      await store.put(retinaKey(key), processed.value.x2, 'image/webp', IMMUTABLE);
-    } catch (error) {
-      console.error(`Storing the image for team ${team.id} failed: ${(error as Error).message}`);
-      await discard(store, imageKeys(key));
-      throw new ImageStorageError('storage failed', { cause: error });
+    const result = await processTeamImage(files.get(change.imageField!)!);
+    if (result.ok) processed.set(change.id, result.value);
+    else errors[change.id] = result.error;
+  }
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+
+  const uploaded: string[] = [];
+  const newKeys = new Map<number, string>();
+  try {
+    for (const [id, image] of processed) {
+      const key = newKey(teams.get(id)!);
+      newKeys.set(id, key);
+      uploaded.push(key, retinaKey(key));
+      await store!.put(key, image.x1, 'image/webp', IMMUTABLE);
+      await store!.put(retinaKey(key), image.x2, 'image/webp', IMMUTABLE);
     }
-    newImageKey = key;
-  } else if (change.clear) {
-    newImageKey = null;
+  } catch (error) {
+    console.error(`Storing team images failed: ${(error as Error).message}`);
+    await discard(store!, uploaded);
+    throw new ImageStorageError('storage failed', { cause: error });
   }
 
-  const saved = repo.saveTeam(team.id, fields, newImageKey);
-  if (!saved) {
-    if (store && typeof newImageKey === 'string') await discard(store, imageKeys(newImageKey)); // team deleted meanwhile
-    return fail('Equipo no encontrado.');
+  let saved;
+  try {
+    saved = repo.saveTeamsBatch(
+      tournamentId,
+      planned.changes.map((change) => ({
+        id: change.id,
+        fields: change.fields,
+        key: change.image === 'set' ? newKeys.get(change.id)! : change.image === 'clear' ? null : undefined,
+      })),
+    );
+  } catch (error) {
+    if (store) await discard(store, uploaded); // the commit failed: the new objects are orphans
+    throw error;
   }
-  if (store && newImageKey !== undefined && saved.previous && saved.previous !== newImageKey) {
-    await discard(store, imageKeys(saved.previous));
+  if (!saved.ok) {
+    if (store) await discard(store, uploaded); // a team was deleted meanwhile
+    return { ok: false, errors: { [saved.missingId]: 'Equipo no encontrado.' } };
   }
-  return ok(saved.team);
+
+  if (store) {
+    for (const change of planned.changes) {
+      const previous = saved.previous[change.id];
+      const current = change.image === 'set' ? newKeys.get(change.id) : change.image === 'clear' ? null : previous;
+      if (previous && previous !== current) await discard(store, imageKeys(previous));
+    }
+  }
+  return { ok: true, teams: saved.teams };
 }
 
 /** Deletes the files of a team that is being deleted. */

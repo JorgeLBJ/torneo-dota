@@ -24,9 +24,9 @@ export interface CreateAppOptions {
 
 /** Largest accepted request body; every form in the app is far smaller. */
 export const MAX_BODY_BYTES = 64 * 1024;
-/** A 5 MB picture plus the multipart envelope. */
-export const MAX_UPLOAD_BYTES = 6 * 1024 * 1024;
-const IMAGE_UPLOAD_PATH = /^\/admin\/t\/\d+\/equipos\/\d+$/; // the team row save, which may carry the cropped image
+/** One save of the Equipos screen: several 5 MB pictures plus the multipart envelope. */
+export const MAX_UPLOAD_BYTES = 30 * 1024 * 1024;
+const IMAGE_UPLOAD_PATH = /^\/admin\/t\/\d+\/equipos\/lote$/; // the Equipos batch save, which may carry cropped images
 
 export function createApp({ db, config }: CreateAppOptions) {
   const repo = createRepository(db);
@@ -41,7 +41,7 @@ export function createApp({ db, config }: CreateAppOptions) {
   const smallBodies = bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (c) => c.text('La solicitud es demasiado grande.', 413) });
   const imageBodies = bodyLimit({
     maxSize: MAX_UPLOAD_BYTES,
-    onError: (c) => c.json({ error: 'La imagen debe ser JPG, PNG o WebP de hasta 5 MB.' }, 413),
+    onError: (c) => c.json({ error: 'Los cambios son demasiado grandes (máximo 30 MB en total, 5 MB por imagen).' }, 413),
   });
   // Only the image upload route may carry a large body; everything else keeps the small cap.
   app.use('*', (c, next) => (IMAGE_UPLOAD_PATH.test(c.req.path) ? imageBodies(c, next) : smallBodies(c, next)));

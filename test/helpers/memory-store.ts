@@ -12,6 +12,8 @@ export class MemoryImageStore implements ImageStore {
   readonly deleted: string[] = [];
   failPut = false;
   failDelete = false;
+  /** Called before each delete, to observe the state the database is in at that moment. */
+  onDelete: ((key: string) => void) | null = null;
   /** Runs before each put, to interleave other work while an upload is in flight. */
   beforePut: (() => Promise<void> | void) | null = null;
 
@@ -23,6 +25,7 @@ export class MemoryImageStore implements ImageStore {
   }
 
   async delete(key: string): Promise<void> {
+    this.onDelete?.(key);
     if (this.failDelete) throw new Error('simulated delete failure');
     this.deleted.push(key);
     this.objects.delete(key);

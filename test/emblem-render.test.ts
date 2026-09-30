@@ -177,37 +177,6 @@ describe('crop dialog', () => {
   });
 });
 
-describe('choosing a hero over a custom image', () => {
-  const save = (fields: Record<string, string>) =>
-    t.post(`/admin/t/${tournament.id}/equipos/${alpha.id}`, { code: 'AA', name: 'Alpha', hero: 'axe', ...fields }, cookie);
-  const withStoredImage = async () => {
-    await store.put(KEY, new Uint8Array([1]), 'image/webp', 'x');
-    await store.put(KEY.replace('.webp', '@2x.webp'), new Uint8Array([2]), 'image/webp', 'x');
-    t.repo.updateTeam(alpha.id, { imageKey: KEY });
-  };
-
-  it('keeps the image when the form does not ask to clear it', async () => {
-    await withStoredImage();
-    await save({ hero: 'axe' });
-    expect(t.repo.getTeam(alpha.id)!.imageKey).toBe(KEY);
-    expect(store.keys()).toHaveLength(2);
-  });
-
-  it('removes the image and its files when the admin confirmed replacing it', async () => {
-    await withStoredImage();
-    await save({ hero: 'axe', clear_image: '1' });
-    expect(t.repo.getTeam(alpha.id)).toMatchObject({ imageKey: null, hero: 'axe' });
-    expect(store.keys()).toEqual([]);
-  });
-
-  it('removes nothing when the rest of the form is invalid', async () => {
-    await withStoredImage();
-    await save({ hero: 'not-a-hero', clear_image: '1' });
-    expect(t.repo.getTeam(alpha.id)!.imageKey).toBe(KEY);
-    expect(store.keys()).toHaveLength(2);
-  });
-});
-
 describe('dialogs name the team as typed in the row', () => {
   // The page script has no DOM test harness here, so this guards the wiring: every dialog that names a team reads
   // the row's current name input (teamRows.nameOf), never an attribute frozen at render time.

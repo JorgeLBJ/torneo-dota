@@ -7,7 +7,8 @@ import { setFlash } from '../flash.js';
 import { renderPage } from '../render.js';
 import { resolveEmblem, type EmblemSources } from '../../domain/emblem.js';
 import { emblemSourcesFor } from '../../emblem-sources.js';
-import { ImageStorageError, deleteTeamImage, saveTeam } from '../../services/team-image.js';
+import type { BatchRow } from '../../domain/team-batch.js';
+import { ImageStorageError, deleteTeamImage, saveTeamBatch } from '../../services/team-image.js';
 import { fail, ok, type Checked } from '../validate.js';
 import { TeamsView } from '../views/teams.js';
 
@@ -31,7 +32,35 @@ function rowJson(team: Team, sources: EmblemSources) {
   };
 }
 
-const INVALID_IMAGE = 'La imagen debe ser JPG, PNG o WebP de hasta 5 MB.';
+const EMBLEMS = new Set(['keep', 'hero', 'image', 'none']);
+
+/** The `rows` part of a batch, or null when it is not the expected JSON. */
+function parseRows(raw: unknown): BatchRow[] | null {
+  if (typeof raw !== 'string') return null;
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(data) || data.length > 200) return null;
+  const rows: BatchRow[] = [];
+  for (const item of data) {
+    if (typeof item !== 'object' || item === null) return null;
+    const r = item as Record<string, unknown>;
+    if (!Number.isInteger(r.id) || typeof r.code !== 'string' || typeof r.name !== 'string' || typeof r.emblem !== 'string' || !EMBLEMS.has(r.emblem)) return null;
+    rows.push({
+      id: r.id as number,
+      code: r.code,
+      name: r.name,
+      captain: typeof r.captain === 'string' ? r.captain : '',
+      hero: typeof r.hero === 'string' && r.hero !== '' ? r.hero : null,
+      emblem: r.emblem as BatchRow['emblem'],
+      imageField: typeof r.imageField === 'string' ? r.imageField : undefined,
+    });
+  }
+  return rows;
+}
 
 interface TeamInput {
   code: string;
@@ -104,53 +133,46 @@ export function teamRoutes(deps: Deps) {
   };
 
   /**
-   * Saves one team row. Plain form posts (no JavaScript) redirect with a flash. The page script sends the same fields
-   * as multipart, adds the cropped image when one is staged, and asks for JSON so it can update just that row.
+   * "Guardar cambios": every changed row of the screen in ONE request. `rows` is JSON (see BatchRow) and each staged
+   * image travels as its own file part. Answers JSON only, because only the page script calls it.
    */
-  app.post('/equipos/:teamId', async (c) => {
+  app.post('/equipos/lote', async (c) => {
     const tournament = c.get('tournament');
-    const json = (c.req.header('accept') ?? '').includes('application/json');
-    const back = `/admin/t/${tournament.id}/equipos`;
-    const refuse = (message: string, status: 400 | 404 | 429 | 502 | 503) => {
-      if (json) return c.json({ error: message }, status);
-      setFlash(c, 'error', message);
-      return c.redirect(back, 303);
-    };
-    const team = ownTeam(tournament.id, c.req.param('teamId'));
-    if (!team) return json ? c.json({ error: 'Equipo no encontrado.' }, 404) : c.text('Equipo no encontrado.', 404);
+    const body = await c.req.parseBody({ all: true });
+    const rows = parseRows(Array.isArray(body['rows']) ? body['rows'][0] : body['rows']);
+    if (!rows) return c.json({ error: 'Solicitud no válida.' }, 400);
+    if (rows.length === 0) return c.json({ error: 'No hay cambios que guardar.' }, 400);
 
-    const body = await readBody(c);
-    const others = repo.listTeams(tournament.id).filter((t) => t.id !== team.id);
-    const parsed = parseTeam(body, others);
-    if (!parsed.ok) return refuse(parsed.error, 400);
-
-    const rawImage = Array.isArray(body['image']) ? body['image'][0] : body['image'];
-    if (typeof rawImage === 'string' && rawImage !== '') return refuse(INVALID_IMAGE, 400);
-    const file = rawImage instanceof File && rawImage.size > 0 ? rawImage : null;
-    if (file) {
-      if (!deps.images) return refuse('Las imágenes personalizadas no están disponibles en este servidor.', 503);
+    const files = new Map<string, Uint8Array>();
+    for (const [field, value] of Object.entries(body)) {
+      const file = Array.isArray(value) ? value[0] : value;
+      if (file instanceof File && file.size > 0) files.set(field, new Uint8Array(await file.arrayBuffer()));
+    }
+    if (files.size > 0) {
+      if (!deps.images) return c.json({ error: 'Las imágenes personalizadas no están disponibles en este servidor.' }, 503);
       if (!deps.uploadLimiter.consume(`admin:${c.get('admin').id}`)) {
-        return refuse('Demasiadas subidas seguidas: espera un minuto.', 429);
+        return c.json({ error: 'Demasiadas subidas seguidas: espera un minuto.' }, 429);
       }
+    } else if (rows.some((row) => row.emblem === 'image') && !deps.images) {
+      return c.json({ error: 'Las imágenes personalizadas no están disponibles en este servidor.' }, 503);
     }
 
     let saved;
     try {
-      saved = await saveTeam(repo, deps.images, team, parsed.value, {
-        image: file ? new Uint8Array(await file.arrayBuffer()) : undefined,
-        clear: str(body, 'clear_image') === '1',
-      });
+      saved = await saveTeamBatch(repo, deps.images, tournament.id, rows, files);
     } catch (error) {
       if (!(error instanceof ImageStorageError)) throw error;
-      return refuse('No se pudo guardar la imagen. Inténtalo de nuevo.', 502);
+      return c.json({ error: 'No se pudo guardar la imagen. Inténtalo de nuevo.' }, 502);
     }
-    if (!saved.ok) return refuse(saved.error, saved.error === 'Equipo no encontrado.' ? 404 : 400);
+    if (!saved.ok) return c.json({ errors: saved.errors }, 400);
 
     deps.events.tournamentChanged(tournament.id);
-    const message = `Equipo ${saved.value.code} guardado.`;
-    if (json) return c.json({ ok: true, message, team: rowJson(saved.value, emblemSources) });
-    setFlash(c, 'ok', message);
-    return c.redirect(back, 303);
+    const count = saved.teams.length;
+    return c.json({
+      ok: true,
+      message: `Cambios guardados (${count} ${count === 1 ? 'equipo' : 'equipos'}).`,
+      teams: saved.teams.map((team) => rowJson(team, emblemSources)),
+    });
   });
 
   app.post('/equipos/:teamId/eliminar', async (c) => {

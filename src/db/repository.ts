@@ -276,15 +276,26 @@ export function createRepository(db: Database.Database) {
   });
 
   /**
-   * Saves a team's fields and, when `key` is given (null clears it), swaps its image key. The previous key is read
-   * in the same transaction, so concurrent saves each see a distinct previous key and never share an object.
+   * Saves several teams at once in ONE transaction: fields, hero and (when `key` is given; null clears it) image key.
+   * The previous keys are read inside it, so concurrent saves each see a distinct previous key and never share an
+   * object. Codes and heroes are freed first, so teams can swap them without tripping the unique indexes; the caller
+   * has already validated the final state.
    */
-  const saveTeamTx = db.transaction(
-    (teamId: number, fields: Pick<Team, 'code' | 'name' | 'captain' | 'hero'>, key: string | null | undefined): { team: Team; previous: string | null } | undefined => {
-      const current = teamById(teamId);
-      if (!current) return undefined;
-      q.updateTeam.run({ ...current, ...fields, imageKey: key === undefined ? current.imageKey : key, id: teamId });
-      return { team: requireRow(teamById(teamId), 'Team'), previous: current.imageKey };
+  const saveTeamsBatchTx = db.transaction(
+    (tournamentId: number, updates: TeamUpdate[]): { ok: true; teams: Team[]; previous: Record<number, string | null> } | { ok: false; missingId: number } => {
+      const previous: Record<number, string | null> = {};
+      for (const update of updates) {
+        const current = teamById(update.id);
+        if (!current || current.tournamentId !== tournamentId) return { ok: false, missingId: update.id };
+        previous[update.id] = current.imageKey;
+      }
+      const free = db.prepare("UPDATE teams SET code = '~' || id, hero = NULL WHERE id = ?");
+      for (const update of updates) free.run(update.id);
+      for (const update of updates) {
+        const current = requireRow(teamById(update.id), 'Team');
+        q.updateTeam.run({ ...current, ...update.fields, imageKey: update.key === undefined ? previous[update.id] : update.key, id: update.id });
+      }
+      return { ok: true, teams: updates.map((update) => requireRow(teamById(update.id), 'Team')), previous };
     },
   );
 
@@ -394,10 +405,10 @@ export function createRepository(db: Database.Database) {
       q.updateTeam.run({ ...current, ...patch, id });
       return requireRow(teamById(id), 'Team');
     },
-    /** Atomically saves fields (+ image key when given) and returns the key it replaced; undefined when the team is gone. */
-    saveTeam(id: number, fields: Pick<Team, 'code' | 'name' | 'captain' | 'hero'>, key?: string | null) {
-      requireHero(fields.hero);
-      return saveTeamTx(id, fields, key);
+    /** Atomically saves many teams (see saveTeamsBatchTx); returns the image keys it replaced. */
+    saveTeamsBatch(tournamentId: number, updates: TeamUpdate[]) {
+      for (const update of updates) requireHero(update.fields.hero);
+      return saveTeamsBatchTx(tournamentId, updates);
     },
     deleteTeam(id: number): void {
       q.deleteTeam.run(id);
@@ -492,6 +503,13 @@ export function createRepository(db: Database.Database) {
       q.deleteExpiredSessions.run(now);
     },
   };
+}
+
+export interface TeamUpdate {
+  id: number;
+  fields: Pick<Team, 'code' | 'name' | 'captain' | 'hero'>;
+  /** Undefined: keep the stored image key. String: the new key. Null: no image. */
+  key?: string | null;
 }
 
 export type Repository = ReturnType<typeof createRepository>;

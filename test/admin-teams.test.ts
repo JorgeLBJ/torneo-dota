@@ -14,6 +14,13 @@ beforeEach(async () => {
 });
 afterEach(() => t.db.close());
 
+/** The screen's global save: rows as the page sends them (JSON answer). */
+const saveRows = (rows: Record<string, unknown>[]) => {
+  const form = new FormData();
+  form.append('rows', JSON.stringify(rows));
+  return t.app.request(`${url}/lote`, { method: 'POST', body: form, headers: { origin: 'http://localhost', cookie, accept: 'application/json' } });
+};
+
 describe('teams screen', () => {
   it('lists teams with their hero portrait and name', async () => {
     t.repo.createTeam(tournament.id, { code: 'A', name: 'Alpha', captain: 'Kelvin', hero: 'axe' });
@@ -74,23 +81,24 @@ describe('teams screen', () => {
 
   it('updates a team and lets it keep its own hero', async () => {
     const team = t.repo.createTeam(tournament.id, { code: 'A', name: 'Alpha', hero: 'axe' });
-    const res = await t.post(`${url}/${team.id}`, { code: 'A', name: 'Alpha 2', captain: 'Z', hero: 'axe' }, cookie);
-    expect(res.status).toBe(303);
+    const res = await saveRows([{ id: team.id, code: 'A', name: 'Alpha 2', captain: 'Z', hero: 'axe', emblem: 'hero' }]);
+    expect(res.status).toBe(200);
     expect(t.repo.getTeam(team.id)).toMatchObject({ name: 'Alpha 2', captain: 'Z', hero: 'axe' });
   });
 
   it('rejects taking another team hero on update', async () => {
     t.repo.createTeam(tournament.id, { code: 'A', name: 'Alpha', hero: 'axe' });
     const b = t.repo.createTeam(tournament.id, { code: 'B', name: 'Bravo' });
-    const res = await t.post(`${url}/${b.id}`, { code: 'B', name: 'Bravo', hero: 'axe' }, cookie);
-    expect(await flashText(t, res, cookie)).toContain('ya lo usa el equipo A');
+    const res = await saveRows([{ id: b.id, code: 'B', name: 'Bravo', captain: '', hero: 'axe', emblem: 'hero' }]);
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(await res.json())).toContain('ya lo usa el equipo A');
     expect(t.repo.getTeam(b.id)!.hero).toBeNull();
   });
 
   it('does not touch teams of another tournament', async () => {
     const other = t.repo.createTournament({ name: 'Otro', slug: 'otro' });
     const foreign = t.repo.createTeam(other.id, { code: 'A', name: 'Foreign' });
-    expect((await t.post(`${url}/${foreign.id}`, { code: 'A', name: 'Hacked' }, cookie)).status).toBe(404);
+    expect((await saveRows([{ id: foreign.id, code: 'A', name: 'Hacked', captain: '', hero: null, emblem: 'keep' }])).status).toBe(400);
     expect((await t.post(`${url}/${foreign.id}/eliminar`, {}, cookie)).status).toBe(404);
     expect(t.repo.getTeam(foreign.id)!.name).toBe('Foreign');
   });
