@@ -7,6 +7,10 @@ export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export const MAX_IMAGE_SIDE = 8000;
 /** Decoded size guard: 25 megapixels is a 6000x4000 camera photo, and stays safe inside a 256 MB container. */
 export const MAX_IMAGE_PIXELS = 25_000_000;
+// One image at a time and no operation cache: the container has little memory and uploads are rare.
+sharp.concurrency(1);
+sharp.cache(false);
+
 const ALLOWED = new Set(['jpeg', 'png', 'webp']);
 
 /** The avatar slot is 16:9: one file for normal screens, one at twice the size for dense ones. */
