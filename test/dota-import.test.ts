@@ -48,6 +48,7 @@ describe('snapshotSummary', () => {
     expect(formatDuration(3966)).toBe('66:06');
     expect(formatDuration(59)).toBe('0:59');
     expect(formatDuration(600)).toBe('10:00');
+    expect(formatDuration(-25)).toBe('−0:25');
     expect(snapshotSummary(snapshot)).toBe('Partida encontrada · 66:06 · Radiant ganó 42 – 41');
     expect(snapshotSummary({ ...snapshot, radiantWin: false })).toBe('Partida encontrada · 66:06 · Dire ganó 41 – 42');
   });

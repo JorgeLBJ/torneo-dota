@@ -24,6 +24,7 @@
   }
 
   function mmss(total) {
+    if (total < 0) return '−' + mmss(-total);
     var m = Math.floor(total / 60);
     var s = Math.floor(total % 60);
     return m + ':' + (s < 10 ? '0' : '') + s;

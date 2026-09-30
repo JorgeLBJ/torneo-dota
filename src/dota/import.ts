@@ -4,8 +4,9 @@ import { parseDotaMatchId } from './opendota.js';
 import type { DotaSnapshot } from './snapshot.js';
 import { DotaLookupError, type DotaMatchSource } from './source.js';
 
-/** mm:ss (minutes are not wrapped into hours: Dota games are read as "66:06"). */
+/** mm:ss (minutes are not wrapped into hours: Dota games are read as "66:06"); before the horn it is "−0:25". */
 export function formatDuration(totalSeconds: number): string {
+  if (totalSeconds < 0) return `−${formatDuration(-totalSeconds)}`;
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = Math.floor(totalSeconds % 60);
   return `${minutes}:${String(seconds).padStart(2, '0')}`;

@@ -53,6 +53,17 @@ function mapPlayer(raw: Record<string, unknown>, side: 'radiant' | 'dire'): Dota
   };
 }
 
+/**
+ * OpenDota reports first_blood_time 0 when first blood came before the horn; the real time (possibly negative) is in
+ * the objectives log. It wins when present.
+ */
+function firstBloodTime(match: Record<string, unknown>): number | null {
+  const objectives = Array.isArray(match.objectives) ? (match.objectives as Record<string, unknown>[]) : [];
+  const entry = objectives.find((o) => o.type === 'CHAT_MESSAGE_FIRSTBLOOD' && typeof o.time === 'number' && Number.isFinite(o.time));
+  if (entry) return entry.time as number;
+  return typeof match.first_blood_time === 'number' ? match.first_blood_time : null;
+}
+
 /** Keeps only the compact fields of an OpenDota match; anything that is not a full 5v5 is refused. */
 export function mapOpenDotaMatch(raw: unknown): DotaSnapshot {
   if (typeof raw !== 'object' || raw === null) throw lookupError('incomplete');
@@ -76,7 +87,7 @@ export function mapOpenDotaMatch(raw: unknown): DotaSnapshot {
     radiantWin: match.radiant_win === true,
     radiantScore: num(match.radiant_score),
     direScore: num(match.dire_score),
-    firstBloodSec: typeof match.first_blood_time === 'number' ? match.first_blood_time : null,
+    firstBloodSec: firstBloodTime(match),
     startTime: num(match.start_time),
     players: [...radiant.map((p) => mapPlayer(p, 'radiant')), ...dire.map((p) => mapPlayer(p, 'dire'))],
     bans,

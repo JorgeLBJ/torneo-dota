@@ -37,7 +37,7 @@ describe('mapOpenDotaMatch (the real match 9023462170)', () => {
       radiantWin: true,
       radiantScore: 42,
       direScore: 41,
-      firstBloodSec: 0,
+      firstBloodSec: -25, // first_blood_time says 0: the real time is in objectives, before the horn
       startTime: 1790791891,
     });
   });
@@ -101,8 +101,11 @@ describe('mapOpenDotaMatch edge cases', () => {
   });
 
   it('missing numbers (an unparsed match) become zero, an unknown hero keeps a placeholder', () => {
-    const snapshot = mapOpenDotaMatch(base({ first_blood_time: null }, { hero_damage: null, last_hits: undefined, hero_id: 9999 }));
+    const snapshot = mapOpenDotaMatch(base({ first_blood_time: null, objectives: [] }, { hero_damage: null, last_hits: undefined, hero_id: 9999 }));
     expect(snapshot.firstBloodSec).toBeNull();
+    // without an objectives entry, first_blood_time is what there is
+    expect(mapOpenDotaMatch(base({ objectives: [], first_blood_time: 312 })).firstBloodSec).toBe(312);
+    expect(mapOpenDotaMatch(base({ objectives: [{ type: 'CHAT_MESSAGE_FIRSTBLOOD', time: 'x' }], first_blood_time: 7 })).firstBloodSec).toBe(7);
     expect(snapshot.players[0]).toMatchObject({ heroDamage: 0, lastHits: 0, heroSlug: null, heroName: 'Héroe 9999' });
   });
 
