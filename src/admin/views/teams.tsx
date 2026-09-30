@@ -2,6 +2,7 @@ import type { FC } from 'hono/jsx';
 import { HEROES, getHero } from '../../data/heroes.js';
 import type { Team, Tournament } from '../../db/repository.js';
 import { teamColor } from './layout.js';
+import { assetUrl } from '../../assets.js';
 import { EmblemPicture } from '../../emblem-view.js';
 import { PageHead, heroImage } from './parts.js';
 
@@ -44,6 +45,10 @@ const CustomImage: FC<{ team: Team; base: string; enabled: boolean }> = ({ team,
   if (!enabled) return null;
   return (
     <div class="img-row">
+      <input type="file" accept="image/jpeg,image/png,image/webp" hidden data-image-file aria-label={`Imagen del equipo ${team.code}`} />
+      <button type="button" class="btn sm" data-image-pick data-upload-url={`${base}/${team.id}/imagen`} data-team-label={team.name}>
+        Subir imagen
+      </button>
       {team.imageKey ? (
         <span class="img-thumb">
           <EmblemPicture team={team} eager />
@@ -59,6 +64,64 @@ const CustomImage: FC<{ team: Team; base: string; enabled: boolean }> = ({ team,
     </div>
   );
 };
+
+/** Crop dialog: the admin frames the picture at 16:9 (the avatar slot) before it is uploaded. */
+const ImageModal: FC = () => (
+  <>
+    <link rel="stylesheet" href={assetUrl('vendor/cropperjs/cropper.min.css')} />
+    <script src={assetUrl('vendor/cropperjs/cropper.min.js')} defer></script>
+    <dialog id="imageModal" class="image-modal" aria-labelledby="imageTitle">
+      <div class="hm-head">
+        <h2 id="imageTitle" style="margin:0">
+          Imagen para <span id="imageTeam" style="color:var(--gold)"></span>
+        </h2>
+      </div>
+      <p class="flash error" id="imageError" role="alert" hidden></p>
+      <div class="im-layout" id="imageEditor">
+        <div class="im-stage">
+          <img id="cropImage" alt="Imagen que se va a recortar" />
+        </div>
+        <div class="im-side">
+          <p class="muted" style="margin:0;font-size:12px">
+            Arrastra para encuadrar. Acerca con la rueda, pellizcando o con el control. El recorte es 16:9, como el
+            espacio del héroe.
+          </p>
+          <label class="im-zoom">
+            <span>Zoom</span>
+            <input type="range" id="cropZoom" min="0" max="100" value="0" step="1" />
+          </label>
+          <div class="actions">
+            <button class="btn sm" type="button" id="cropRotate">
+              Girar 90°
+            </button>
+          </div>
+          <div class="im-previews" aria-hidden="true">
+            <div class="im-prev-item">
+              <div class="im-preview im-preview-lg"></div>
+              <span class="muted">Tarjeta</span>
+            </div>
+            <div class="im-prev-item">
+              <div class="im-preview im-preview-md"></div>
+              <span class="muted">Tabla</span>
+            </div>
+            <div class="im-prev-item">
+              <div class="im-preview im-preview-sm"></div>
+              <span class="muted">Chip</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="actions im-foot">
+        <button class="btn" type="button" id="cropCancel">
+          Cancelar
+        </button>
+        <button class="btn pri" type="button" id="cropSave">
+          Guardar
+        </button>
+      </div>
+    </dialog>
+  </>
+);
 
 export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: boolean; imagesEnabled?: boolean }> = ({
   tournament,
@@ -164,6 +227,7 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
           ? ' Si el equipo sube su propia imagen, reemplaza al héroe en toda la web; al quitarla vuelve el héroe.'
           : ' Las imágenes personalizadas no están disponibles en este servidor (falta configurar el almacenamiento).'}
       </p>
+      {imagesEnabled ? <ImageModal /> : null}
       <dialog id="heroModal" class="hero-modal">
         <div class="hm-head">
           <h2 style="margin:0">

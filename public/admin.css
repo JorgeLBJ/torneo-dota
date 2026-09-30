@@ -247,3 +247,33 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;overflow:hidde
 .img-row{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
 .img-thumb{display:block;flex:none;width:72px;height:40px;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:var(--panel-2)}
 .img-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* ---------- Custom team image: crop dialog ---------- */
+.image-modal{width:min(820px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:18px;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--fg);box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.image-modal::backdrop{background:rgba(0,0,0,.7)}
+.image-modal .flash{margin:0 0 12px}
+.image-modal [hidden]{display:none}
+.im-layout{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:16px;align-items:start}
+.im-stage{height:min(52vh,380px);background:#0c0d0f;border-radius:10px;overflow:hidden}
+.im-stage img{display:block;max-width:100%}
+.im-side{display:grid;gap:12px;min-width:0}
+.im-zoom{display:grid;gap:6px;font-size:12px;color:var(--muted)}
+.im-zoom input{padding:0;height:var(--control-h-sm);background:none;border:0;accent-color:var(--gold)}
+.im-previews{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.im-prev-item{display:grid;gap:4px;font-size:11px}
+.im-preview{overflow:hidden;border:1px solid var(--line);border-radius:4px;background:var(--panel-2)}
+.im-preview img{max-width:none}
+.im-preview-lg{width:112px;height:63px}
+.im-preview-md{width:64px;height:36px}
+.im-preview-sm{width:44px;height:25px}
+.im-foot{justify-content:flex-end;margin-top:14px}
+.im-foot .btn{width:auto}
+.im-foot .btn[disabled]{opacity:.6;cursor:progress}
+.image-modal.busy .im-stage{opacity:.6}
+.image-modal .cropper-view-box{outline-color:var(--gold)}
+.image-modal .cropper-line,.image-modal .cropper-point{background-color:var(--gold)}
+@media (max-width:760px){
+  .im-layout{grid-template-columns:1fr}
+  .im-stage{height:min(46vh,320px)}
+  .im-foot .btn{flex:1}
+}

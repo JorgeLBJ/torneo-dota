@@ -84,3 +84,32 @@ describe('admin teams page', () => {
     off.db.close();
   });
 });
+
+describe('crop dialog', () => {
+  it('is on the teams page with upload buttons and the vendored cropper', async () => {
+    const base = `/admin/t/${tournament.id}/equipos`;
+    const body = await (await t.get(base, cookie)).text();
+    expect(body).toContain('Subir imagen');
+    expect(body).toContain(`data-upload-url="${base}/${alpha.id}/imagen"`);
+    expect(body).toContain('id="imageModal"');
+    expect(body).toMatch(/src="\/assets\/vendor\/cropperjs\/cropper\.min\.js\?v=[0-9a-f]{10}"/);
+    expect(body).toMatch(/href="\/assets\/vendor\/cropperjs\/cropper\.min\.css\?v=[0-9a-f]{10}"/);
+    expect(body).not.toMatch(/https?:\/\/[^"]*cropper/);
+  });
+
+  it('serves the vendored files and their license', async () => {
+    for (const file of ['cropper.min.js', 'cropper.min.css', 'LICENSE']) {
+      expect((await t.get(`/assets/vendor/cropperjs/${file}`)).status).toBe(200);
+    }
+  });
+
+  it('is absent when custom images are unavailable', async () => {
+    const off = await makeApp({ imageStore: null });
+    const c = await off.login();
+    const tour = off.repo.createTournament({ name: 'X', slug: 'x' });
+    off.repo.createTeam(tour.id, { code: 'AA', name: 'Alpha' });
+    const body = await (await off.get(`/admin/t/${tour.id}/equipos`, c)).text();
+    expect(body).not.toContain('imageModal');
+    off.db.close();
+  });
+});

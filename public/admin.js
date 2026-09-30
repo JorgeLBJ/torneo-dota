@@ -122,3 +122,181 @@
     wire(button, button.getAttribute('data-confirm-open'));
   });
 })();
+
+// Custom team image: pick a file, crop it to 16:9 with Cropper.js, upload the result.
+(function () {
+  var modal = document.getElementById('imageModal');
+  if (!modal || typeof modal.showModal !== 'function') return;
+
+  var MAX_BYTES = 5 * 1024 * 1024;
+  var TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+  var WRONG = 'La imagen debe ser JPG, PNG o WebP de hasta 5 MB.';
+  var OUT = { width: 1024, height: 576 };
+
+  var image = document.getElementById('cropImage');
+  var editor = document.getElementById('imageEditor');
+  var errorBox = document.getElementById('imageError');
+  var teamLabel = document.getElementById('imageTeam');
+  var zoom = document.getElementById('cropZoom');
+  var saveButton = document.getElementById('cropSave');
+  var cancelButton = document.getElementById('cropCancel');
+  var rotateButton = document.getElementById('cropRotate');
+  var cropper = null;
+  var objectUrl = null;
+  var uploadUrl = null;
+  var baseRatio = 1;
+  var saving = false;
+
+  function showError(message) {
+    errorBox.textContent = message || '';
+    errorBox.hidden = !message;
+  }
+
+  function idle() {
+    saving = false;
+    saveButton.disabled = false;
+    cancelButton.disabled = false;
+    saveButton.textContent = 'Guardar';
+    modal.classList.remove('busy');
+  }
+
+  function cleanup() {
+    if (cropper) { cropper.destroy(); cropper = null; }
+    if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+    image.removeAttribute('src');
+    idle();
+  }
+
+  function setZoomFromSlider() {
+    if (!cropper) return;
+    cropper.zoomTo(baseRatio * (1 + (Number(zoom.value) / 100) * 4));
+  }
+
+  function startCropper() {
+    if (typeof window.Cropper !== 'function') {
+      showError('No se pudo cargar el recortador. Recarga la página e inténtalo de nuevo.');
+      editor.hidden = true;
+      saveButton.disabled = true;
+      return;
+    }
+    cropper = new window.Cropper(image, {
+      aspectRatio: 16 / 9,
+      viewMode: 1,
+      dragMode: 'move',
+      autoCropArea: 1,
+      cropBoxMovable: false,
+      cropBoxResizable: false,
+      toggleDragModeOnDblclick: false,
+      background: false,
+      guides: false,
+      center: false,
+      highlight: false,
+      responsive: true,
+      preview: modal.querySelectorAll('.im-preview'),
+      ready: function () {
+        var data = cropper.getImageData();
+        baseRatio = data.width / data.naturalWidth;
+        zoom.value = 0;
+      },
+      zoom: function (event) {
+        if (!baseRatio) return;
+        var value = ((event.detail.ratio / baseRatio) - 1) / 4 * 100;
+        zoom.value = Math.max(0, Math.min(100, value));
+      },
+    });
+  }
+
+  function open(file, url, label) {
+    cleanup();
+    showError('');
+    uploadUrl = url;
+    teamLabel.textContent = label;
+    editor.hidden = false;
+    objectUrl = URL.createObjectURL(file);
+    image.addEventListener('load', startCropper, { once: true });
+    // A file that only has an image extension: the browser cannot decode it, so there is nothing to crop.
+    image.addEventListener('error', function () {
+      if (!objectUrl) return;
+      editor.hidden = true;
+      saveButton.disabled = true;
+      showError(WRONG);
+    }, { once: true });
+    image.src = objectUrl;
+    modal.showModal();
+  }
+
+  function openError(message, label) {
+    cleanup();
+    teamLabel.textContent = label;
+    editor.hidden = true;
+    saveButton.disabled = true;
+    showError(message);
+    modal.showModal();
+  }
+
+  document.querySelectorAll('[data-image-pick]').forEach(function (button) {
+    var input = button.parentElement.querySelector('[data-image-file]');
+    var label = button.getAttribute('data-team-label') || '';
+    button.addEventListener('click', function () { input.click(); });
+    input.addEventListener('change', function () {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      var type = file.type;
+      var size = file.size;
+      input.value = '';
+      if (TYPES.indexOf(type) === -1 || size > MAX_BYTES) return openError(WRONG, label);
+      open(file, button.getAttribute('data-upload-url'), label);
+    });
+  });
+
+  zoom.addEventListener('input', setZoomFromSlider);
+  rotateButton.addEventListener('click', function () {
+    if (cropper) cropper.rotate(90);
+  });
+
+  cancelButton.addEventListener('click', function () {
+    if (!saving) modal.close();
+  });
+  modal.addEventListener('cancel', function (event) { if (saving) event.preventDefault(); });
+  modal.addEventListener('close', cleanup);
+
+  function toBlob(canvas) {
+    return new Promise(function (resolve) {
+      canvas.toBlob(function (webp) {
+        if (webp && webp.type === 'image/webp') return resolve(webp);
+        canvas.toBlob(function (png) { resolve(png); }, 'image/png');
+      }, 'image/webp', 0.92);
+    });
+  }
+
+  saveButton.addEventListener('click', function () {
+    if (!cropper || saving) return;
+    saving = true;
+    showError('');
+    saveButton.disabled = true;
+    cancelButton.disabled = true;
+    saveButton.textContent = 'Guardando…';
+    modal.classList.add('busy');
+    var failed = function (message) {
+      idle();
+      showError(message);
+    };
+    var canvas = cropper.getCroppedCanvas({ width: OUT.width, height: OUT.height, imageSmoothingQuality: 'high' });
+    if (!canvas) return failed('No se pudo recortar la imagen.');
+    toBlob(canvas).then(function (blob) {
+      if (!blob) return failed('No se pudo preparar la imagen.');
+      if (blob.size > MAX_BYTES) return failed(WRONG);
+      var form = new FormData();
+      form.append('image', blob, blob.type === 'image/webp' ? 'equipo.webp' : 'equipo.png');
+      return fetch(uploadUrl, { method: 'POST', body: form, credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then(function (res) {
+          return res.json().catch(function () { return {}; }).then(function (body) {
+            if (res.ok) { window.location.reload(); return; }
+            failed(body.error || 'No se pudo guardar la imagen. Inténtalo de nuevo.');
+          });
+        });
+    }).catch(function () {
+      failed('No se pudo subir la imagen. Revisa tu conexión e inténtalo de nuevo.');
+    });
+  });
+})();
