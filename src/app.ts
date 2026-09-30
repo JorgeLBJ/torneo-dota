@@ -13,6 +13,8 @@ import { createRepository } from './db/repository.js';
 import { createEvents } from './events.js';
 import { FAVICON_SVG } from './favicon.js';
 import { publicApp } from './public/routes.js';
+import { OpenDotaSource } from './dota/opendota.js';
+import { CachedDotaSource } from './dota/source.js';
 import { LocalImageStore } from './storage/local.js';
 
 export type { AppConfig } from './config.js';
@@ -35,6 +37,7 @@ export function createApp({ db, config }: CreateAppOptions) {
   const accountLimiter = new LoginRateLimiter();
   const uploadLimiter = new LoginRateLimiter({ maxFailures: 30, windowMs: 60_000 });
   const images = config.imageStore ?? null;
+  const dota = config.dotaSource ?? new CachedDotaSource(new OpenDotaSource());
   const now = clockOf(config);
   const app = new Hono();
 
@@ -81,7 +84,7 @@ export function createApp({ db, config }: CreateAppOptions) {
   }
   app.get('/favicon.svg', (c) => c.body(FAVICON_SVG, 200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' }));
   app.get('/favicon.ico', (c) => c.body(null, 204));
-  app.route('/admin', adminApp({ repo, events, config, limiter, accountLimiter, now, images, uploadLimiter }));
+  app.route('/admin', adminApp({ repo, events, config, limiter, accountLimiter, now, images, uploadLimiter, dota }));
   app.route('/', publicApp({ repo, events, config, now, images }));
 
   return { app, repo, events };

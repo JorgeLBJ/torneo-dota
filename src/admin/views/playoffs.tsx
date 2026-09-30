@@ -37,6 +37,8 @@ export const PlayoffsView: FC<PlayoffsViewProps> = ({ tournament, state, slots }
       team2={team(slot.team2Id)}
       prefix={seedPrefix}
       match={stored(slot)}
+      games={state.gamesByMatch.get(slot.matchId ?? -1) ?? []}
+      length={phase === 'final' ? tournament.finalGames : tournament.semifinalGames}
     />
   );
 

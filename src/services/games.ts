@@ -1,5 +1,7 @@
 import { fail, ok, type Checked } from '../checked.js';
 import type { Game, Match, Repository, Tournament } from '../db/repository.js';
+import { gameFromSnapshot, lookupDotaMatch } from '../dota/import.js';
+import type { DotaMatchSource } from '../dota/source.js';
 import { seriesLengthFor, validateSeries, type GameScore } from '../domain/series.js';
 import { validateResult, type RawResult } from './results.js';
 
@@ -78,4 +80,49 @@ export function deleteGameResult(repo: Repository, tournament: Tournament, match
   if (!games.some((g) => g.gameNumber === gameNumber)) return fail('Ese juego no tiene resultado.');
   if (games.some((g) => g.gameNumber > gameNumber)) return fail('Borra primero los juegos siguientes.');
   return ok(repo.deleteGame(match.id, gameNumber));
+}
+
+/** What the game form says about a Dota import. */
+export interface ImportFields {
+  /** The Match ID as typed ('' when the game is manual). */
+  dotaMatchId: string;
+  /** The team id chosen as Radiant. */
+  radiant: string;
+  /** The form carries the import the game already has. */
+  keep: boolean;
+}
+
+const MISMATCH = 'Los datos no coinciden con la partida de Dota: pulsa «Autocompletar» de nuevo o quita el Match ID.';
+
+/**
+ * Turns the import part of a game form into what is stored with the game. The match is looked up again (from the
+ * source's short cache) and the submitted numbers must be the ones it produces: the public detail can never
+ * contradict the score shown next to it.
+ */
+export async function prepareGameImport(
+  source: DotaMatchSource,
+  teams: [number | null, number | null],
+  raw: RawResult,
+  fields: ImportFields,
+): Promise<Checked<ImportChoice>> {
+  if (fields.dotaMatchId.trim() === '') return ok(fields.keep ? 'keep' : undefined);
+  const result = validateResult(teams, raw);
+  if (!result.ok) return result;
+  const [team1, team2] = teams as [number, number];
+  const radiant = /^\d+$/.test(fields.radiant) ? Number(fields.radiant) : null;
+  if (radiant === null || (radiant !== team1 && radiant !== team2)) {
+    return fail('Indica qué equipo jugó de Radiant (pulsa «Buscar» y elige).');
+  }
+  const found = await lookupDotaMatch(source, fields.dotaMatchId);
+  if (!found.ok) return found;
+  const expected = gameFromSnapshot(found.value, radiant, team1, team2);
+  const given = result.value;
+  const same =
+    expected.winnerId === given.winnerId &&
+    expected.team1Kills === given.team1Kills &&
+    expected.team1Deaths === given.team1Deaths &&
+    expected.team2Kills === given.team2Kills &&
+    expected.team2Deaths === given.team2Deaths;
+  if (!same) return fail(MISMATCH);
+  return ok({ radiantTeamId: radiant, dotaMatchId: found.value.matchId, snapshot: JSON.stringify(found.value) });
 }

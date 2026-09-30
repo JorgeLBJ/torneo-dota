@@ -2,11 +2,18 @@ import { Hono } from 'hono';
 import { TIEBREAKER_KEYS, type TiebreakerKey } from '../../db/repository.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { intOrNull, rawStr, readBody, str } from '../form.js';
+import { isSeriesLength, type SeriesLength } from '../../domain/series.js';
 import { setFlash } from '../flash.js';
 import { renderPage } from '../render.js';
 import { RulesView } from '../views/rules.js';
 
 const KNOWN: readonly TiebreakerKey[] = TIEBREAKER_KEYS;
+
+const PHASES = [
+  { field: 'group_games', key: 'groupGames', phase: 'group', label: 'la fase de grupos' },
+  { field: 'semifinal_games', key: 'semifinalGames', phase: 'semifinal', label: 'las semifinales' },
+  { field: 'final_games', key: 'finalGames', phase: 'final', label: 'la final' },
+] as const;
 const MAX_RULES_LENGTH = 20000;
 
 /** The submitted order: any list (even empty) of known criteria, none repeated. */
@@ -66,12 +73,27 @@ export function rulesRoutes(deps: Deps) {
       tiebreakers = [...tiebreakers, chosen];
     }
 
+    // Games per match in each phase. A missing field keeps the current value.
+    const lengths: Partial<Record<'groupGames' | 'semifinalGames' | 'finalGames', SeriesLength>> = {};
+    const games = repo.listTournamentGames(tournament.id);
+    const matches = repo.listMatches(tournament.id);
+    for (const { field, key, phase, label } of PHASES) {
+      const raw = str(body, field);
+      if (raw === '') continue;
+      const value = Number(raw);
+      if (!isSeriesLength(value)) return error('Elige 1, 3 o 5 partidas por partido.');
+      const inPhase = new Set(matches.filter((m) => m.phase === phase && !m.isTiebreak).map((m) => m.id));
+      const highest = Math.max(0, ...games.filter((g) => inPhase.has(g.matchId)).map((g) => g.gameNumber));
+      if (value < highest) return error(`Hay juegos cargados hasta el juego ${highest} en ${label}: bórralos antes de reducir las partidas por partido.`);
+      lengths[key] = value;
+    }
+
     const rulesText = rawStr(body, 'rules_text');
     if (rulesText.length > MAX_RULES_LENGTH) return error('El reglamento es demasiado largo (máximo 20 000 caracteres).');
 
     const groupLegs = Number(legs) as 1 | 2;
     const formatChanged = groupLegs !== tournament.groupLegs && repo.listMatches(tournament.id, 'group').length > 0;
-    repo.updateTournament(tournament.id, { pointsWin, pointsLoss, tiebreakers, groupLegs, rulesText });
+    repo.updateTournament(tournament.id, { pointsWin, pointsLoss, tiebreakers, groupLegs, rulesText, ...lengths });
     deps.events.tournamentChanged(tournament.id);
     if (formatChanged) setFlash(c, 'warn', 'Reglas guardadas. Regenera el fixture para aplicar el nuevo formato.');
     else setFlash(c, 'ok', 'Reglas guardadas.');

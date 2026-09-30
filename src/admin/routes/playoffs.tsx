@@ -1,5 +1,7 @@
-import { Hono } from 'hono';
-import { assignSemifinalTeams, clearPlayoffResult, phaseSlots, recordPlayoffResult, resetPlayoffs } from '../../services/playoffs.js';
+import { Hono, type Context } from 'hono';
+import { seriesLengthFor } from '../../domain/series.js';
+import { assignSemifinalTeams, deletePlayoffGame, phaseSlots, recordPlayoffResult, resetPlayoffs } from '../../services/playoffs.js';
+import { parseGameNumber, readGameForm } from '../game-form.js';
 import { loadState } from '../../services/state.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { readBody, str } from '../form.js';
@@ -61,7 +63,8 @@ export function playoffRoutes(deps: Deps) {
     return c.redirect(back, 303);
   });
 
-  app.post('/playoffs/:phase/:number', async (c) => {
+  /** Saves or clears one game of a semifinal/final series. `/playoffs/:phase/:number` (no game) is game 1. */
+  const playoffGame = async (c: Context<AdminEnv>, gameParam: string | undefined) => {
     const tournament = c.get('tournament');
     const phase = c.req.param('phase');
     const number = Number(c.req.param('number'));
@@ -71,28 +74,37 @@ export function playoffRoutes(deps: Deps) {
     const kind = phase as 'semifinal' | 'final';
     const back = `/admin/t/${tournament.id}/playoffs`;
     const body = await readBody(c);
+    const gameNumber = parseGameNumber(gameParam ?? (str(body, 'game') || '1'));
+    const refuse = (message: string) => {
+      setFlash(c, 'error', message);
+      return c.redirect(back, 303);
+    };
+    if (gameNumber === null) return refuse('Ese juego no existe.');
+    const multi = seriesLengthFor(tournament, kind, false) > 1;
 
     if (str(body, 'action') === 'clear') {
-      clearPlayoffResult(repo, tournament, kind, number);
+      const removed = deletePlayoffGame(repo, tournament, kind, number, gameNumber);
+      if (!removed.ok) return refuse(removed.error);
       deps.events.tournamentChanged(tournament.id);
-      setFlash(c, 'ok', 'Resultado borrado.');
+      setFlash(c, 'ok', multi ? `Juego ${gameNumber} borrado.` : 'Resultado borrado.');
       return c.redirect(back, 303);
     }
 
-    const checked = recordPlayoffResult(repo, tournament, loadState(repo, tournament), kind, number, {
-      winner: str(body, 'winner'),
-      t1Kills: str(body, 't1_kills'),
-      t1Deaths: str(body, 't1_deaths'),
-      t2Kills: str(body, 't2_kills'),
-      t2Deaths: str(body, 't2_deaths'),
-    });
-    if (!checked.ok) setFlash(c, 'error', checked.error);
-    else {
-      deps.events.tournamentChanged(tournament.id);
-      setFlash(c, 'ok', 'Resultado guardado.');
-    }
+    const state = loadState(repo, tournament);
+    const slot = kind === 'final' ? state.bracket.final : state.bracket.semifinals[number - 1]!;
+    const existingMatch = state.playoffMatches.find((m) => m.id === slot.matchId);
+    const existing = existingMatch ? repo.listGames(existingMatch.id).find((g) => g.gameNumber === gameNumber) : undefined;
+    const input = await readGameForm(deps.dota, [slot.team1Id, slot.team2Id], body, existing);
+    if (!input.ok) return refuse(input.error);
+    const checked = recordPlayoffResult(repo, tournament, state, kind, number, input.value.raw, { gameNumber, imported: input.value.imported });
+    if (!checked.ok) return refuse(checked.error);
+    deps.events.tournamentChanged(tournament.id);
+    setFlash(c, 'ok', multi ? `Juego ${gameNumber} guardado.` : 'Resultado guardado.');
     return c.redirect(back, 303);
-  });
+  };
+
+  app.post('/playoffs/:phase/:number/juego/:n', (c) => playoffGame(c, c.req.param('n')));
+  app.post('/playoffs/:phase/:number', (c) => playoffGame(c, undefined));
 
   return app;
 }

@@ -368,3 +368,23 @@ tr.row-msg .flash{margin:0}
 @media (prefers-reduced-motion:reduce){.spinner,.btn.is-busy::before{animation-duration:2.4s}}
 .btn:disabled{opacity:.55;cursor:not-allowed}
 .btn.is-busy:disabled{opacity:1;cursor:progress}
+
+/* Series: one form per game inside the match card */
+.rc.series{gap:10px}
+.rc.series .game{display:grid;gap:10px;padding-top:10px;border-top:1px solid var(--line)}
+.rc.series .rc-top + .game,.rc.series .series-line + .game{border-top:0;padding-top:0}
+.series-line{margin:0;font-weight:700;color:var(--gold)}
+.game-head{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px}
+.game.off{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;font-size:12px;opacity:.7}
+.dota summary{cursor:pointer;font-size:12px;color:var(--muted);user-select:none}
+.dota[open] summary{color:var(--gold)}
+.dota-body{display:grid;gap:8px;margin-top:8px}
+.dota-row{display:flex;gap:8px}
+.dota-row input{flex:1;min-width:0}
+.dota-status{margin:0;font-size:12px;min-height:16px}
+.dota-status.ok{color:var(--win)}
+.dota-status.error{color:var(--loss)}
+.dota-status a{color:var(--gold)}
+.dota-radiant{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
+.dota-radiant .f{flex:1;min-width:150px}
+.rc.series{align-content:start}

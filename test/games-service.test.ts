@@ -1,8 +1,11 @@
+import { readFileSync } from 'node:fs';
 import type Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openDatabase } from '../src/db/open.js';
 import { createRepository, type Match, type Repository, type Team, type Tournament } from '../src/db/repository.js';
-import { deleteGameResult, saveGameResult } from '../src/services/games.js';
+import { mapOpenDotaMatch } from '../src/dota/opendota.js';
+import { DotaLookupError, type DotaMatchSource } from '../src/dota/source.js';
+import { deleteGameResult, prepareGameImport, saveGameResult } from '../src/services/games.js';
 import { assignSemifinalTeams, clearPlayoffResult, deletePlayoffGame, recordPlayoffResult } from '../src/services/playoffs.js';
 import { loadState } from '../src/services/state.js';
 
@@ -192,5 +195,65 @@ describe('playoff series', () => {
     assignSemifinalTeams(repo, t1, [teams[0]!.id, teams[3]!.id, teams[1]!.id, teams[2]!.id]);
     recordPlayoffResult(repo, t1, loadState(repo, t1), 'semifinal', 1, raw(teams[0]!.id));
     expect(loadState(repo, t1).bracket.semifinals[0].winnerId).toBe(teams[0]!.id);
+  });
+});
+
+describe('prepareGameImport', () => {
+  const snapshot = mapOpenDotaMatch(JSON.parse(readFileSync(new URL('./fixtures/opendota-9023462170.json', import.meta.url), 'utf8')));
+  const source = (fail?: DotaLookupError): DotaMatchSource => ({
+    fetch: async () => {
+      if (fail) throw fail;
+      return snapshot;
+    },
+  });
+  const deathsOf = (side: 'radiant' | 'dire') => snapshot.players.filter((p) => p.side === side).reduce((n, p) => n + p.deaths, 0);
+  // team 1 was Radiant and won 42-41
+  const imported = (over: Record<string, string> = {}) => ({
+    ...raw(0),
+    winner: '1',
+    t1Kills: '42',
+    t1Deaths: String(deathsOf('radiant')),
+    t2Kills: '41',
+    t2Deaths: String(deathsOf('dire')),
+    ...over,
+  });
+  const teamsOf = (): [number, number] => [1, 2];
+
+  it('no Match ID: a manual game, or keep the import the game already has', async () => {
+    expect(await prepareGameImport(source(), teamsOf(), imported(), { dotaMatchId: '', radiant: '', keep: false })).toEqual({ ok: true, value: undefined });
+    expect(await prepareGameImport(source(), teamsOf(), imported(), { dotaMatchId: '', radiant: '', keep: true })).toEqual({ ok: true, value: 'keep' });
+  });
+
+  it('a Match ID with the Radiant team and matching numbers becomes an import with the compact snapshot', async () => {
+    const result = await prepareGameImport(source(), teamsOf(), imported(), { dotaMatchId: '9023462170', radiant: '1', keep: false });
+    expect(result).toMatchObject({ ok: true, value: { radiantTeamId: 1, dotaMatchId: 9023462170 } });
+    if (!result.ok || result.value === undefined || result.value === 'keep') throw new Error('expected an import');
+    expect(JSON.parse(result.value.snapshot)).toMatchObject({ matchId: 9023462170, radiantScore: 42 });
+  });
+
+  it('refuses numbers that do not match the Dota match (the detail would contradict the score)', async () => {
+    const result = await prepareGameImport(source(), teamsOf(), imported({ t1Kills: '50' }), { dotaMatchId: '9023462170', radiant: '1', keep: false });
+    expect(result).toEqual({ ok: false, error: 'Los datos no coinciden con la partida de Dota: pulsa «Autocompletar» de nuevo o quita el Match ID.' });
+    const wrongWinner = await prepareGameImport(source(), teamsOf(), imported({ winner: '2' }), { dotaMatchId: '9023462170', radiant: '1', keep: false });
+    expect(wrongWinner).toMatchObject({ ok: false });
+  });
+
+  it('needs the Radiant team, which must be one of the two', async () => {
+    const message = 'Indica qué equipo jugó de Radiant (pulsa «Buscar» y elige).';
+    expect(await prepareGameImport(source(), teamsOf(), imported(), { dotaMatchId: '9023462170', radiant: '', keep: false })).toEqual({ ok: false, error: message });
+    expect(await prepareGameImport(source(), teamsOf(), imported(), { dotaMatchId: '9023462170', radiant: '9', keep: false })).toEqual({ ok: false, error: message });
+  });
+
+  it('a bad id or a failed lookup is a readable error', async () => {
+    expect(await prepareGameImport(source(), teamsOf(), imported(), { dotaMatchId: 'abc', radiant: '1', keep: false })).toMatchObject({ ok: false });
+    const notFound = new DotaLookupError('not_found', 'Partida no encontrada. Revisa el Match ID.');
+    expect(await prepareGameImport(source(notFound), teamsOf(), imported(), { dotaMatchId: '9023462170', radiant: '1', keep: false })).toEqual({
+      ok: false,
+      error: 'Partida no encontrada. Revisa el Match ID.',
+    });
+  });
+
+  it('keep needs the normal result validation to pass first (a teamless match cannot import)', async () => {
+    expect(await prepareGameImport(source(), [1, null], imported(), { dotaMatchId: '9023462170', radiant: '1', keep: false })).toMatchObject({ ok: false });
   });
 });

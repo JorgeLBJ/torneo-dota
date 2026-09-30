@@ -1131,3 +1131,106 @@
     opener = null;
   });
 })();
+
+// Result forms: optional import of a game from a Dota match id. The lookups run on the server (never from the browser).
+(function () {
+  var forms = document.querySelectorAll('[data-game-form]');
+  if (!forms.length) return;
+  var base = location.pathname.replace(/\/(resultados|playoffs)(\/.*)?$/, '');
+
+  function post(path, data) {
+    return fetch(base + path, {
+      method: 'POST',
+      body: new URLSearchParams(data),
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (body) { return { ok: res.ok, body: body }; });
+    });
+  }
+
+  forms.forEach(function (form) {
+    var idInput = form.querySelector('[name="dota_match_id"]');
+    var statusEl = form.querySelector('[data-dota-status]');
+    var radiantBox = form.querySelector('[data-dota-radiant]');
+    var radiantSelect = form.querySelector('[name="dota_radiant"]');
+    var search = form.querySelector('[data-dota-search]');
+    var fill = form.querySelector('[data-dota-fill]');
+    if (!idInput || !search || !fill) return;
+    var original = idInput.value;
+
+    function say(text, kind) {
+      statusEl.textContent = text || '';
+      statusEl.className = 'dota-status ' + (kind || 'muted');
+    }
+
+    function busy(button, on, label) {
+      button.disabled = on;
+      button.dataset.label = button.dataset.label || button.textContent;
+      button.textContent = on ? label : button.dataset.label;
+    }
+
+    function doSearch() {
+      var id = idInput.value.trim();
+      if (!id) { say('Escribe el Match ID de Dota.', 'error'); return; }
+      busy(search, true, 'Buscando…');
+      say('Consultando OpenDota…', 'muted');
+      post('/dota/buscar', { dota_match_id: id }).then(function (res) {
+        busy(search, false);
+        if (res.ok && res.body.ok) {
+          say('✓ ' + res.body.summary, 'ok');
+          radiantBox.hidden = false;
+        } else {
+          say(res.body.error || 'No se pudo consultar la partida.', 'error');
+          radiantBox.hidden = true;
+        }
+      }).catch(function () {
+        busy(search, false);
+        say('No se pudo consultar la partida. Revisa tu conexión.', 'error');
+      });
+    }
+
+    function setValue(name, value) {
+      var input = form.querySelector('[name="' + name + '"]');
+      if (input) input.value = String(value);
+    }
+
+    function doFill() {
+      if (!radiantSelect.value) { say('Elige qué equipo jugó de Radiant.', 'error'); return; }
+      busy(fill, true, 'Cargando…');
+      post('/dota/autocompletar', {
+        dota_match_id: idInput.value.trim(),
+        radiant: radiantSelect.value,
+        team1_id: form.getAttribute('data-team1'),
+        team2_id: form.getAttribute('data-team2'),
+      }).then(function (res) {
+        busy(fill, false);
+        if (!(res.ok && res.body.ok)) { say(res.body.error || 'No se pudo autocompletar.', 'error'); return; }
+        var winner = form.querySelector('input[name="winner"][value="' + res.body.winnerId + '"]');
+        if (winner) winner.checked = true;
+        setValue('t1_kills', res.body.team1Kills);
+        setValue('t1_deaths', res.body.team1Deaths);
+        setValue('t2_kills', res.body.team2Kills);
+        setValue('t2_deaths', res.body.team2Deaths);
+        say('✓ ' + res.body.summary + ' · Datos cargados: revisa y guarda.', 'ok');
+      }).catch(function () {
+        busy(fill, false);
+        say('No se pudo autocompletar. Revisa tu conexión.', 'error');
+      });
+    }
+
+    search.addEventListener('click', doSearch);
+    fill.addEventListener('click', doFill);
+    // Enter in the Match ID searches instead of saving the game.
+    idInput.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') { event.preventDefault(); doSearch(); }
+    });
+    // A different id is a different match: look it up again before using it.
+    idInput.addEventListener('input', function () {
+      if (idInput.value.trim() !== original) {
+        radiantBox.hidden = true;
+        say('', 'muted');
+      }
+    });
+  });
+})();

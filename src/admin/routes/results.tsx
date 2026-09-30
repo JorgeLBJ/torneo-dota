@@ -1,7 +1,9 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import type { Match } from '../../db/repository.js';
 import { loadState } from '../../services/state.js';
-import { validateResult } from '../../services/results.js';
+import { seriesLengthFor } from '../../domain/series.js';
+import { deleteGameResult, saveGameResult } from '../../services/games.js';
+import { parseGameNumber, readGameForm } from '../game-form.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { isDate, readBody, str } from '../form.js';
 import { setFlash } from '../flash.js';
@@ -46,11 +48,13 @@ export function resultRoutes(deps: Deps) {
         hasUndated={hasUndated}
         filter={filter}
         standings={state.standings}
+        gamesByMatch={state.gamesByMatch}
       />,
     );
   });
 
-  app.post('/resultados/:mid', async (c) => {
+  /** Saves or clears one game of a group match. `/resultados/:mid` (no game) is game 1, as it always was. */
+  const saveGame = async (c: Context<AdminEnv>, gameParam: string | undefined) => {
     const tournament = c.get('tournament');
     const id = Number(c.req.param('mid'));
     const match: Match | undefined = Number.isInteger(id) ? repo.getMatch(id) : undefined;
@@ -58,32 +62,35 @@ export function resultRoutes(deps: Deps) {
       return c.text('Partido no encontrado.', 404);
     }
     const body = await readBody(c);
+    const gameNumber = parseGameNumber(gameParam ?? (str(body, 'game') || '1'));
     const filter = parseFilter(str(body, 'fecha'));
     const back = `/admin/t/${tournament.id}/resultados${filter ? `?fecha=${filter}` : ''}`;
+    const refuse = (message: string) => {
+      setFlash(c, 'error', message);
+      return c.redirect(back, 303);
+    };
+    if (gameNumber === null) return refuse('Ese juego no existe.');
+    const multi = seriesLengthFor(tournament, match.phase, match.isTiebreak) > 1;
 
     if (str(body, 'action') === 'clear') {
-      repo.clearResult(match.id);
+      const removed = deleteGameResult(repo, tournament, match, gameNumber);
+      if (!removed.ok) return refuse(removed.error);
       deps.events.tournamentChanged(tournament.id);
-      setFlash(c, 'ok', 'Resultado borrado.');
+      setFlash(c, 'ok', multi ? `Juego ${gameNumber} borrado.` : 'Resultado borrado.');
       return c.redirect(back, 303);
     }
 
-    const checked = validateResult([match.team1Id, match.team2Id], {
-      winner: str(body, 'winner'),
-      t1Kills: str(body, 't1_kills'),
-      t1Deaths: str(body, 't1_deaths'),
-      t2Kills: str(body, 't2_kills'),
-      t2Deaths: str(body, 't2_deaths'),
-    });
-    if (!checked.ok) {
-      setFlash(c, 'error', checked.error);
-      return c.redirect(back, 303);
-    }
-    repo.recordResult(match.id, checked.value);
+    const input = await readGameForm(deps.dota, [match.team1Id, match.team2Id], body, repo.listGames(match.id).find((g) => g.gameNumber === gameNumber));
+    if (!input.ok) return refuse(input.error);
+    const saved = saveGameResult(repo, tournament, match, gameNumber, input.value.raw, input.value.imported);
+    if (!saved.ok) return refuse(saved.error);
     deps.events.tournamentChanged(tournament.id);
-    setFlash(c, 'ok', `Resultado del partido ${match.matchNumber} guardado.`);
+    setFlash(c, 'ok', multi ? `Juego ${gameNumber} del partido ${match.matchNumber} guardado.` : `Resultado del partido ${match.matchNumber} guardado.`);
     return c.redirect(back, 303);
-  });
+  };
+
+  app.post('/resultados/:mid/juego/:n', (c) => saveGame(c, c.req.param('n')));
+  app.post('/resultados/:mid', (c) => saveGame(c, undefined));
 
   return app;
 }

@@ -3,6 +3,7 @@ import type { LoginRateLimiter } from '../auth/rate-limit.js';
 import type { AppConfig } from '../config.js';
 import type { Admin, Repository, Tournament } from '../db/repository.js';
 import type { Events } from '../events.js';
+import type { DotaMatchSource } from '../dota/source.js';
 import type { ImageStore } from '../storage/image-store.js';
 
 export interface Deps {
@@ -16,6 +17,8 @@ export interface Deps {
   now: Clock;
   /** Where custom team images live, or null when they are switched off. */
   images: ImageStore | null;
+  /** Looks up Dota matches (server side only, so the browser never talks to the data provider). */
+  dota: DotaMatchSource;
   /** Image uploads, keyed by admin id. */
   uploadLimiter: LoginRateLimiter;
 }

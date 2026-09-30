@@ -15,6 +15,8 @@ export interface AppConfig {
   publicBaseUrl?: string;
   /** Where custom team images live. Null/absent: custom images are switched off. */
   imageStore?: import('./storage/image-store.js').ImageStore | null;
+  /** Where Dota match data comes from (OpenDota by default; tests inject a stub). */
+  dotaSource?: import('./dota/source.js').DotaMatchSource;
   /** Clock override for tests. */
   now?: () => Date;
 }

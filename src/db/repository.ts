@@ -141,9 +141,9 @@ export interface GameInput {
   importedAt?: string | null;
 }
 
-const gameCols = (p: string) => `${p}id, ${p}match_id AS matchId, ${p}game_number AS gameNumber, ${p}winner_id AS winnerId,
+const gameCols = (p: string, snapshot = true) => `${p}id, ${p}match_id AS matchId, ${p}game_number AS gameNumber, ${p}winner_id AS winnerId,
   ${p}team1_kills AS team1Kills, ${p}team1_deaths AS team1Deaths, ${p}team2_kills AS team2Kills, ${p}team2_deaths AS team2Deaths,
-  ${p}radiant_team_id AS radiantTeamId, ${p}dota_match_id AS dotaMatchId, ${p}dota_snapshot AS dotaSnapshot, ${p}imported_at AS importedAt`;
+  ${p}radiant_team_id AS radiantTeamId, ${p}dota_match_id AS dotaMatchId, ${snapshot ? `${p}dota_snapshot` : 'NULL'} AS dotaSnapshot, ${p}imported_at AS importedAt`;
 
 export interface Admin {
   id: number;
@@ -253,8 +253,9 @@ export function createRepository(db: Database.Database) {
          team2_kills = @team2Kills, team2_deaths = @team2Deaths WHERE id = @id`,
     ),
     gamesByMatch: db.prepare(`SELECT ${gameCols('')} FROM match_games WHERE match_id = ? ORDER BY game_number`),
+    // Without the (few KB) snapshots: the tournament state is rebuilt on every public update.
     gamesByTournament: db.prepare(
-      `SELECT ${gameCols('g.')} FROM match_games g JOIN matches m ON m.id = g.match_id
+      `SELECT ${gameCols('g.', false)} FROM match_games g JOIN matches m ON m.id = g.match_id
        WHERE m.tournament_id = ? ORDER BY g.match_id, g.game_number`,
     ),
     upsertGame: db.prepare(
@@ -579,7 +580,7 @@ export function createRepository(db: Database.Database) {
 
     // Games (the series of a match). The match's winner and kills/deaths are re-derived in the same transaction.
     listGames: gamesOf,
-    /** Every game of the tournament, ordered by match then game number. */
+    /** Every game of the tournament, ordered by match then game number. `dotaSnapshot` is always null here: read a match's games for it. */
     listTournamentGames: (tournamentId: number): Game[] => q.gamesByTournament.all(tournamentId) as Game[],
     saveGame(matchId: number, game: GameInput): Match {
       return inTransaction(() => {

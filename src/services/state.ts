@@ -1,4 +1,4 @@
-import type { Match, Repository, Team, Tournament } from '../db/repository.js';
+import type { Game, Match, Repository, Team, Tournament } from '../db/repository.js';
 import { buildPlayoffs, type Bracket, type PlayoffMatch } from '../domain/playoffs.js';
 import { computeStandings, type StandingRow } from '../domain/standings.js';
 
@@ -15,6 +15,8 @@ export interface TournamentState {
   playoffMatches: Match[];
   standings: StandingRow[];
   bracket: Bracket;
+  /** The games of every match, in game order. */
+  gamesByMatch: Map<number, Game[]>;
   /** Group matches without a recorded winner. */
   pendingGroup: number;
   groupComplete: boolean;
@@ -46,6 +48,12 @@ export function loadState(repo: Repository, tournament: Tournament): TournamentS
       }),
     ),
   );
+  const gamesByMatch = new Map<number, Game[]>();
+  for (const game of repo.listTournamentGames(tournament.id)) {
+    const list = gamesByMatch.get(game.matchId) ?? [];
+    list.push(game);
+    gamesByMatch.set(game.matchId, list);
+  }
   const pendingGroup = groupMatches.filter((m) => m.winnerId === null).length;
   return {
     tournament,
@@ -57,6 +65,7 @@ export function loadState(repo: Repository, tournament: Tournament): TournamentS
     playoffMatches,
     standings,
     bracket,
+    gamesByMatch,
     pendingGroup,
     groupComplete: groupMatches.length > 0 && pendingGroup === 0,
   };

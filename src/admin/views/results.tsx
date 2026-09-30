@@ -1,5 +1,6 @@
 import type { Child, FC } from 'hono/jsx';
-import type { Match, Team, Tournament } from '../../db/repository.js';
+import type { Game, Match, Team, Tournament } from '../../db/repository.js';
+import { resolveSeries, seriesLengthFor, type SeriesLength, type SeriesState } from '../../domain/series.js';
 import type { StandingRow } from '../../domain/standings.js';
 import { formatDate, formatLocalDateTime } from '../../format/datetime.js';
 import { TeamBadge } from './layout.js';
@@ -9,27 +10,48 @@ import { PageHead, Select } from './parts.js';
 export const scheduleLabel = (m: Pick<Match, 'scheduledDate' | 'startTime'>): string =>
   formatLocalDateTime(m.scheduledDate, m.startTime) || 'Sin horario';
 
+type ResultMatch = Pick<Match, 'winnerId' | 'team1Kills' | 'team1Deaths' | 'team2Kills' | 'team2Deaths'>;
+
 export interface ResultCardProps {
+  /** URL of the match; each game posts to `${action}/juego/${n}`. */
   action: string;
   header: Child;
   team1: Team | null;
   team2: Team | null;
   /** Optional text before a team name (for example a playoff seed "1.º "). */
   prefix?: (team: Team) => string;
-  match?: Pick<Match, 'winnerId' | 'team1Kills' | 'team1Deaths' | 'team2Kills' | 'team2Deaths'>;
+  match?: ResultMatch;
+  /** The games already loaded, and how many make a full series (1, 3 or 5). */
+  games?: Game[];
+  length?: SeriesLength;
   hidden?: Record<string, string>;
   editHref?: string;
 }
 
-export const ResultCard: FC<ResultCardProps> = ({ action, header, team1, team2, prefix, match, hidden, editHref }) => {
-  const saved = match?.winnerId != null;
+const dotaLink = (id: number) => `https://www.opendota.com/matches/${id}`;
+
+interface GameFormProps {
+  action: string;
+  number: number;
+  multi: boolean;
+  team1: Team;
+  team2: Team;
+  prefix?: (team: Team) => string;
+  game?: Game;
+  hidden?: Record<string, string>;
+}
+
+/** One game of a series: winner, kills and deaths, plus the optional import from a Dota match. */
+const GameForm: FC<GameFormProps> = ({ action, number, multi, team1, team2, prefix, game, hidden }) => {
+  const saved = game !== undefined;
+  const imported = game?.dotaMatchId != null;
   const row = (team: Team, side: 1 | 2) => {
-    const kills = side === 1 ? match?.team1Kills : match?.team2Kills;
-    const deaths = side === 1 ? match?.team1Deaths : match?.team2Deaths;
+    const kills = side === 1 ? game?.team1Kills : game?.team2Kills;
+    const deaths = side === 1 ? game?.team1Deaths : game?.team2Deaths;
     return (
       <div class="team-row">
         <label class="pick">
-          <input type="radio" class="sr-only" name="winner" value={String(team.id)} checked={match?.winnerId === team.id} />
+          <input type="radio" class="sr-only" name="winner" value={String(team.id)} checked={game?.winnerId === team.id} />
           <TeamBadge team={team} />
           <span>
             {prefix?.(team) ?? ''}
@@ -41,7 +63,100 @@ export const ResultCard: FC<ResultCardProps> = ({ action, header, team1, team2, 
       </div>
     );
   };
+  return (
+    <form
+      class={`game ${saved ? 'saved' : 'open'}`}
+      method="post"
+      action={`${action}/juego/${number}`}
+      data-game-form
+      data-team1={String(team1.id)}
+      data-team2={String(team2.id)}
+    >
+      <button type="submit" name="action" value="save" class="sr-only" tabindex={-1} aria-hidden="true">
+        Guardar
+      </button>
+      {Object.entries(hidden ?? {}).map(([name, value]) => (
+        <input type="hidden" name={name} value={value} />
+      ))}
+      {imported ? <input type="hidden" name="dota_keep" value="1" /> : null}
+      {multi ? (
+        <div class="game-head">
+          <b>Juego {number}</b>
+          {saved ? <span class="pill ok">Guardado</span> : <span class="pill next">Pendiente</span>}
+        </div>
+      ) : null}
+      <div class="kd-h">
+        <span>Ganador</span>
+        <span>Kills</span>
+        <span>Deaths</span>
+      </div>
+      {row(team1, 1)}
+      {row(team2, 2)}
+      <details class="dota" open={imported}>
+        <summary>{imported ? 'Importado de Dota' : 'Importar desde Dota (opcional)'}</summary>
+        <div class="dota-body">
+          <div class="dota-row">
+            <input name="dota_match_id" inputmode="numeric" maxlength={15} placeholder="Match ID de Dota" value={game?.dotaMatchId == null ? '' : String(game.dotaMatchId)} aria-label="Match ID de Dota" />
+            <button class="btn sm" type="button" data-dota-search>
+              Buscar
+            </button>
+          </div>
+          <p class="dota-status muted" data-dota-status role="status">
+            {imported ? (
+              <>
+                Detalle guardado ·{' '}
+                <a href={dotaLink(game!.dotaMatchId!)} target="_blank" rel="noopener">
+                  Ver en OpenDota ↗
+                </a>
+              </>
+            ) : null}
+          </p>
+          <div class="dota-radiant" data-dota-radiant hidden={!imported}>
+            <label class="f">
+              ¿Qué equipo jugó de Radiant?
+              <Select name="dota_radiant">
+                <option value="">Elegir…</option>
+                <option value={String(team1.id)} selected={game?.radiantTeamId === team1.id}>
+                  {team1.name}
+                </option>
+                <option value={String(team2.id)} selected={game?.radiantTeamId === team2.id}>
+                  {team2.name}
+                </option>
+              </Select>
+            </label>
+            <button class="btn sm" type="button" data-dota-fill>
+              Autocompletar
+            </button>
+          </div>
+        </div>
+      </details>
+      <div class="rc-foot">
+        {saved ? (
+          <button class="btn sm danger" type="submit" name="action" value="clear">
+            {multi ? 'Borrar juego' : 'Borrar resultado'}
+          </button>
+        ) : (
+          <button class="btn sm" type="reset">
+            Deshacer cambios
+          </button>
+        )}
+        <button class="btn sm pri" type="submit" name="action" value="save">
+          Guardar
+        </button>
+      </div>
+    </form>
+  );
+};
 
+/** "Serie 2 – 1 · gana Team Fe" / "Serie 1 – 1 · en juego" for a match of more than one game. */
+const seriesLine = (state: SeriesState, team1: Team, team2: Team): string => {
+  const score = `${state.wins[0]} – ${state.wins[1]}`;
+  if (state.winnerId !== null) return `Serie ${score} · gana ${state.winnerId === team1.id ? team1.name : team2.name}`;
+  return state.wins[0] + state.wins[1] === 0 ? `Al mejor de ${state.length} · gana quien llegue a ${state.needed}` : `Serie ${score} · en juego`;
+};
+
+export const ResultCard: FC<ResultCardProps> = ({ action, header, team1, team2, prefix, match, games = [], length = 1, hidden, editHref }) => {
+  const saved = match?.winnerId != null;
   if (!team1 || !team2) {
     return (
       <div class="rc open">
@@ -61,40 +176,35 @@ export const ResultCard: FC<ResultCardProps> = ({ action, header, team1, team2, 
     );
   }
 
+  const multi = length > 1;
+  const state = resolveSeries(team1.id, team2.id, length, games);
+  const byNumber = new Map(games.map((g) => [g.gameNumber, g]));
   return (
-    <form class={`rc ${saved ? 'saved' : 'open'}`} method="post" action={action}>
-      <button type="submit" name="action" value="save" class="sr-only" tabindex={-1} aria-hidden="true">
-        Guardar
-      </button>
-      {Object.entries(hidden ?? {}).map(([name, value]) => (
-        <input type="hidden" name={name} value={value} />
-      ))}
+    <div class={`rc series ${saved ? 'saved' : 'open'}`}>
       <div class="rc-top">
         <span>{header}</span>
-        {saved ? <span class="pill ok">Guardado</span> : <span class="pill next">Pendiente</span>}
-      </div>
-      <div class="kd-h">
-        <span>Ganador</span>
-        <span>Kills</span>
-        <span>Deaths</span>
-      </div>
-      {row(team1, 1)}
-      {row(team2, 2)}
-      <div class="rc-foot">
         {saved ? (
-          <button class="btn sm danger" type="submit" name="action" value="clear">
-            Borrar resultado
-          </button>
+          <span class="pill ok">Guardado</span>
+        ) : games.length > 0 ? (
+          <span class="pill next">En juego</span>
         ) : (
-          <button class="btn sm" type="reset">
-            Deshacer cambios
-          </button>
+          <span class="pill next">Pendiente</span>
         )}
-        <button class="btn sm pri" type="submit" name="action" value="save">
-          Guardar
-        </button>
       </div>
-    </form>
+      {multi ? <p class="series-line">{seriesLine(state, team1, team2)}</p> : null}
+      {Array.from({ length }, (_, i) => i + 1).map((number) => {
+        const game = byNumber.get(number);
+        if (game || number === state.nextGame) {
+          return <GameForm action={action} number={number} multi={multi} team1={team1} team2={team2} prefix={prefix} game={game} hidden={hidden} />;
+        }
+        return (
+          <div class="game off">
+            <b>Juego {number}</b>
+            <span class="muted">{state.decided ? 'No se juega: la serie ya está decidida.' : `Carga primero el juego ${number - 1}.`}</span>
+          </div>
+        );
+      })}
+    </div>
   );
 };
 
@@ -150,13 +260,14 @@ export interface ResultsViewProps {
   hasUndated: boolean;
   filter: string;
   standings: StandingRow[];
+  gamesByMatch: Map<number, Game[]>;
 }
 
-export const ResultsView: FC<ResultsViewProps> = ({ tournament, cards, dates, hasUndated, filter, standings }) => (
+export const ResultsView: FC<ResultsViewProps> = ({ tournament, cards, dates, hasUndated, filter, standings, gamesByMatch }) => (
   <>
     <PageHead
       title="Resultados"
-      sub="Toca el equipo ganador, carga kills y deaths, guarda. La página pública se actualiza al instante."
+      sub="Toca el equipo ganador, carga kills y deaths, guarda. En series de varios juegos se guarda juego por juego. La página pública se actualiza al instante."
     >
       <form method="get" class="actions">
         <Select name="fecha" data-autosubmit aria-label="Filtrar por fecha" style="width:auto">
@@ -199,6 +310,8 @@ export const ResultsView: FC<ResultsViewProps> = ({ tournament, cards, dates, ha
           team1={team1}
           team2={team2}
           match={match}
+          games={gamesByMatch.get(match.id) ?? []}
+          length={seriesLengthFor(tournament, match.phase, match.isTiebreak)}
           hidden={{ fecha: filter }}
           editHref={`/admin/t/${tournament.id}/fixture/partidos/${match.id}`}
         />

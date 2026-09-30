@@ -134,8 +134,34 @@ export const RulesView: FC<{ tournament: Tournament }> = ({ tournament }) => {
               <option>4 (semis 1v4 · 2v3 + final)</option>
             </Select>
           </label>
+          <h2 style="margin-top:6px">Partidas por partido</h2>
+          <div class="grid2" style="grid-template-columns:repeat(3,1fr)">
+            {(
+              [
+                ['group_games', 'Grupos', tournament.groupGames],
+                ['semifinal_games', 'Semifinales', tournament.semifinalGames],
+                ['final_games', 'Final', tournament.finalGames],
+              ] as const
+            ).map(([name, label, value]) => (
+              <label class="f">
+                {label}
+                <Select name={name}>
+                  <option value="1" selected={value === 1}>
+                    Al mejor de 1
+                  </option>
+                  <option value="3" selected={value === 3}>
+                    Al mejor de 3
+                  </option>
+                  <option value="5" selected={value === 5}>
+                    Al mejor de 5
+                  </option>
+                </Select>
+              </label>
+            ))}
+          </div>
           <p class="muted" style="margin:0;font-size:12px">
-            Por ahora los playoffs son siempre de 4 equipos, al mejor de 1.
+            Gana el partido quien llegue primero a la mitad más uno (1, 2 o 3 juegos). La tabla de grupos suma las kills y
+            deaths de todos los juegos. Los playoffs son siempre de 4 equipos. Los juegos de desempate son de un solo juego.
           </p>
         </div>
       </div>

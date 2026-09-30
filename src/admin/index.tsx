@@ -3,6 +3,7 @@ import { sameOriginGuard } from '../security.js';
 import type { AdminEnv, Deps } from './context.js';
 import { loginRoutes, logoutRoutes, requireAdmin } from './routes/auth.js';
 import { configRoutes } from './routes/config.js';
+import { dotaRoutes } from './routes/dota.js';
 import { fixtureRoutes } from './routes/fixture.js';
 import { playoffRoutes } from './routes/playoffs.js';
 import { resultRoutes } from './routes/results.js';
@@ -39,6 +40,6 @@ export function adminApp(deps: Deps) {
   app.route('/', userRoutes(deps));
   app.route('/', accountRoutes(deps));
   app.route('/', tournamentListRoutes(deps));
-  for (const routes of [configRoutes, streamRoutes, rulesRoutes, teamRoutes, fixtureRoutes, resultRoutes, playoffRoutes]) app.route('/t/:tid', routes(deps));
+  for (const routes of [configRoutes, streamRoutes, rulesRoutes, teamRoutes, fixtureRoutes, resultRoutes, playoffRoutes, dotaRoutes]) app.route('/t/:tid', routes(deps));
   return app;
 }
