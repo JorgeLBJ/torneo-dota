@@ -30,6 +30,7 @@ Aplicación web ligera y multitorneo para ligas de Dota 2. Genera un fixture de 
 
 ```bash
 npm ci
+cp .env.example .env   # opcional: ajustes locales (puerto, contraseña, R2); ver más abajo
 npm run dev
 ```
 
@@ -50,6 +51,7 @@ Luego abre:
 - El código de configuración generado es aleatorio (192 bits), se imprime **una sola vez** en la salida del servidor y cambia en cada arranque. Para usar uno propio, define `ADMIN_SETUP_TOKEN`.
 - `/admin/setup` solo existe mientras no haya administradores; después responde 404. Los intentos tienen límite de frecuencia, igual que el inicio de sesión.
 - Después, gestiona los usuarios en el panel (**Usuarios**). Cada administrador puede cambiar su propia contraseña desde la barra lateral (**Cambiar contraseña**), lo que además cierra sus otras sesiones.
+- **Archivo `.env` (opcional, solo desarrollo).** `npm run dev`, `npm run seed:oct2026` y `npm run render:og` leen `./.env` si existe (con `--env-file-if-exists` de Node, sin dependencias nuevas). Está en `.gitignore`; parte de `.env.example`, que lista `PORT`, `DATABASE_PATH`, `ADMIN_PASSWORD` y las variables `R2_*`. `npm start` y Docker **no** lo leen. Si defines solo algunas de las cinco `R2_*`, el servidor no arranca y te dice cuáles faltan.
 - La base de datos SQLite se crea en `./data/torneos.db` en el primer arranque y se migra automáticamente.
 - Datos de demostración opcionales: `npm run seed:oct2026` crea *Torneo All vs All · Oct 2026* (7 equipos, 21 partidos) y lo deja activo. Se puede ejecutar dos veces sin problema (no hace nada si el torneo ya existe).
 
@@ -175,7 +177,7 @@ docs/screenshots/     imágenes usadas en este README
 
 | Comando | Qué hace |
 | --- | --- |
-| `npm run dev` | Inicia con observación de archivos (`tsx watch`) |
+| `npm run dev` | Inicia con observación de archivos (`tsx watch`) y carga `./.env` si existe |
 | `npm run build` | Compila TypeScript a `dist/` (`tsc -p tsconfig.build.json`) |
 | `npm start` | Inicia la versión compilada (`node dist/server.js`); ejecuta antes `npm run build` |
 | `npm test` | Ejecuta todas las pruebas una vez (`vitest run`) |

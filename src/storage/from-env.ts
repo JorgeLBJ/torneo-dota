@@ -26,8 +26,11 @@ export function imageStoreFromEnv(env: NodeJS.ProcessEnv = process.env): ImageSt
     });
     return { kind: 'r2', store, message: `Team images: Cloudflare R2 bucket "${env.R2_BUCKET!.trim()}"` };
   }
-  const partial = missing.length < R2_VARS.length;
-  if (env.IMAGE_STORE === 'local' || (env.NODE_ENV !== 'production' && !partial)) {
+  // All or nothing: a half-filled R2 configuration is a mistake to fix, never to guess around.
+  if (missing.length < R2_VARS.length) {
+    throw new Error(`Configuración de R2 incompleta: faltan ${missing.join(', ')}. Define las cinco variables R2_* o deja todas vacías.`);
+  }
+  if (env.IMAGE_STORE === 'local' || env.NODE_ENV !== 'production') {
     const dir = env.IMAGES_DIR?.trim() || './data/uploads';
     const store = new LocalImageStore(dir);
     return { kind: 'local', store, message: `Team images: local folder ${store.dir} (served at /uploads)` };
@@ -35,8 +38,7 @@ export function imageStoreFromEnv(env: NodeJS.ProcessEnv = process.env): ImageSt
   return {
     kind: 'disabled',
     store: null,
-    message: partial
-      ? `Team images disabled: incomplete R2 configuration, missing ${missing.join(', ')}`
-      : 'Team images disabled: set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET and R2_PUBLIC_BASE_URL (or IMAGE_STORE=local to keep them on this server)',
+    message:
+      'Team images disabled: set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET and R2_PUBLIC_BASE_URL (or IMAGE_STORE=local to keep them on this server)',
   };
 }

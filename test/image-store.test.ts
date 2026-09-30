@@ -138,11 +138,12 @@ describe('choosing the store from the environment', () => {
     expect(imageStoreFromEnv({ NODE_ENV: 'production', IMAGE_STORE: 'local' }).kind).toBe('local');
   });
 
-  it('a partly filled R2 configuration is reported, not half-used', () => {
-    const { R2_BUCKET: _omit, ...partial } = r2;
-    const choice = imageStoreFromEnv({ ...partial, NODE_ENV: 'production' });
-    expect(choice.kind).toBe('disabled');
-    expect(choice.message).toContain('R2_BUCKET');
+  it('a partly filled R2 configuration fails fast, naming what is missing, in any environment', () => {
+    const { R2_BUCKET: _a, R2_ACCOUNT_ID: _b, ...partial } = r2;
+    for (const NODE_ENV of ['production', 'development']) {
+      expect(() => imageStoreFromEnv({ ...partial, NODE_ENV })).toThrow(/Configuración de R2 incompleta: faltan R2_ACCOUNT_ID, R2_BUCKET\./);
+    }
+    expect(() => imageStoreFromEnv({ ...r2, R2_BUCKET: '   ' })).toThrow(/R2_BUCKET/);
   });
 
   it('honours IMAGES_DIR for the local folder', () => {
