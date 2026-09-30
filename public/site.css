@@ -145,14 +145,16 @@ footer .credit { margin-top: 8px; font-size: 11px; letter-spacing: .2em; color: 
 .chip[aria-pressed="true"] { border-color: var(--gold); color: var(--gold-hi); background: linear-gradient(180deg, rgba(200,170,110,.14), rgba(200,170,110,.03)); }
 
 /* ---------- Rounds & matches ---------- */
-.days { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px 16px; align-items: start; }
+.days { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px 16px; align-items: stretch; }
 /* Day headings, the placeholder and rounds with several matches take a whole row; a round with one match is one cell. */
 .day-head, .days > .empty { grid-column: 1 / -1; }
 .round:not([data-matches="1"]) { grid-column: 1 / -1; }
 .day-head { margin-top: 18px; }
 .day-head:first-child { margin-top: 0; }
 .tznote { margin: 0; text-align: center; color: var(--muted); font: 500 13px/1.3 var(--fl); letter-spacing: .08em; text-transform: uppercase; }
-.round { display: grid; gap: 10px; }
+/* Rounds sharing a grid row are as tall as the tallest: the card fills what is left under the header. */
+.round { display: grid; grid-template-rows: auto 1fr; gap: 10px; }
+.round > .matches { align-items: stretch; }
 .round-head { display: flex; flex-wrap: wrap; align-items: center; min-height: 21px; gap: 8px 14px; font: 600 13px/1 var(--fl); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
 .round-head b { font: 700 17px/1 var(--fd); color: var(--fg); letter-spacing: .1em; }
 .tag { padding: 4px 9px; font: 700 11px/1 var(--fl); letter-spacing: .18em; text-transform: uppercase; border: 1px solid var(--line); }
@@ -166,26 +168,38 @@ footer .credit { margin-top: 8px; font-size: 11px; letter-spacing: .2em; color: 
 .round[data-matches="1"] .rest { margin-left: 0; flex-basis: 100%; }
 
 .matches { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+/* Two rows: portraits (with the score between them) on top, names below. Both portraits always share row 1, so a
+   name that wraps can never push one side's portrait lower than the other's; cards of a grid row stretch to the
+   same height (row 2 takes the slack). */
 .match {
-  position: relative; display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center;
+  position: relative; display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); grid-template-rows: auto 1fr;
+  align-items: start; row-gap: 8px;
   background: linear-gradient(180deg, var(--panel-2), var(--panel)); border: 1px solid var(--line); overflow: hidden;
 }
 .match::before, .match::after { content: ""; position: absolute; top: 0; bottom: 0; width: 3px; }
 .match::before { left: 0; background: var(--radiant); opacity: .7; }
 .match::after { right: 0; background: var(--dire); opacity: .7; }
 .match.is-next { border-color: var(--line-2); box-shadow: 0 0 0 1px rgba(200,170,110,.15), 0 10px 40px -20px rgba(200,170,110,.5); }
-.side { position: relative; display: grid; gap: 8px; padding: 12px 12px 12px 14px; min-width: 0; }
-.side.b { text-align: right; padding: 12px 14px 12px 12px; }
+.side { display: contents; }
+.side.b { text-align: right; }
+.side.a .portrait, .side.a .who { grid-column: 1; }
+.side.b .portrait, .side.b .who { grid-column: 3; }
+.side .portrait { grid-row: 1; margin: 12px 0 0; }
+.side .who { grid-row: 2; min-width: 0; padding-bottom: 12px; }
+.side.a .portrait { margin-left: 14px; margin-right: 12px; }
+.side.a .who { padding-left: 14px; padding-right: 12px; }
+.side.b .portrait { margin-left: 12px; margin-right: 14px; }
+.side.b .who { padding-left: 12px; padding-right: 14px; }
 .portrait { position: relative; aspect-ratio: 16/9; overflow: hidden; border: 1px solid var(--line); }
 .portrait img { transition: filter .3s; }
 .side.lose .portrait img { filter: grayscale(1) brightness(.55); }
 .side.win .portrait { border-color: var(--gold); }
 .crown { position: absolute; top: 4px; left: 4px; padding: 3px 6px; font: 700 10px/1 var(--fl); letter-spacing: .18em; text-transform: uppercase; background: var(--gold); color: #1b1408; }
 .side.b .crown { left: auto; right: 4px; }
-.who strong { display: block; font: 700 15px/1.15 var(--fd); letter-spacing: .03em; text-transform: uppercase; overflow-wrap: anywhere; }
+.who strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; font: 700 15px/1.15 var(--fd); letter-spacing: .03em; text-transform: uppercase; overflow-wrap: anywhere; }
 .who small { display: block; min-height: 13px; font: 500 13px/1 var(--fl); letter-spacing: .06em; color: var(--muted); font-variant-numeric: tabular-nums; }
 .side.lose .who strong { color: var(--muted); }
-.mid { display: grid; justify-items: center; gap: 6px; padding: 0 4px; min-width: 70px; }
+.mid { grid-column: 2; grid-row: 1; align-self: center; display: grid; justify-items: center; gap: 6px; padding: 12px 4px 0; min-width: 70px; }
 .mid .vs { font: 900 22px/1 var(--fd); color: var(--muted); letter-spacing: .06em; }
 .mid .res { font: 800 30px/1 var(--fd); font-variant-numeric: tabular-nums; display: flex; gap: 6px; align-items: baseline; }
 .mid .res .w { color: var(--gold-hi); } .mid .res .l { color: var(--muted); } .mid .res i { font-style: normal; font-size: 18px; color: var(--muted); }
@@ -204,7 +218,7 @@ tr.q td.pos { color: var(--gold-hi); }
 tr.q td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
 tr.cut td { border-bottom: 1px solid var(--gold); }
 .team { display: flex; align-items: center; gap: 12px; text-align: left; }
-.team strong { font: 700 15px/1.1 var(--fd); letter-spacing: .03em; text-transform: uppercase; }
+.team strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; font: 700 15px/1.1 var(--fd); letter-spacing: .03em; text-transform: uppercase; }
 .team small { display: block; margin-top: 3px; font: 500 12px/1.2 var(--fl); color: var(--muted); letter-spacing: .06em; }
 .team small.st { font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
 .st.qualified { color: var(--radiant); } .st.tiebreak, .st.extra-pending { color: var(--gold-hi); }
@@ -225,7 +239,7 @@ td.pts { font: 800 22px/1 var(--fd); color: var(--gold-hi); }
 .bm header b { color: var(--gold); font-weight: 600; }
 .slot { display: flex; align-items: center; gap: 10px; padding: 8px 12px; }
 .slot + .slot { border-top: 1px solid var(--line); }
-.slot strong { font: 700 14px/1.1 var(--fd); text-transform: uppercase; letter-spacing: .03em; overflow-wrap: anywhere; }
+.slot strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; font: 700 14px/1.1 var(--fd); text-transform: uppercase; letter-spacing: .03em; overflow-wrap: anywhere; }
 .slot small { display: block; font: 500 12px/1.2 var(--fl); color: var(--muted); letter-spacing: .08em; }
 .slot.tbd strong { color: var(--muted); }
 .slot.win strong, .slot.win small { color: var(--gold-hi); }
@@ -290,6 +304,7 @@ td.pts { font: 800 22px/1 var(--fd); color: var(--gold-hi); }
   .tab-dot { margin-left: 4px; }
   .tab[aria-selected="true"]::after { left: 10%; right: 10%; }
   main { padding: 22px 12px 56px; }
-  .side, .side.b { padding-inline: 10px; }
+  .side.a .portrait, .side.b .portrait { margin-inline: 10px; }
+  .side.a .who, .side.b .who { padding-inline: 10px; }
   .rest { margin-left: 0; }
 }
