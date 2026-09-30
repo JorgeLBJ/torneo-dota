@@ -232,7 +232,7 @@ describe('rules', () => {
       { label: 'Clasifican', value: 'Top 4' },
       { label: 'Semis', value: '1.º vs 4.º · 2.º vs 3.º' },
     ]);
-    expect(r.tiebreakers).toEqual(['Mayor cantidad de kills', 'Diferencia de kills y deaths (K − D)', 'Si persiste: partida de desempate']);
+    expect(r.tiebreakers).toEqual(['Mayor cantidad de kills', 'Diferencia de kills y deaths (K − D)']);
     expect(r.legendTiebreak).toBe('kills, luego K−D');
     expect(r.blocks).toEqual([{ type: 'heading', text: 'Generales' }, { type: 'list', items: ['Cinco jugadores'] }]);
   });

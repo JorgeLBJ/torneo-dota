@@ -1,18 +1,18 @@
 import { Hono } from 'hono';
-import type { TiebreakerKey } from '../../db/repository.js';
+import { TIEBREAKER_KEYS, type TiebreakerKey } from '../../db/repository.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { intOrNull, rawStr, readBody, str } from '../form.js';
 import { setFlash } from '../flash.js';
 import { renderPage } from '../render.js';
 import { RulesView } from '../views/rules.js';
 
-const KNOWN: TiebreakerKey[] = ['kd', 'kills'];
+const KNOWN: readonly TiebreakerKey[] = TIEBREAKER_KEYS;
 const MAX_RULES_LENGTH = 20000;
 
-/** The submitted order must be a permutation of the known criteria. */
+/** The submitted order: any list (even empty) of known criteria, none repeated. */
 function parseOrder(csv: string): TiebreakerKey[] | null {
-  const keys = csv.split(',').map((k) => k.trim());
-  const valid = keys.length === KNOWN.length && KNOWN.every((k) => keys.includes(k as TiebreakerKey));
+  const keys = csv.split(',').map((k) => k.trim()).filter((k) => k !== '');
+  const valid = new Set(keys).size === keys.length && keys.every((k) => KNOWN.includes(k as TiebreakerKey));
   return valid ? (keys as TiebreakerKey[]) : null;
 }
 
@@ -55,9 +55,15 @@ export function rulesRoutes(deps: Deps) {
     let tiebreakers = parseOrder(str(body, 'tiebreakers'));
     if (!tiebreakers) return error('El orden de desempate no es válido.');
     const action = str(body, 'action');
-    const moveMatch = /^(up|down):(\w+)$/.exec(action);
-    if (moveMatch && KNOWN.includes(moveMatch[2] as TiebreakerKey)) {
-      tiebreakers = move(tiebreakers, moveMatch[2] as TiebreakerKey, moveMatch[1] === 'up' ? -1 : 1);
+    const editMatch = /^(up|down|remove):(\w+)$/.exec(action);
+    if (editMatch && KNOWN.includes(editMatch[2] as TiebreakerKey)) {
+      const key = editMatch[2] as TiebreakerKey;
+      tiebreakers = editMatch[1] === 'remove' ? tiebreakers.filter((k) => k !== key) : move(tiebreakers, key, editMatch[1] === 'up' ? -1 : 1);
+    }
+    if (action === 'add') {
+      const chosen = str(body, 'new_tiebreaker') as TiebreakerKey;
+      if (!KNOWN.includes(chosen) || tiebreakers.includes(chosen)) return error('Elige un criterio de desempate para agregar.');
+      tiebreakers = [...tiebreakers, chosen];
     }
 
     const rulesText = rawStr(body, 'rules_text');

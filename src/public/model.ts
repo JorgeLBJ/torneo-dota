@@ -158,8 +158,9 @@ export interface PublicModel {
 const TIEBREAK_LONG: Record<TiebreakerKey, string> = {
   kd: 'Diferencia de kills y deaths (K − D)',
   kills: 'Mayor cantidad de kills',
+  h2h: 'Resultado directo entre los equipos empatados',
 };
-const TIEBREAK_SHORT: Record<TiebreakerKey, string> = { kd: 'K−D', kills: 'kills' };
+const TIEBREAK_SHORT: Record<TiebreakerKey, string> = { kd: 'K−D', kills: 'kills', h2h: 'resultado directo' };
 
 const DEFAULT_SLOT_MS = 60 * 60_000;
 
@@ -360,7 +361,7 @@ function buildRules(state: TournamentState): PublicModel['rules'] {
   ];
   return {
     summary,
-    tiebreakers: [...tournament.tiebreakers.map((k) => TIEBREAK_LONG[k]), 'Si persiste: partida de desempate'],
+    tiebreakers: tournament.tiebreakers.map((k) => TIEBREAK_LONG[k]),
     legendTiebreak: tournament.tiebreakers.map((k) => TIEBREAK_SHORT[k]).join(', luego '),
     blocks: renderRulebook(tournament.rulesText),
     qualifiers: tournament.qualifiers,

@@ -316,6 +316,48 @@ describe('server clock for the browser', () => {
   });
 });
 
+describe('tiebreaker rules on the public page', () => {
+  it('lists the configured criteria in order, in the legend and in the Reglas tab', async () => {
+    t.repo.updateTournament(tournament.id, { tiebreakers: ['kd', 'h2h'] });
+    const body = await html('/');
+    expect(body).toContain('<b>Desempate:</b> K−D, luego resultado directo');
+    const rules = body.slice(body.indexOf('<h3>Desempate</h3>'));
+    expect(rules.indexOf('Diferencia de kills y deaths (K − D)')).toBeGreaterThan(-1);
+    expect(rules.indexOf('Resultado directo entre los equipos empatados')).toBeGreaterThan(rules.indexOf('Diferencia de kills'));
+    expect(body).not.toContain('Mayor cantidad de kills');
+  });
+
+  it('never mentions a tiebreak match', async () => {
+    for (const list of [['kd', 'kills'], ['h2h'], []] as const) {
+      t.repo.updateTournament(tournament.id, { tiebreakers: [...list] });
+      expect(await html('/')).not.toContain('partida de desempate');
+    }
+  });
+
+  it('with no criteria: no legend line and a plain statement in the Reglas tab', async () => {
+    t.repo.updateTournament(tournament.id, { tiebreakers: [] });
+    const body = await html('/');
+    expect(body).not.toContain('<b>Desempate:</b>');
+    expect(body).toContain('Sin criterios de desempate: los equipos con los mismos puntos quedan empatados.');
+  });
+
+  it('shows "Empate sin resolver" (not a tiebreak match) when a tie at the cutoff survives every criterion', async () => {
+    const cup = t.repo.createTournament({ name: 'Ciclo', slug: 'ciclo' });
+    const [x, y, z] = ['X', 'Y', 'Z'].map((code) => t.repo.createTeam(cup.id, { code, name: `Equipo ${code}` }));
+    t.repo.updateTournament(cup.id, { tiebreakers: ['kd', 'h2h'], qualifiers: 2 });
+    const play = (n: number, a: number, b: number) => {
+      const m = t.repo.createMatch({ tournamentId: cup.id, phase: 'group', round: n, matchNumber: n, team1Id: a, team2Id: b });
+      t.repo.recordResult(m.id, { winnerId: a, team1Kills: 10, team1Deaths: 5, team2Kills: 5, team2Deaths: 10 });
+    };
+    play(1, x!.id, y!.id);
+    play(2, y!.id, z!.id);
+    play(3, z!.id, x!.id);
+    const body = await html('/t/ciclo');
+    expect(body.match(/>Empate sin resolver</g)?.length).toBe(3);
+    expect(body).not.toContain('>Desempate</small>');
+  });
+});
+
 describe('partial', () => {
   it('returns the content fragment without a document shell', async () => {
     const body = await html('/t/torneo-oct/partial');
