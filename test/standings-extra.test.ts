@@ -3,7 +3,7 @@ import { computeStandings, type GroupMatch, type StandingTeam, type TiebreakCrit
 import { buildPlayoffs } from '../src/domain/playoffs.js';
 
 const team = (id: number): StandingTeam => ({ id, code: String.fromCharCode(64 + id), name: `Team ${String.fromCharCode(64 + id)}` });
-const [A, B, C, D] = [1, 2, 3, 4] as const;
+const [A, B, C, D, E] = [1, 2, 3, 4, 5] as const;
 
 let number = 0;
 const game = (t1: number, t2: number, winner: number | null, over: Partial<GroupMatch> = {}): GroupMatch => ({
@@ -102,8 +102,26 @@ describe('the "extra" criterion', () => {
 
   it('passes what it cannot separate to the next criterion', () => {
     number = 0;
+    // A cycle in which A scores 35 kills in total, C 17 and B 15; the only extra game was never played.
+    const matches = [
+      game(A, B, A, { team1Kills: 30, team2Kills: 5 }),
+      game(B, C, B, { team1Kills: 10, team2Kills: 5 }),
+      game(C, A, C, { team1Kills: 12, team2Kills: 5 }),
+      extra(A, B, null),
+    ];
+    const rows = standings([A, B, C], matches, ['extra', 'kills']);
+    expect(order(rows)).toBe('ACB');
+    expect(rows.map((r) => r.rank)).toEqual([1, 2, 3]);
+    expect(rows.some((r) => r.unresolvedTie)).toBe(false);
+    // With the top 2 qualifying, "kills" settles the cutoff too.
+    expect(rows.map((r) => r.status)).toEqual(['qualified', 'qualified', 'eliminated']);
+  });
+
+  it('with the next criterion unable to separate them either, they stay level', () => {
+    number = 0;
     const rows = standings([A, B, C], [...cycle(), extra(A, B, null)], ['extra', 'kills']);
     expect(rows.every((r) => r.unresolvedTie)).toBe(true);
+    expect(rows.map((r) => r.rank)).toEqual([1, 1, 1]);
   });
 });
 
@@ -132,15 +150,46 @@ describe('status at the qualification cutoff', () => {
   it('resolves to qualified / eliminated once the extra game decides it', () => {
     number = 0;
     const rows = standings([A, B, C, D], [game(A, C, A), game(B, C, B), game(A, D, D), game(B, D, D), extra(B, A, B)], ['extra'], 2);
-    expect(row(rows, 'D').points).toBe(2);
-    expect(rows.every((r) => r.status !== 'pending')).toBe(true);
+    // D has 2 points; A and B are level on 1 and the extra game B won decides them; C has none.
+    expect(order(rows)).toBe('DBAC');
+    expect(rows.map((r) => r.rank)).toEqual([1, 2, 3, 4]);
+    expect(rows.map((r) => r.status)).toEqual(['qualified', 'qualified', 'eliminated', 'eliminated']);
+    expect(rows.some((r) => r.unresolvedTie)).toBe(false);
   });
 
-  it('keeps playoff seeding manual while pending', () => {
-    number = 0;
-    const teams = [A, B, C, D];
-    const rows = standings(teams, [...cycle(), game(A, D, A), game(B, D, B), game(C, D, C)], ['extra'], 4);
-    expect(rows.slice(0, 4).some((r) => r.status === 'extra-pending' || r.unresolvedTie)).toBe(true);
-    expect(buildPlayoffs(rows, []).seeded).toBe(false);
+  describe('playoff seeding', () => {
+    // A beat everyone. B, C, D and E form a 4-cycle (B>C>D>E>B): level on 1 point, and the top 4 cut runs through them.
+    const league = () => [
+      game(A, B, A), game(A, C, A), game(A, D, A), game(A, E, A),
+      game(B, C, B), game(C, D, C), game(D, E, D), game(E, B, E),
+    ];
+
+    it('stays manual while "Pendiente de juego adicional" sits on the cutoff', () => {
+      number = 0;
+      const rows = standings([A, B, C, D, E], league(), ['extra'], 4);
+      expect(order(rows)).toBe('ABCDE');
+      expect(rows.map((r) => r.status)).toEqual(['qualified', 'extra-pending', 'extra-pending', 'extra-pending', 'extra-pending']);
+      const bracket = buildPlayoffs(rows, []);
+      expect(bracket.seeded).toBe(false);
+      expect(bracket.seeds).toEqual([]);
+    });
+
+    it('seeds automatically once the extra games settle the cutoff', () => {
+      number = 0;
+      // Extra games: B beat C, D and E; C beat D and E; D beat E.
+      const settled = [...league(), extra(B, C, B), extra(B, D, B), extra(B, E, B), extra(C, D, C), extra(C, E, C), extra(D, E, D)];
+      const rows = standings([A, B, C, D, E], settled, ['extra'], 4);
+      expect(order(rows)).toBe('ABCDE');
+      expect(rows.map((r) => r.status)).toEqual(['qualified', 'qualified', 'qualified', 'qualified', 'eliminated']);
+      const bracket = buildPlayoffs(rows, []);
+      expect(bracket.seeded).toBe(true);
+      expect(bracket.seeds).toEqual([A, B, C, D]);
+    });
+
+    it('a tie that does not reach the cutoff still blocks seeding through the unresolved flag', () => {
+      number = 0;
+      const rows = standings([A, B, C, D], [...cycle(), game(A, D, A), game(B, D, B), game(C, D, C)], ['extra'], 4);
+      expect(buildPlayoffs(rows, []).seeded).toBe(false);
+    });
   });
 });

@@ -34,7 +34,14 @@ export function playoffRoutes(deps: Deps) {
     const body = await readBody(c);
     const raw = ['sf1_a', 'sf1_b', 'sf2_a', 'sf2_b'].map((key) => str(body, key));
     // Undo: the "Quitar cruces manuales" button, or the form sent with all four selects empty.
-    if (str(body, 'action') === 'reset' || raw.every((value) => value === '')) {
+    const allEmpty = raw.every((value) => value === '');
+    const hasResults = repo.listMatches(tournament.id).some((m) => m.phase !== 'group' && m.winnerId !== null);
+    // An empty form is a reset only while no playoff result would be lost; deleting results needs the confirm dialog.
+    if (allEmpty && hasResults && str(body, 'action') !== 'reset') {
+      setFlash(c, 'error', 'Hay resultados de playoffs cargados: usa «Quitar cruces manuales» para confirmar el borrado.');
+      return c.redirect(back, 303);
+    }
+    if (str(body, 'action') === 'reset' || allEmpty) {
       resetPlayoffs(repo, tournament);
       deps.events.tournamentChanged(tournament.id);
       setFlash(c, 'ok', 'Cruces manuales quitados: los cruces se calculan desde la tabla.');

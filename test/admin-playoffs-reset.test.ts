@@ -78,6 +78,30 @@ describe('undoing manual semifinal picks', () => {
     expect(playoffMatches()).toHaveLength(0);
   });
 
+  it('an all-empty submit does NOT delete playoff results: only the confirmed button does', async () => {
+    playGroup();
+    await t.post(`${base}/cruces`, picks([0, 1, 2, 3]), cookie);
+    await t.post(`${base}/semifinal/1`, { action: 'save', winner: String(teams[0]!.id), t1_kills: '10', t1_deaths: '5', t2_kills: '5', t2_deaths: '10' }, cookie);
+    let changes = 0;
+    t.events.onTournamentChanged(tournament.id, () => changes++);
+    const res = await t.post(`${base}/cruces`, EMPTY, cookie);
+    expect(res.status).toBe(303);
+    expect(await flashText(t, res, cookie)).toContain('Hay resultados de playoffs cargados: usa «Quitar cruces manuales» para confirmar el borrado.');
+    expect(playoffMatches().length).toBeGreaterThan(0);
+    expect(t.repo.listMatches(tournament.id, 'semifinal')[0]!.winnerId).toBe(teams[0]!.id);
+    expect(changes).toBe(0);
+    // The button (with its confirm dialog) is still the way to do it.
+    await t.post(`${base}/cruces`, { ...EMPTY, action: 'reset' }, cookie);
+    expect(playoffMatches()).toHaveLength(0);
+  });
+
+  it('an all-empty submit still resets when there are manual picks but no results', async () => {
+    playGroup();
+    await t.post(`${base}/cruces`, picks([0, 1, 2, 3]), cookie);
+    await t.post(`${base}/cruces`, EMPTY, cookie);
+    expect(playoffMatches()).toHaveLength(0);
+  });
+
   it('an all-empty submit with nothing stored is harmless', async () => {
     const res = await t.post(`${base}/cruces`, EMPTY, cookie);
     expect(res.status).toBe(303);

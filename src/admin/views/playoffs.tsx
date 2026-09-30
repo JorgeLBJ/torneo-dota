@@ -107,7 +107,9 @@ export const PlayoffsView: FC<PlayoffsViewProps> = ({ tournament, state, slots }
             ))}
           </div>
           <p class="muted" style="margin:0;font-size:12px">
-            Para volver al cálculo automático deja los cuatro vacíos y guarda{manualStored ? ', o usa "Quitar cruces manuales"' : ''}.
+            {hasPlayoffResults
+              ? 'Hay resultados de playoffs: para volver al cálculo automático usa "Quitar cruces manuales" (borra esos resultados).'
+              : `Para volver al cálculo automático deja los cuatro vacíos y guarda${manualStored ? ', o usa "Quitar cruces manuales"' : ''}.`}
           </p>
           <div class="actions">
             <button class="btn pri" type="submit">

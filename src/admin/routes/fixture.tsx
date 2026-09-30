@@ -172,7 +172,8 @@ export function fixtureRoutes(deps: Deps) {
     const match = addRound(repo, tournament.id, { isTiebreak: true });
     if (tied) repo.updateMatchTeams(match.id, tied[0], tied[1]);
     deps.events.tournamentChanged(tournament.id);
-    setFlash(c, 'ok', 'Juego adicional creado: completa la fecha y los equipos.');
+    if (tournament.tiebreakers.includes('extra')) setFlash(c, 'ok', 'Juego adicional creado: completa la fecha y los equipos.');
+    else setFlash(c, 'warn', 'Este juego adicional no cuenta hasta que agregues «Juego adicional» en Reglas → Desempate.');
     return c.redirect(`/admin/t/${tournament.id}/fixture/partidos/${match.id}`, 303);
   });
 

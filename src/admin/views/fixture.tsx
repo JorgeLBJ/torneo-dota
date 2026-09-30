@@ -114,6 +114,11 @@ export const FixtureView: FC<FixtureViewProps> = ({ tournament, teams, matches, 
           <button class="btn" type="submit">
             + Agregar partida de desempate
           </button>
+          {tournament.tiebreakers.includes('extra') ? null : (
+            <span class="muted" style="margin-left:10px;font-size:12px">
+              Solo cuenta si «Juego adicional» está en Reglas → Desempate.
+            </span>
+          )}
         </form>
       </div>
     </>

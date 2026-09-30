@@ -86,6 +86,34 @@ describe('admin Fixture', () => {
     expect(created.team1Id).not.toBe(created.team2Id);
   });
 
+  it('warns that the extra game does not count when "Juego adicional" is not a criterion', async () => {
+    await cycle(['kd', 'h2h']);
+    const res = await t.post(`${fixtureUrl()}/desempate`, {}, cookie);
+    expect(res.status).toBe(303);
+    const text = await flashText(t, res, cookie);
+    expect(text).toContain('Este juego adicional no cuenta hasta que agregues «Juego adicional» en Reglas → Desempate.');
+    // It is created all the same, and the flash is a warning, not a success.
+    expect(t.repo.listMatches(tournament.id, 'group').filter((m) => m.isTiebreak)).toHaveLength(1);
+    expect(decodeURIComponent(res.headers.getSetCookie().join(';'))).toContain('"kind":"warn"');
+  });
+
+  it('gives no warning when "Juego adicional" is a criterion', async () => {
+    await cycle(['kd', 'extra']);
+    const res = await t.post(`${fixtureUrl()}/desempate`, {}, cookie);
+    const text = await flashText(t, res, cookie);
+    expect(text).toContain('Juego adicional creado');
+    expect(text).not.toContain('no cuenta hasta que agregues');
+  });
+
+  it('shows an inline note next to the button only while the criterion is missing', async () => {
+    await cycle(['kd']);
+    let html = await (await t.get(fixtureUrl(), cookie)).text();
+    expect(html).toContain('Solo cuenta si «Juego adicional» está en Reglas → Desempate.');
+    t.repo.updateTournament(tournament.id, { tiebreakers: ['kd', 'extra'] });
+    html = await (await t.get(fixtureUrl(), cookie)).text();
+    expect(html).not.toContain('Solo cuenta si «Juego adicional» está en Reglas → Desempate.');
+  });
+
   it('"+ Agregar ronda" and "+ partido" still create regular matches', async () => {
     regenerateFixture(t.repo, tournament);
     const res = await t.post(`${fixtureUrl()}/rondas`, {}, cookie);
