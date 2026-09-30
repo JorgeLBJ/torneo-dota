@@ -275,6 +275,14 @@ export function createRepository(db: Database.Database) {
     ...instants(m.tournamentId, m),
   });
 
+  /** Reads the current image key and replaces it in one transaction, so concurrent swaps each see a distinct previous key. */
+  const swapImageKeyTx = db.transaction((teamId: number, key: string | null): { previous: string | null } | undefined => {
+    const row = db.prepare('SELECT image_key AS imageKey FROM teams WHERE id = ?').get(teamId) as { imageKey: string | null } | undefined;
+    if (!row) return undefined;
+    db.prepare('UPDATE teams SET image_key = ? WHERE id = ?').run(key, teamId);
+    return { previous: row.imageKey };
+  });
+
   const insertMatchesTx = db.transaction((matches: NewMatch[]) => {
     for (const m of matches) q.insertMatch.run(withDefaults(m));
   });
@@ -381,6 +389,8 @@ export function createRepository(db: Database.Database) {
       q.updateTeam.run({ ...current, ...patch, id });
       return requireRow(teamById(id), 'Team');
     },
+    /** Atomically sets the team's image key and returns the key it replaced; undefined when the team no longer exists. */
+    swapTeamImageKey: (id: number, key: string | null) => swapImageKeyTx(id, key),
     deleteTeam(id: number): void {
       q.deleteTeam.run(id);
     },

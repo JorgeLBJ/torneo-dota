@@ -43,18 +43,21 @@ export async function setTeamImage(repo: Repository, store: ImageStore, team: Te
     throw new ImageStorageError('storage failed', { cause: error });
   }
 
-  const previous = team.imageKey;
-  const updated = repo.updateTeam(team.id, { imageKey: key });
-  if (previous) await discard(store, imageKeys(previous));
-  return { ok: true, value: updated };
+  // The previous key is read while swapping (never from the stale `team`), and its files are deleted only after
+  // the swap committed: concurrent uploads each delete a distinct object and only the last swap stays.
+  const swapped = repo.swapTeamImageKey(team.id, key);
+  if (!swapped) {
+    await discard(store, imageKeys(key)); // the team was deleted while the image was being stored
+    return fail('Equipo no encontrado.');
+  }
+  if (swapped.previous) await discard(store, imageKeys(swapped.previous));
+  return { ok: true, value: repo.getTeam(team.id)! };
 }
 
 /** Drops the team's custom image (it falls back to the hero) and deletes its files. */
 export async function removeTeamImage(repo: Repository, store: ImageStore | null, team: Team): Promise<void> {
-  const previous = team.imageKey;
-  if (!previous) return;
-  repo.updateTeam(team.id, { imageKey: null });
-  if (store) await discard(store, imageKeys(previous));
+  const swapped = repo.swapTeamImageKey(team.id, null);
+  if (swapped?.previous && store) await discard(store, imageKeys(swapped.previous));
 }
 
 /** Deletes the files of a team that is being deleted. */

@@ -60,6 +60,9 @@ describe('public pages', () => {
     const body = await (await off.get('/')).text();
     expect(body).not.toContain('images.example');
     expect(body).toContain('/assets/heroes/axe.png');
+    // No hero to fall back to: the code tile, never a blank slot.
+    expect(body).toMatch(/class="ph[^"]*"[^>]*>BB</);
+    expect(body).not.toMatch(/<img[^>]*alt="Bravo"/);
     off.db.close();
   });
 });

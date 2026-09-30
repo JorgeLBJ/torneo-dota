@@ -12,8 +12,11 @@ export class MemoryImageStore implements ImageStore {
   readonly deleted: string[] = [];
   failPut = false;
   failDelete = false;
+  /** Runs before each put, to interleave other work while an upload is in flight. */
+  beforePut: (() => Promise<void> | void) | null = null;
 
   async put(key: string, bytes: Uint8Array, contentType: string, cacheControl: string): Promise<void> {
+    await this.beforePut?.();
     // Fails on the second file of a pair, so the first one has to be cleaned up.
     if (this.failPut && key.includes('@2x')) throw new Error('simulated put failure');
     this.objects.set(key, { bytes, contentType, cacheControl });

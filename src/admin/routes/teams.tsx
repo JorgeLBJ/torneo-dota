@@ -132,7 +132,7 @@ export function teamRoutes(deps: Deps) {
 
     try {
       const saved = await setTeamImage(repo, deps.images, team, new Uint8Array(await file.arrayBuffer()));
-      if (!saved.ok) return c.json({ error: saved.error }, 400);
+      if (!saved.ok) return c.json({ error: saved.error }, saved.error === 'Equipo no encontrado.' ? 404 : 400);
     } catch (error) {
       if (!(error instanceof ImageStorageError)) throw error;
       return c.json({ error: 'No se pudo guardar la imagen. Inténtalo de nuevo.' }, 502);

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -77,6 +78,18 @@ describe('R2ImageStore (no network: fetch is mocked)', () => {
     expect(req.headers.get('x-amz-date')).toMatch(/^\d{8}T\d{6}Z$/);
     expect(req.headers.get('x-amz-content-sha256')).toMatch(/^[0-9a-f]{64}$/);
     expect(new Uint8Array(await req.arrayBuffer())).toEqual(bytes);
+  });
+
+  it('signs the real SHA-256 of the body, so R2 can reject a truncated or altered upload', async () => {
+    const { calls, fetchImpl } = recorder();
+    const payload = new Uint8Array(Array.from({ length: 2048 }, (_, i) => (i * 7) % 251));
+    await new R2ImageStore(config, fetchImpl).put('teams/1/3-cd.webp', payload, 'image/webp', CACHE);
+    const req = calls[0]!;
+    const sent = Buffer.from(await req.arrayBuffer());
+    expect(sent.equals(Buffer.from(payload))).toBe(true);
+    expect(req.headers.get('x-amz-content-sha256')).toBe(createHash('sha256').update(sent).digest('hex'));
+    expect(req.headers.get('x-amz-content-sha256')).not.toBe('UNSIGNED-PAYLOAD');
+    expect(req.headers.get('authorization')).toContain('x-amz-content-sha256');
   });
 
   it('the secret never appears in the request', async () => {

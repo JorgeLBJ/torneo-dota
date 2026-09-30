@@ -92,6 +92,45 @@ describe('uploading', () => {
   });
 });
 
+describe('concurrent uploads for the same team', () => {
+  it('end with exactly one image: the loser is deleted, nothing leaks, nothing wrong is deleted', async () => {
+    await upload(await jpeg());
+    const original = team_().imageKey!;
+    const [a, b] = await Promise.all([upload(await jpeg(800, 800)), upload(await jpeg(700, 500))]);
+    expect([a.status, b.status]).toEqual([200, 200]);
+    const winner = team_().imageKey!;
+    expect(winner).not.toBe(original);
+    // Only the winner's pair remains in the store.
+    expect(store.keys()).toEqual([winner, winner.replace('.webp', '@2x.webp')].sort());
+    // The original, and the upload that lost the race, were each deleted exactly once.
+    const deletedBases = store.deleted.filter((k) => !k.includes('@2x'));
+    expect(deletedBases).toHaveLength(2);
+    expect(new Set(deletedBases).size).toBe(2);
+    expect(deletedBases).toContain(original);
+    expect(deletedBases).not.toContain(winner);
+  });
+
+  it('a team deleted while its image is being stored leaves no objects behind', async () => {
+    store.beforePut = () => {
+      store.beforePut = null;
+      t.repo.deleteTeam(team.id);
+    };
+    const res = await upload(await jpeg());
+    expect(res.status).toBe(404);
+    expect(store.keys()).toEqual([]);
+  });
+
+  it('removing while an upload is in flight never deletes the new image', async () => {
+    await upload(await jpeg());
+    const [up, rm] = await Promise.all([upload(await jpeg(900, 900)), t.post(`${url}/quitar`, {}, cookie)]);
+    expect(up.status).toBe(200);
+    expect(rm.status).toBe(303);
+    const key = team_().imageKey;
+    const expected = key ? [key, key.replace('.webp', '@2x.webp')].sort() : [];
+    expect(store.keys()).toEqual(expected);
+  });
+});
+
 describe('rejecting uploads', () => {
   it('a text file renamed to .jpg, and other non-images', async () => {
     for (const bytes of [Buffer.from('esto es texto'), Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>')]) {
