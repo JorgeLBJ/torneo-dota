@@ -75,6 +75,24 @@ export function buildSeries(state: TournamentState, match: Match): PublicSeries 
 export const hasDetail = (state: TournamentState, matchId: number): boolean =>
   (state.gamesByMatch.get(matchId) ?? []).some((g) => g.dotaMatchId !== null);
 
+/** The game being played right now (marked by the admin), ready for the strip and the notice. */
+export interface PublicLive {
+  matchId: number;
+  phase: Match['phase'];
+  teamA: Team;
+  teamB: Team;
+  /** "2.º de grupos" once the table has results, otherwise empty. */
+  subtitleA: string;
+  subtitleB: string;
+  /** "Semifinal 2 · Juego 3 de 3", "Gran final · Juego 1 de 5", "Ronda 4 · Partido 11". */
+  label: string;
+  gameNumber: number;
+  /** Null for a single game. */
+  series: PublicSeries | null;
+  /** ISO UTC instant the admin marked it. */
+  startedAt: string;
+}
+
 export interface PublicMatch {
   id: number;
   number: number;
@@ -92,6 +110,8 @@ export interface PublicMatch {
   isTiebreak: boolean;
   series: PublicSeries | null;
   hasDetail: boolean;
+  /** The game being played now when this is the live match, otherwise null. */
+  liveGame: number | null;
 }
 
 export interface PublicRound {
@@ -143,6 +163,7 @@ export interface BracketMatchView {
   matchId: number | null;
   series: PublicSeries | null;
   hasDetail: boolean;
+  liveGame: number | null;
   /** ISO UTC start; the visible `when` text is the server-side (tournament zone) fallback. */
   startsAt: string | null;
   when: string | null;
@@ -169,6 +190,8 @@ export interface PublicModel {
   /** The tournament's live stream, ready to embed, or null. */
   stream: StreamView | null;
   phases: PublicPhase[];
+  /** What is being played right now, or null. */
+  live: PublicLive | null;
   progress: { played: number; total: number; percent: number };
   teams: Team[];
   days: PublicDay[];
@@ -250,6 +273,7 @@ function buildDays(state: TournamentState, live: Set<number>, nextRound: number 
     isTiebreak: m.isTiebreak,
     series: buildSeries(state, m),
     hasDetail: hasDetail(state, m.id),
+    liveGame: state.tournament.live?.matchId === m.id ? state.tournament.live.gameNumber : null,
   });
 
   const byDate = new Map<string | null, Match[]>();
@@ -364,6 +388,7 @@ function buildBracket(state: TournamentState, days: ScheduleDay[]): PublicModel[
       matchId: stored?.id ?? null,
       series,
       hasDetail: stored ? hasDetail(state, stored.id) : false,
+      liveGame: stored && state.tournament.live?.matchId === stored.id ? state.tournament.live.gameNumber : null,
       startsAt: startsAt('semifinal', i + 1),
       when: when('semifinal', i + 1),
       slots: [view(ids[0], 0), view(ids[1], 1)],
@@ -396,6 +421,7 @@ function buildBracket(state: TournamentState, days: ScheduleDay[]): PublicModel[
       matchId: finalStored?.id ?? null,
       series: finalSeries,
       hasDetail: finalStored ? hasDetail(state, finalStored.id) : false,
+      liveGame: finalStored && state.tournament.live?.matchId === finalStored.id ? state.tournament.live.gameNumber : null,
       startsAt: startsAt('final', 1),
       when: when('final', 1),
       slots: [finalView(bracket.final.team1Id, 'Ganador SF1', 0), finalView(bracket.final.team2Id, 'Ganador SF2', 1)],
@@ -436,6 +462,40 @@ function buildRules(state: TournamentState): PublicModel['rules'] {
   };
 }
 
+/** Name of the stage a match belongs to, without the game: "Semifinal 2", "Gran final", "Ronda 4 · Partido 11". */
+function matchLabel(match: Match): string {
+  if (match.phase === 'final') return 'Gran final';
+  if (match.phase === 'semifinal') return `Semifinal ${match.matchNumber}`;
+  return `Ronda ${match.round} · Partido ${match.matchNumber}`;
+}
+
+function buildLive(state: TournamentState): PublicLive | null {
+  const mark = state.tournament.live;
+  if (!mark) return null;
+  const match = [...state.allGroupMatches, ...state.playoffMatches].find((m) => m.id === mark.matchId);
+  const teamA = match?.team1Id == null ? undefined : state.teamsById.get(match.team1Id);
+  const teamB = match?.team2Id == null ? undefined : state.teamsById.get(match.team2Id);
+  if (!match || !teamA || !teamB) return null;
+  const series = buildSeries(state, match);
+  const anyPlayed = state.standings.some((row) => row.played > 0);
+  const position = (id: number) => {
+    const index = state.standings.findIndex((row) => row.teamId === id);
+    return anyPlayed && index >= 0 ? `${index + 1}.º de grupos` : '';
+  };
+  return {
+    matchId: match.id,
+    phase: match.phase,
+    teamA,
+    teamB,
+    subtitleA: position(teamA.id),
+    subtitleB: position(teamB.id),
+    label: series ? `${matchLabel(match)} · Juego ${mark.gameNumber} de ${series.length}` : matchLabel(match),
+    gameNumber: mark.gameNumber,
+    series,
+    startedAt: mark.startedAt,
+  };
+}
+
 export function buildPublicModel(state: TournamentState, scheduleDays: ScheduleDay[], options: { now?: Date; parentHosts?: readonly string[] } = {}): PublicModel {
   const { tournament, groupMatches } = state;
   const now = options.now ?? new Date();
@@ -455,6 +515,7 @@ export function buildPublicModel(state: TournamentState, scheduleDays: ScheduleD
     serverNow: now.toISOString(),
     stream: describeStream(tournament.streamUrl, options.parentHosts ?? ['sites.google.com']),
     phases: buildPhases(state, scheduleDays),
+    live: buildLive(state),
     progress: {
       played,
       total: groupMatches.length,

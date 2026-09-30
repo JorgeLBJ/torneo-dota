@@ -95,6 +95,15 @@
     return isInstant(serverIso) ? Date.parse(serverIso) - clientNowMs : 0;
   }
 
+  /** "23 min" / "1 h 05 min" since an instant, never negative; empty when the instant is unusable. */
+  function elapsedText(startIso, nowMs) {
+    if (!isInstant(startIso)) return '';
+    var minutes = Math.max(0, Math.floor((nowMs - Date.parse(startIso)) / 60000));
+    if (minutes < 60) return minutes + ' min';
+    var rest = minutes % 60;
+    return Math.floor(minutes / 60) + ' h ' + (rest < 10 ? '0' : '') + rest + ' min';
+  }
+
   /**
    * Whether a live refresh may keep the existing player node. Panels are described as
    * { frames: how many players, frameIsDirectChild, embed: the player's embed URL }.
@@ -235,6 +244,7 @@
     isInstant: isInstant,
     msUntilNextBoundary: msUntilNextBoundary,
     clockOffset: clockOffset,
+    elapsedText: elapsedText,
     canPatchRegions: canPatchRegions,
     streamPatchMode: streamPatchMode,
     backoffDelay: backoffDelay,

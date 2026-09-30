@@ -108,6 +108,19 @@
     });
   }
 
+  // "Empezó hace N min": computed here from the mark's start and the server's clock, so it stays right
+  // whatever the visitor's own clock says; refreshed every minute and after every live swap.
+  function applyElapsed() {
+    if (!window.SiteCore) return;
+    var stamp = app.querySelector('[data-server-now]');
+    var offset = window.SiteCore.clockOffset(stamp && stamp.getAttribute('data-server-now'), Date.now());
+    each('[data-live-start]', function (el) {
+      var text = window.SiteCore.elapsedText(el.getAttribute('data-live-start'), Date.now() + offset);
+      if (text && el.textContent !== text) el.textContent = text;
+    });
+  }
+  setInterval(applyElapsed, 60000);
+
   function apply() {
     try {
       localize();
@@ -116,6 +129,7 @@
     }
     applyTabs();
     applyFilter();
+    applyElapsed();
     scheduleBoundary();
   }
 

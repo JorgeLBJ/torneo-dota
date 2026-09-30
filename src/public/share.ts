@@ -76,6 +76,14 @@ export function buildShare(model: PublicModel | null): Share {
   const finished = model.bracket.champion !== null;
   const liveRound = finished ? undefined : model.days.flatMap((d) => d.rounds).find((r) => r.status === 'live');
 
+  // The admin marked a game as being played: say who is playing, before anything derived from the schedule.
+  if (model.live && !finished) {
+    const playing = `En juego: ${model.live.teamA.name} vs ${model.live.teamB.name}`;
+    return {
+      title: clip(oneLine(`🔴 EN VIVO · ${state.title}`), 200),
+      description: clip(model.stream ? `${playing} · Míralo en vivo en ${model.stream.label}` : playing, MAX_DESCRIPTION),
+    };
+  }
   if (liveRound && model.stream) {
     return {
       title: clip(oneLine(`🔴 EN VIVO · ${state.title}`), 200),

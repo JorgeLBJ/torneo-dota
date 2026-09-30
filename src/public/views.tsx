@@ -11,6 +11,7 @@ import type {
   BracketMatchView,
   BracketSlotView,
   PublicDay,
+  PublicLive,
   PublicMatch,
   PublicModel,
   PublicRound,
@@ -130,6 +131,84 @@ const defaultSources = emblemSourcesFor(null);
 
 const teamName = (team: Team | null) => team?.name ?? 'Por definir';
 
+// ---------- Live game ----------
+
+/** "23 min" (or "1 h 05 min") between the mark and the server's clock. */
+export function elapsedText(startedAt: string, nowIso: string): string {
+  const minutes = Math.max(0, Math.floor((Date.parse(nowIso) - Date.parse(startedAt)) / 60000));
+  return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')} min`;
+}
+
+/** The red pulsing pill: "En juego" (plus the game of a series, e.g. "En juego · J3"). */
+const NowPill: FC<{ game?: number | null }> = ({ game = null }) => (
+  <span class="now-pill">
+    <span class="now-dot"></span>En juego{game !== null ? ` · J${game}` : ''}
+  </span>
+);
+
+/** Shown on every tab while a game is marked live: who is playing and where to watch (the stream, else the card). */
+const LiveNotice: FC<{ model: PublicModel }> = ({ model }) => {
+  const { live } = model;
+  if (!live) return null;
+  const href = model.stream ? '#envivo' : live.phase === 'group' ? '#partidos' : '#playoffs';
+  return (
+    <a class="live-notice" href={href}>
+      <span>
+        🔴 En juego: {live.teamA.name} vs {live.teamB.name}
+      </span>
+      <b>{model.stream ? 'Ver en vivo' : 'Ver partido'}</b>
+    </a>
+  );
+};
+
+const LiveSide: FC<{ team: Team; subtitle: string; side: 'a' | 'b' }> = ({ team, subtitle, side }) => (
+  <div class={`ls-side ${side}`}>
+    <div class="ls-emb">
+      <Portrait team={team} />
+    </div>
+    <div>
+      <strong>{team.name}</strong>
+      {subtitle ? <small>{subtitle}</small> : null}
+    </div>
+  </div>
+);
+
+/** The strip above the player: phase, teams, series score and games (best of 3/5 only) and the elapsed time. */
+const LiveStrip: FC<{ live: PublicLive; now: string }> = ({ live, now }) => {
+  const { series, teamA, teamB } = live;
+  const chip = (g: { number: number; winnerId: number }) => (
+    <span class={g.winnerId === teamA.id ? 'w1' : 'w2'}>
+      J{g.number} · {g.winnerId === teamA.id ? teamA.name : teamB.name}
+    </span>
+  );
+  return (
+    <div class="live-strip">
+      <LiveSide team={teamA} subtitle={live.subtitleA} side="a" />
+      <div class="ls-center">
+        <NowPill />
+        <span class="ls-phase">{live.label}</span>
+        {series ? (
+          <>
+            <div class="ls-series" aria-label="Marcador de la serie">
+              <span>{series.wins[0]}</span>
+              <i>–</i>
+              <span>{series.wins[1]}</span>
+            </div>
+            <div class="ls-games">
+              {series.games.map(chip)}
+              <span class="now">J{live.gameNumber} · ahora</span>
+            </div>
+          </>
+        ) : null}
+        <span class="ls-elapsed">
+          Empezó hace <b data-live-start={live.startedAt}>{elapsedText(live.startedAt, now)}</b>
+        </span>
+      </div>
+      <LiveSide team={teamB} subtitle={live.subtitleB} side="b" />
+    </div>
+  );
+};
+
 // ---------- Hero ----------
 
 const Hero: FC<{ model: PublicModel }> = ({ model }) => (
@@ -163,6 +242,7 @@ const Hero: FC<{ model: PublicModel }> = ({ model }) => (
       >
         <i style={`width:${model.progress.percent}%`}></i>
       </div>
+      <LiveNotice model={model} />
     </div>
   </header>
 );
@@ -224,7 +304,8 @@ const MatchCard: FC<{ match: PublicMatch; time: string | null; live: boolean; de
   const running = series !== null && !match.played && series.games.length > 0;
   const teamIds = [match.teamA?.id, match.teamB?.id].filter((id) => id !== undefined).join(' ');
   return (
-    <article class={`match ${match.isNext ? 'is-next' : ''} ${live ? 'is-live' : ''}`} data-teams={teamIds}>
+    <article class={`match ${match.isNext ? 'is-next' : ''} ${live ? 'is-live' : ''} ${match.liveGame !== null ? 'on-air' : ''}`} data-teams={teamIds} id={`m-${match.id}`}>
+      {match.liveGame !== null ? <NowPill game={match.series ? match.liveGame : null} /> : null}
       <MatchSide team={match.teamA} side="a" match={match} index={0} />
       {match.played || running ? (
         <div class="mid">
@@ -335,6 +416,7 @@ const StreamPanel: FC<{ model: PublicModel }> = ({ model }) => {
   return (
     <>
       <Section title="En vivo" sub={stream?.label} />
+      {model.live ? <LiveStrip live={model.live} now={model.serverNow} /> : null}
       {stream ? (
         <>
           <div class="stream-frame" data-stream-frame data-embed={stream.embedUrl}>
@@ -484,7 +566,8 @@ const BracketSlot: FC<{ slot: BracketSlotView }> = ({ slot }) =>
   );
 
 const BracketMatch: FC<{ match: BracketMatchView; detailBase: string }> = ({ match, detailBase }) => (
-  <div class="bm">
+  <div class={`bm ${match.liveGame !== null ? 'on-air' : ''}`}>
+    {match.liveGame !== null ? <NowPill game={match.series ? match.liveGame : null} /> : null}
     <header>
       <span>
         {match.title}

@@ -144,6 +144,12 @@ Cambiar la zona de un torneo mantiene los partidos existentes en el mismo instan
 - Se envía un latido cada 25 s. Las conexiones tienen un tope (500 en total y 10 por cliente; las demás reciben `503`). El cliente se reconecta con retroceso exponencial acotado.
 - **Ejecuta una sola instancia.** Los eventos viven en memoria, así que un segundo proceso de Node no avisaría a los visitantes del primero.
 
+### Partida en vivo
+
+Los datos en vivo de Dota no se pueden obtener solos (OpenDota solo lista las partidas de alto ranking, nunca las privadas), así que el admin marca cuál se está jugando. En **Resultados** (o **Playoffs**), pulsa **▶ Marcar en vivo** en el juego que empieza; se habilita cuando están los dos equipos y solo para el siguiente juego sin resultado de la serie. Marcar otro partido reemplaza al actual, y **■ Quitar en vivo** lo apaga a mano. Se apaga solo al guardar el resultado de ese juego y si se borra el resultado, cambian los equipos o se reinician los playoffs.
+
+En el sitio público aparece una franja sobre el reproductor (fase, equipos, marcador y juegos de la serie, y «Empezó hace N min»), la tarjeta del partido se resalta con «En juego» y todas las pestañas muestran un aviso con enlace. Sin partida marcada, nada de esto aparece. Con `prefers-reduced-motion` no hay parpadeo.
+
 ### Transmisión en vivo
 
 Define el enlace en **Configuración > Transmisión en vivo**. La pestaña pública "En vivo" lo incrusta (un punto rojo marca la pestaña mientras haya transmisión configurada).

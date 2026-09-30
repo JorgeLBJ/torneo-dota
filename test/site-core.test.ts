@@ -11,6 +11,7 @@ interface Core {
   isInstant(value: unknown): boolean;
   msUntilNextBoundary(isos: (string | null)[], nowMs: number): number | null;
   clockOffset(serverIso: unknown, clientNowMs: number): number;
+  elapsedText(startIso: unknown, nowMs: number): string;
   canPatchRegions(oldPage: PageShape | null, nextPage: PageShape | null): boolean;
   streamPatchMode(oldPanel: PanelShape | null, nextPanel: PanelShape | null): 'keep' | 'replace';
 }
@@ -111,6 +112,22 @@ describe('msUntilNextBoundary', () => {
   it('ignores the past, nulls and garbage, and is null when nothing is ahead', () => {
     expect(core.msUntilNextBoundary(['2026-10-03T19:00:00Z', null, 'garbage'], now)).toBeNull();
     expect(core.msUntilNextBoundary([], now)).toBeNull();
+  });
+});
+
+describe('elapsedText', () => {
+  const start = '2026-10-03T19:00:00.000Z';
+  const at = (minutes: number) => Date.parse(start) + minutes * 60_000;
+  it('says the minutes, then hours and minutes', () => {
+    expect(core.elapsedText(start, at(0))).toBe('0 min');
+    expect(core.elapsedText(start, at(23))).toBe('23 min');
+    expect(core.elapsedText(start, at(65))).toBe('1 h 05 min');
+    expect(core.elapsedText(start, at(130))).toBe('2 h 10 min');
+  });
+  it('never goes negative and is empty when the instant is unusable', () => {
+    expect(core.elapsedText(start, at(-5))).toBe('0 min');
+    expect(core.elapsedText('nonsense', at(3))).toBe('');
+    expect(core.elapsedText(null, at(3))).toBe('');
   });
 });
 
