@@ -68,6 +68,12 @@
     img.alt = '';
     img.src = '/assets/heroes/' + hero.slug + '.png';
     thumb.appendChild(img);
+    // The thumbnail now shows the hero: make it open that portrait in the viewer.
+    thumb.disabled = false;
+    thumb.setAttribute('data-full', '/assets/heroes/' + hero.slug + '.png');
+    thumb.removeAttribute('data-fallback');
+    thumb.setAttribute('data-source', hero.name);
+    thumb.setAttribute('aria-label', 'Ver emblema de ' + (thumb.getAttribute('data-name') || 'el equipo'));
     var label = target.cell.querySelector('[data-emblem-label]');
     label.textContent = hero.name;
     label.title = hero.name;
@@ -594,5 +600,38 @@
     if (dialog.id === 'removeImageDialog' || dialog.id === 'replaceImageDialog') {
       dialog.addEventListener('click', function (event) { if (event.target === dialog) dialog.close(); });
     }
+  });
+})();
+
+// Emblem viewer: a lightbox with the thumbnail's picture at real size.
+(function () {
+  var dialog = document.getElementById('emblemViewer');
+  if (!dialog || typeof dialog.showModal !== 'function') return;
+  var picture = document.getElementById('emblemViewerImage');
+  var caption = document.getElementById('emblemViewerCaption');
+  var opener = null;
+
+  document.addEventListener('click', function (event) {
+    var thumb = event.target.closest('[data-emblem-view]');
+    if (!thumb || thumb.disabled || !thumb.getAttribute('data-full')) return;
+    opener = thumb;
+    var fallback = thumb.getAttribute('data-fallback');
+    picture.onerror = fallback && picture.src !== fallback ? function () { picture.onerror = null; picture.src = fallback; } : null;
+    picture.src = thumb.getAttribute('data-full');
+    var name = thumb.getAttribute('data-name') || '';
+    var source = thumb.getAttribute('data-source') || '';
+    picture.alt = name;
+    caption.textContent = source ? name + ' · ' + source : name;
+    dialog.showModal();
+  });
+
+  dialog.querySelector('[data-viewer-close]').addEventListener('click', function () { dialog.close(); });
+  // A click on the backdrop lands on the dialog element itself.
+  dialog.addEventListener('click', function (event) { if (event.target === dialog) dialog.close(); });
+  dialog.addEventListener('close', function () {
+    picture.onerror = null;
+    picture.removeAttribute('src');
+    if (opener) opener.focus();
+    opener = null;
   });
 })();

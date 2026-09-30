@@ -97,6 +97,27 @@ describe('admin teams page', () => {
     expect(body).not.toContain('Sin héroe');
   });
 
+  it('opens the emblem in a viewer: custom image at 2x, hero portrait, nothing for a code tile', async () => {
+    t.repo.updateTeam(alpha.id, { imageKey: KEY });
+    const body = await (await t.get(`/admin/t/${tournament.id}/equipos`, cookie)).text();
+    expect(body).toContain('id="emblemViewer"');
+    const cells = body.split('class="emblem-cell"').slice(1);
+    const thumb = (cell: string) => /<button[^>]*class="emblem-thumb"[^>]*>/.exec(cell)![0];
+    expect(thumb(cells[0]!)).toContain('type="button"');
+    expect(thumb(cells[0]!)).toContain(`data-full="https://images.example/teams/1/1-aabbccddeeff@2x.webp"`);
+    expect(thumb(cells[0]!)).toContain(`data-fallback="https://images.example/${KEY}"`);
+    expect(thumb(cells[0]!)).toContain('data-name="Alpha"');
+    expect(thumb(cells[0]!)).toContain('data-source="Imagen propia"');
+    expect(thumb(cells[0]!)).toContain('aria-label="Ver emblema de Alpha"');
+    expect(thumb(cells[1]!)).toContain('data-full="/assets/heroes/lina.png"');
+    expect(thumb(cells[1]!)).toContain('data-source="Lina"');
+    expect(thumb(cells[1]!)).not.toContain('data-fallback');
+    const tile = thumb(cells[2]!);
+    expect(tile).toContain('disabled');
+    expect(tile).not.toContain('data-full');
+    expect(tile).not.toContain('aria-label');
+  });
+
   it('says so when custom images are unavailable', async () => {
     const off = await makeApp({ imageStore: null });
     const c = await off.login();

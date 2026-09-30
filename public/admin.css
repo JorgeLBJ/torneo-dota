@@ -312,3 +312,15 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;overflow:hidde
 @media (max-width:760px){
   .im-bg{grid-template-columns:repeat(3,1fr)}
 }
+
+/* Emblem thumbnail is a button that opens the viewer */
+button.emblem-thumb{padding:0;color:inherit;font:inherit;cursor:zoom-in}
+button.emblem-thumb:disabled{cursor:default;opacity:1}
+button.emblem-thumb:not(:disabled):hover{border-color:var(--gold)}
+button.emblem-thumb:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.viewer-modal{max-width:none;max-height:none;width:fit-content;height:fit-content;padding:16px;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--fg);box-shadow:0 20px 60px rgba(0,0,0,.6);overflow:visible}
+.viewer-modal::backdrop{background:rgba(0,0,0,.78)}
+.viewer-modal figure{margin:0;display:grid;gap:10px;justify-items:center}
+.viewer-modal img{display:block;width:auto;height:auto;max-width:min(calc(90vw - 34px),1024px);max-height:80vh;border-radius:8px;background:var(--panel-2)}
+.viewer-modal figcaption{font-size:13px;color:var(--muted);text-align:center}
+.viewer-close{position:absolute;top:-12px;right:-12px;width:32px;padding:0;border-radius:99px;background:var(--panel);font-size:20px;line-height:1;z-index:1}

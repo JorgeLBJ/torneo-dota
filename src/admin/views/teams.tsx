@@ -1,9 +1,11 @@
+import { useContext } from 'hono/jsx';
 import type { FC } from 'hono/jsx';
 import { HEROES, getHero } from '../../data/heroes.js';
 import type { Team, Tournament } from '../../db/repository.js';
 import { teamColor } from './layout.js';
 import { assetUrl } from '../../assets.js';
-import { EmblemPicture } from '../../emblem-view.js';
+import { resolveEmblem } from '../../domain/emblem.js';
+import { EmblemPicture, EmblemSourcesContext } from '../../emblem-view.js';
 import { PageHead, heroImage } from './parts.js';
 
 const ATTRS: [string, string][] = [
@@ -26,11 +28,30 @@ const EmblemCell: FC<{ formId: string; base: string; team?: Team; imagesEnabled:
   const hero = team?.hero ? getHero(team.hero) : undefined;
   const custom = Boolean(team?.imageKey) && imagesEnabled;
   const label = custom ? 'Imagen propia' : hero ? hero.name : 'Sin emblema';
+  // What the viewer shows at real size: the @2x WebP (the 1x as fallback), or the hero's own portrait.
+  const emblem = team ? resolveEmblem(team, useContext(EmblemSourcesContext)) : undefined;
+  const view =
+    team && emblem?.kind === 'image'
+      ? { full: emblem.src2x, fallback: emblem.src }
+      : team && emblem?.kind === 'hero'
+        ? { full: emblem.src, fallback: undefined }
+        : undefined;
   return (
     <div class="emblem-cell" data-emblem-cell data-has-image={custom ? '1' : '0'}>
       <input type="hidden" name="hero" form={formId} value={team?.hero ?? ''} data-hero-input />
       <input type="hidden" name="clear_image" form={formId} value="" data-clear-image />
-      <span class="emblem-thumb" data-emblem-thumb>
+      <button
+        type="button"
+        class="emblem-thumb"
+        data-emblem-thumb
+        data-emblem-view
+        disabled={!view}
+        aria-label={view && team ? `Ver emblema de ${team.name}` : undefined}
+        data-full={view?.full}
+        data-fallback={view?.fallback}
+        data-name={team?.name}
+        data-source={view ? label : undefined}
+      >
         {team && custom ? (
           <EmblemPicture team={team} eager />
         ) : hero ? (
@@ -40,7 +61,7 @@ const EmblemCell: FC<{ formId: string; base: string; team?: Team; imagesEnabled:
             {team ? team.code : '?'}
           </span>
         )}
-      </span>
+      </button>
       <span class="emblem-label" data-emblem-label title={label}>
         {label}
       </span>
@@ -77,6 +98,19 @@ const EmblemCell: FC<{ formId: string; base: string; team?: Team; imagesEnabled:
     </div>
   );
 };
+
+/** Lightbox for the emblem thumbnails (filled in by admin.js). */
+const EmblemViewer: FC = () => (
+  <dialog id="emblemViewer" class="viewer-modal" aria-labelledby="emblemViewerCaption">
+    <button class="btn sm viewer-close" type="button" data-viewer-close aria-label="Cerrar">
+      ×
+    </button>
+    <figure>
+      <img id="emblemViewerImage" alt="" />
+      <figcaption id="emblemViewerCaption"></figcaption>
+    </figure>
+  </dialog>
+);
 
 /** Shared confirmations of the emblem menu (filled in by admin.js). */
 const EmblemDialogs: FC = () => (
@@ -290,6 +324,7 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
           ? ' Si el equipo sube su propia imagen, reemplaza al héroe en toda la web; al quitarla vuelve el héroe.'
           : ' Las imágenes personalizadas no están disponibles en este servidor (falta configurar el almacenamiento).'}
       </p>
+      <EmblemViewer />
       {imagesEnabled ? <ImageModal /> : null}
       {imagesEnabled ? <EmblemDialogs /> : null}
       <dialog id="heroModal" class="hero-modal">
