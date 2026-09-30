@@ -22,9 +22,10 @@ const inlineJson = (value: unknown): string =>
 
 /**
  * The team's emblem in ONE compact row: thumbnail (custom image, else hero portrait, else code tile), the source of
- * that emblem, and a single "Cambiar" menu. The hero picker, upload and removal all hang from the menu.
+ * that emblem, and a single "Cambiar" menu. Every change made here is staged in the row by the page script and only
+ * saved with the row's "Guardar"; the attributes below are the saved state it restores on "Deshacer".
  */
-const EmblemCell: FC<{ formId: string; base: string; team?: Team; imagesEnabled: boolean }> = ({ formId, base, team, imagesEnabled }) => {
+const EmblemCell: FC<{ formId: string; team?: Team; imagesEnabled: boolean }> = ({ formId, team, imagesEnabled }) => {
   const hero = team?.hero ? getHero(team.hero) : undefined;
   const custom = Boolean(team?.imageKey) && imagesEnabled;
   const label = custom ? 'Imagen propia' : hero ? hero.name : 'Sin emblema';
@@ -37,7 +38,17 @@ const EmblemCell: FC<{ formId: string; base: string; team?: Team; imagesEnabled:
         ? { full: emblem.src, fallback: undefined }
         : undefined;
   return (
-    <div class="emblem-cell" data-emblem-cell data-has-image={custom ? '1' : '0'}>
+    <div
+      class="emblem-cell"
+      data-emblem-cell
+      data-has-image={custom ? '1' : '0'}
+      data-saved-src={emblem?.kind === 'image' ? emblem.src : undefined}
+      data-saved-src2x={emblem?.kind === 'image' ? emblem.src2x : undefined}
+      data-hero-name={hero?.name}
+      data-code={team?.code}
+      data-color={team ? teamColor(team.id) : undefined}
+      data-team-name={team?.name}
+    >
       <input type="hidden" name="hero" form={formId} value={team?.hero ?? ''} data-hero-input />
       <input type="hidden" name="clear_image" form={formId} value="" data-clear-image />
       <button
@@ -62,36 +73,30 @@ const EmblemCell: FC<{ formId: string; base: string; team?: Team; imagesEnabled:
           </span>
         )}
       </button>
-      <span class="emblem-label" data-emblem-label title={label}>
-        {label}
+      <span class="emblem-label" title={label}>
+        <span data-emblem-label>{label}</span>
+        <span class="unsaved" data-unsaved hidden>
+          Sin guardar
+        </span>
       </span>
       <details class="emblem-menu" data-emblem-menu>
         <summary class="btn sm">
           Cambiar <span aria-hidden="true">▾</span>
         </summary>
         <div class="emblem-pop" role="group" aria-label="Cambiar emblema">
-          <button
-            type="button"
-            data-hero-pick={formId}
-            data-team-id={team ? String(team.id) : ''}
-            data-team-label={team ? team.name : 'el nuevo equipo'}
-          >
+          <button type="button" data-hero-pick={formId} data-team-id={team ? String(team.id) : ''} data-team-label={team ? team.name : 'el nuevo equipo'}>
             Elegir héroe
           </button>
           {team && imagesEnabled ? (
             <>
               <input type="file" accept="image/jpeg,image/png,image/webp" hidden data-image-file aria-label={`Imagen del equipo ${team.code}`} />
-              <button type="button" data-image-pick data-upload-url={`${base}/${team.id}/imagen`} data-team-label={team.name}>
+              <button type="button" data-image-pick data-team-label={team.name}>
                 Subir imagen
               </button>
-            </>
-          ) : null}
-          {team && custom ? (
-            <form method="post" action={`${base}/${team.id}/imagen/quitar`} data-remove-image data-team-label={team.name}>
-              <button type="submit" class="danger">
+              <button type="button" class="danger" data-remove-image data-team-label={team.name} hidden={!custom}>
                 Quitar imagen
               </button>
-            </form>
+            </>
           ) : null}
         </div>
       </details>
@@ -102,13 +107,13 @@ const EmblemCell: FC<{ formId: string; base: string; team?: Team; imagesEnabled:
 /** Lightbox for the emblem thumbnails (filled in by admin.js). */
 const EmblemViewer: FC = () => (
   <dialog id="emblemViewer" class="viewer-modal" aria-labelledby="emblemViewerCaption">
-    <button class="btn sm viewer-close" type="button" data-viewer-close aria-label="Cerrar">
+    <button class="viewer-close" type="button" data-viewer-close aria-label="Cerrar">
       ×
     </button>
-    <figure>
+    <div class="viewer-scroll">
       <img id="emblemViewerImage" alt="" />
-      <figcaption id="emblemViewerCaption"></figcaption>
-    </figure>
+    </div>
+    <p id="emblemViewerCaption" class="viewer-caption"></p>
   </dialog>
 );
 
@@ -118,7 +123,7 @@ const EmblemDialogs: FC = () => (
     <dialog id="removeImageDialog" class="confirm-modal" aria-labelledby="removeImageTitle">
       <h2 id="removeImageTitle">¿Quitar la imagen?</h2>
       <p>
-        <span data-remove-team></span> volverá a usar su héroe (o su código si no tiene). Se borrarán los archivos de la imagen.
+        <span data-remove-team></span> volverá a usar su héroe (o su código si no tiene). Se aplicará cuando guardes la fila.
       </p>
       <div class="actions">
         <button class="btn" type="button" autofocus data-dialog-cancel>
@@ -131,7 +136,7 @@ const EmblemDialogs: FC = () => (
     </dialog>
     <dialog id="replaceImageDialog" class="confirm-modal" aria-labelledby="replaceImageTitle">
       <h2 id="replaceImageTitle">¿Reemplazar la imagen propia por el héroe?</h2>
-      <p>La imagen se eliminará cuando guardes el equipo; el héroe la sustituye en toda la web.</p>
+      <p>La imagen se quitará cuando guardes la fila; el héroe la sustituye en toda la web.</p>
       <div class="actions">
         <button class="btn" type="button" autofocus data-dialog-cancel>
           Cancelar
@@ -214,7 +219,7 @@ const ImageModal: FC = () => (
           Cancelar
         </button>
         <button class="btn pri" type="button" id="cropSave">
-          Guardar
+          Usar imagen
         </button>
       </div>
     </dialog>
@@ -255,7 +260,7 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
             {teams.map((team) => {
               const formId = `team-${team.id}`;
               return (
-                <tr>
+                <tr data-team-row data-team-id={String(team.id)}>
                   <td data-label="Código">
                     <input
                       class="code-input"
@@ -268,7 +273,7 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
                     />
                   </td>
                   <td data-label="Emblema">
-                    <EmblemCell formId={formId} base={base} team={team} imagesEnabled={imagesEnabled} />
+                    <EmblemCell formId={formId} team={team} imagesEnabled={imagesEnabled} />
                   </td>
                   <td data-label="Nombre">
                     <input name="name" form={formId} value={team.name} required maxlength={40} aria-label="Nombre" />
@@ -278,11 +283,14 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
                   </td>
                   <td>
                     <div class="actions">
-                      <form id={formId} method="post" action={`${base}/${team.id}`} class="inline">
+                      <form id={formId} method="post" action={`${base}/${team.id}`} class="inline" data-team-form>
                         <button class="btn sm" type="submit">
                           Guardar
                         </button>
                       </form>
+                      <button class="btn sm" type="button" data-undo hidden>
+                        Deshacer cambios
+                      </button>
                       <form method="post" action={`${base}/${team.id}/eliminar`} class="inline">
                         <button class="btn sm danger" type="submit">
                           Eliminar
@@ -298,7 +306,7 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
                 <input class="code-input" name="code" form="team-new" maxlength={4} placeholder="Ej. A" aria-label="Código del nuevo equipo" required />
               </td>
               <td data-label="Emblema">
-                <EmblemCell formId="team-new" base={base} imagesEnabled={imagesEnabled} />
+                <EmblemCell formId="team-new" imagesEnabled={imagesEnabled} />
               </td>
               <td data-label="Nombre">
                 <input name="name" form="team-new" maxlength={40} placeholder="Nombre del equipo" aria-label="Nombre del nuevo equipo" required />

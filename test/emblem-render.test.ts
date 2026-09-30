@@ -71,12 +71,16 @@ describe('admin teams page', () => {
   it('shows the current emblem, offers upload, and only offers removal when there is a custom image', async () => {
     const base = `/admin/t/${tournament.id}/equipos`;
     let body = await (await t.get(base, cookie)).text();
-    expect(body).not.toContain('/imagen/quitar');
+    const removeButton = (html: string) => /<button[^>]*data-remove-image[^>]*>/.exec(html)![0];
+    expect(removeButton(body)).toContain('hidden');
     t.repo.updateTeam(alpha.id, { imageKey: KEY });
     body = await (await t.get(base, cookie)).text();
     expect(body).toContain(`https://images.example/${KEY}`);
-    expect(body).toContain(`action="${base}/${alpha.id}/imagen/quitar"`);
+    expect(removeButton(body)).not.toContain('hidden');
     expect(body).toContain('id="removeImageDialog"');
+    // Nothing submits a removal on its own any more: the row's Guardar sends it.
+    expect(body).not.toContain('/imagen/quitar');
+    expect(body).not.toContain('data-upload-url');
   });
 
   it('labels the emblem by its source and keeps a single menu: custom image, hero name, or none', async () => {
@@ -89,9 +93,10 @@ describe('admin teams page', () => {
     expect(cells[0]).toContain(`https://images.example/${KEY}`);
     expect(cells[0]).toContain('Elegir héroe');
     expect(cells[0]).toContain('Subir imagen');
-    expect(cells[0]).toContain('Quitar imagen');
+    expect(/<button[^>]*data-remove-image[^>]*>/.exec(cells[0]!)![0]).not.toContain('hidden');
+    expect(cells[0]).toContain('data-saved-src2x=');
     expect(cells[1]).toContain('Lina');
-    expect(cells[1]).not.toContain('Quitar imagen');
+    expect(/<button[^>]*data-remove-image[^>]*>/.exec(cells[1]!)![0]).toContain('hidden');
     expect(cells[1]).toContain('data-has-image="0"');
     expect(cells[2]).toContain('Sin emblema');
     expect(body).not.toContain('Sin héroe');
@@ -134,7 +139,10 @@ describe('crop dialog', () => {
     const base = `/admin/t/${tournament.id}/equipos`;
     const body = await (await t.get(base, cookie)).text();
     expect(body).toContain('Subir imagen');
-    expect(body).toContain(`data-upload-url="${base}/${alpha.id}/imagen"`);
+    expect(body).toContain('data-image-pick');
+    expect(body).toContain('data-team-form');
+    expect(body).toContain('Deshacer cambios');
+    expect(body).toContain('Sin guardar');
     expect(body).toContain('id="imageModal"');
     expect(body).toMatch(/src="\/assets\/vendor\/cropperjs\/cropper\.min\.js\?v=[0-9a-f]{10}"/);
     expect(body).toMatch(/href="\/assets\/vendor\/cropperjs\/cropper\.min\.css\?v=[0-9a-f]{10}"/);

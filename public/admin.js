@@ -23,6 +23,9 @@
   var data = JSON.parse(dataEl.textContent);
   var heroes = data.heroes;
   var taken = data.taken;
+  // Shared with the team rows, which keep it current as rows are saved.
+  window.teamRows = window.teamRows || {};
+  window.teamRows.taken = taken;
   var grid = document.getElementById('heroGrid');
   var search = document.getElementById('heroSearch');
   var label = document.getElementById('heroTeam');
@@ -57,54 +60,11 @@
     });
   }
 
-  var replaceDialog = document.getElementById('replaceImageDialog');
-  var replacing = null;
-
-  function apply(target, hero) {
-    target.input.value = hero.slug;
-    var thumb = target.cell.querySelector('[data-emblem-thumb]');
-    thumb.textContent = '';
-    var img = document.createElement('img');
-    img.alt = '';
-    img.src = '/assets/heroes/' + hero.slug + '.png';
-    thumb.appendChild(img);
-    // The thumbnail now shows the hero: make it open that portrait in the viewer.
-    thumb.disabled = false;
-    thumb.setAttribute('data-full', '/assets/heroes/' + hero.slug + '.png');
-    thumb.removeAttribute('data-fallback');
-    thumb.setAttribute('data-source', hero.name);
-    thumb.setAttribute('aria-label', 'Ver emblema de ' + (thumb.getAttribute('data-name') || 'el equipo'));
-    var label = target.cell.querySelector('[data-emblem-label]');
-    label.textContent = hero.name;
-    label.title = hero.name;
-  }
-
   function choose(hero) {
-    var target = current;
+    var cell = current.cell;
     modal.close();
-    // A custom image outranks the hero everywhere, so picking a hero means giving the image up.
-    if (target.cell.getAttribute('data-has-image') === '1' && replaceDialog && typeof replaceDialog.showModal === 'function') {
-      replacing = { target: target, hero: hero };
-      replaceDialog.showModal();
-      return;
-    }
-    apply(target, hero);
-  }
-
-  if (replaceDialog) {
-    var replaceConfirm = replaceDialog.querySelector('[data-replace-confirm]');
-    if (replaceConfirm) replaceConfirm.addEventListener('click', function () {
-      if (replacing) {
-        var cell = replacing.target.cell;
-        apply(replacing.target, replacing.hero);
-        cell.querySelector('[data-clear-image]').value = '1';
-        cell.setAttribute('data-has-image', '0');
-        var remove = cell.querySelector('form[data-remove-image]');
-        if (remove) remove.hidden = true;
-      }
-      replacing = null;
-      replaceDialog.close();
-    });
+    // The emblem change is staged in its row (see "Team rows"): nothing is saved until that row's Guardar.
+    window.teamRows.pickHero(cell, hero);
   }
 
   document.querySelectorAll('[data-hero-pick]').forEach(function (button) {
@@ -157,6 +117,347 @@
   });
 })();
 
+// Team rows (Equipos): every emblem change (hero, uploaded image, removal) is STAGED in its row and only saved with
+// that row's "Guardar", which sends ONE request for that row and then redraws just that row. Other rows keep
+// whatever was typed in them. Without JavaScript the plain form post still saves the row's text fields and hero.
+(function () {
+  var cells = Array.prototype.slice.call(document.querySelectorAll('[data-emblem-cell]'));
+  if (!cells.length) return;
+
+  var HEROES = '/assets/heroes/';
+  var states = [];
+  var replaceDialog = document.getElementById('replaceImageDialog');
+  var replacing = null;
+  var api = window.teamRows || {};
+  api.taken = api.taken || null;
+  window.teamRows = api;
+
+  function formIdOf(cell) {
+    return cell.querySelector('[data-hero-input]').getAttribute('form');
+  }
+
+  function fieldsOf(state) {
+    return Array.prototype.slice.call(document.querySelectorAll('[form="' + state.formId + '"]'))
+      .filter(function (el) { return el !== state.clearInput; });
+  }
+
+  function savedFrom(cell, heroInput) {
+    return {
+      hasImage: cell.getAttribute('data-has-image') === '1',
+      src: cell.getAttribute('data-saved-src') || '',
+      src2x: cell.getAttribute('data-saved-src2x') || '',
+      hero: heroInput.defaultValue,
+      heroName: cell.getAttribute('data-hero-name') || '',
+      code: cell.getAttribute('data-code') || '',
+    };
+  }
+
+  cells.forEach(function (cell) {
+    var heroInput = cell.querySelector('[data-hero-input]');
+    var state = {
+      cell: cell,
+      formId: formIdOf(cell),
+      row: cell.closest('[data-team-row]'),
+      heroInput: heroInput,
+      clearInput: cell.querySelector('[data-clear-image]'),
+      thumb: cell.querySelector('[data-emblem-thumb]'),
+      label: cell.querySelector('[data-emblem-label]'),
+      marker: cell.querySelector('[data-unsaved]'),
+      removeItem: cell.querySelector('[data-remove-image]'),
+      saved: savedFrom(cell, heroInput),
+      blob: null,
+      blobUrl: null,
+      removeImage: false,
+      hero: heroInput.defaultValue,
+      heroName: cell.getAttribute('data-hero-name') || '',
+      saving: false,
+    };
+    cell.teamRowState = state;
+    states.push(state);
+  });
+
+  function dropBlob(state) {
+    if (state.blobUrl) URL.revokeObjectURL(state.blobUrl);
+    state.blob = null;
+    state.blobUrl = null;
+  }
+
+  function isDirty(state) {
+    if (state.blob || state.removeImage) return true;
+    return fieldsOf(state).some(function (el) { return el.value !== el.defaultValue; });
+  }
+
+  function message(state, text, kind) {
+    if (!state.row) return;
+    var next = state.row.nextElementSibling;
+    var exists = next && next.classList.contains('row-msg');
+    if (!text) {
+      if (exists) next.remove();
+      return;
+    }
+    if (!exists) {
+      next = document.createElement('tr');
+      next.className = 'row-msg';
+      next.appendChild(document.createElement('td')).setAttribute('colspan', '5');
+      state.row.parentNode.insertBefore(next, state.row.nextSibling);
+    }
+    var cell = next.firstChild;
+    cell.textContent = '';
+    var p = document.createElement('p');
+    p.className = 'flash ' + kind;
+    p.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    p.textContent = text;
+    cell.appendChild(p);
+    if (next.timer) clearTimeout(next.timer);
+    if (kind === 'ok') next.timer = setTimeout(function () { if (next.parentNode) next.remove(); }, 6000);
+  }
+
+  function refreshDirty(state) {
+    var dirty = isDirty(state);
+    if (state.row) {
+      state.marker.hidden = !dirty;
+      state.row.classList.toggle('dirty', dirty);
+      var undo = state.row.querySelector('[data-undo]');
+      if (undo) undo.hidden = !dirty;
+    }
+    return dirty;
+  }
+
+  /** Draws the row's emblem from its state: staged image, saved image, hero, or the code tile. */
+  function render(state) {
+    var kind = state.blob ? 'staged' : state.saved.hasImage && !state.removeImage ? 'saved' : '';
+    var thumb = state.thumb;
+    thumb.textContent = '';
+    var full = '';
+    var fallback = '';
+    var source = '';
+    if (kind) {
+      var img = document.createElement('img');
+      img.alt = '';
+      if (kind === 'staged') {
+        img.src = state.blobUrl;
+        full = state.blobUrl;
+      } else {
+        img.src = state.saved.src;
+        img.srcset = state.saved.src + ' 1x, ' + state.saved.src2x + ' 2x';
+        full = state.saved.src2x;
+        fallback = state.saved.src;
+      }
+      source = 'Imagen propia';
+      thumb.appendChild(img);
+    } else if (state.hero) {
+      var portrait = document.createElement('img');
+      portrait.alt = '';
+      portrait.src = HEROES + state.hero + '.png';
+      thumb.appendChild(portrait);
+      full = portrait.getAttribute('src');
+      source = state.heroName;
+    } else {
+      var tile = document.createElement('span');
+      tile.className = 'emblem-code';
+      var color = state.cell.getAttribute('data-color');
+      if (color) tile.style.setProperty('--tc', color);
+      tile.textContent = state.saved.code || '?';
+      thumb.appendChild(tile);
+    }
+    var name = state.cell.getAttribute('data-team-name') || '';
+    thumb.disabled = !full;
+    ['data-full', 'data-fallback', 'data-source', 'aria-label'].forEach(function (attr) { thumb.removeAttribute(attr); });
+    if (full) {
+      thumb.setAttribute('data-full', full);
+      if (fallback) thumb.setAttribute('data-fallback', fallback);
+      thumb.setAttribute('data-source', source);
+      thumb.setAttribute('aria-label', 'Ver emblema' + (name ? ' de ' + name : ''));
+    }
+    thumb.setAttribute('data-name', name);
+    var text = kind ? 'Imagen propia' : state.hero ? state.heroName : 'Sin emblema';
+    state.label.textContent = text;
+    state.label.parentNode.title = text;
+    state.cell.setAttribute('data-has-image', kind ? '1' : '0');
+    state.heroInput.value = state.hero;
+    state.clearInput.value = state.removeImage && !state.blob ? '1' : '';
+    if (state.removeItem) state.removeItem.hidden = !kind;
+    refreshDirty(state);
+  }
+
+  function stateOf(cell) {
+    return cell.teamRowState;
+  }
+
+  // ---------- Staging ----------
+
+  api.stageImage = function (cell, blob) {
+    var state = stateOf(cell);
+    dropBlob(state);
+    state.blob = blob;
+    state.blobUrl = URL.createObjectURL(blob);
+    state.removeImage = false;
+    message(state, '');
+    render(state);
+  };
+
+  api.stageRemoval = function (cell) {
+    var state = stateOf(cell);
+    dropBlob(state);
+    state.removeImage = state.saved.hasImage;
+    message(state, '');
+    render(state);
+  };
+
+  function applyHero(state, hero) {
+    dropBlob(state);
+    state.removeImage = state.saved.hasImage;
+    state.hero = hero.slug;
+    state.heroName = hero.name;
+    message(state, '');
+    render(state);
+  }
+
+  /** Picking a hero while an image shows means giving the image up, so it asks first (the change is still staged). */
+  api.pickHero = function (cell, hero) {
+    var state = stateOf(cell);
+    var showsImage = state.blob || (state.saved.hasImage && !state.removeImage);
+    if (showsImage && replaceDialog && typeof replaceDialog.showModal === 'function') {
+      replacing = { state: state, hero: hero };
+      replaceDialog.showModal();
+      return;
+    }
+    applyHero(state, hero);
+  };
+
+  if (replaceDialog) {
+    var confirmReplace = replaceDialog.querySelector('[data-replace-confirm]');
+    if (confirmReplace) {
+      confirmReplace.addEventListener('click', function () {
+        if (replacing) applyHero(replacing.state, replacing.hero);
+        replacing = null;
+        replaceDialog.close();
+      });
+    }
+    replaceDialog.addEventListener('close', function () { replacing = null; });
+  }
+
+  function undo(state) {
+    dropBlob(state);
+    state.removeImage = false;
+    state.hero = state.saved.hero;
+    state.heroName = state.saved.heroName;
+    fieldsOf(state).forEach(function (el) { el.value = el.defaultValue; });
+    message(state, '');
+    render(state);
+  }
+
+  // ---------- Saving one row ----------
+
+  /** Redraws the row from the server's JSON; nothing else on the page is touched. */
+  function applySaved(state, team) {
+    var taken = api.taken;
+    if (taken) {
+      Object.keys(taken).forEach(function (slug) { if (taken[slug] === state.saved.code) delete taken[slug]; });
+      if (team.hero) taken[team.hero] = team.code;
+    }
+    var values = { code: team.code, name: team.name, captain: team.captain || '' };
+    fieldsOf(state).forEach(function (el) {
+      if (Object.prototype.hasOwnProperty.call(values, el.name)) el.value = values[el.name];
+    });
+    dropBlob(state);
+    state.removeImage = false;
+    state.hero = team.hero || '';
+    state.heroName = team.heroName || '';
+    var image = team.emblem.kind === 'image';
+    state.saved = {
+      hasImage: image,
+      src: image ? team.emblem.src : '',
+      src2x: image ? team.emblem.src2x : '',
+      hero: state.hero,
+      heroName: state.heroName,
+      code: team.code,
+    };
+    state.cell.setAttribute('data-code', team.code);
+    state.cell.setAttribute('data-team-name', team.name);
+    state.cell.querySelectorAll('[data-team-label]').forEach(function (el) { el.setAttribute('data-team-label', team.name); });
+    state.heroInput.value = state.hero;
+    render(state);
+    fieldsOf(state).forEach(function (el) { el.defaultValue = el.value; });
+    refreshDirty(state);
+  }
+
+  function save(state, form) {
+    if (state.saving) return;
+    state.saving = true;
+    var button = form.querySelector('button[type="submit"]');
+    var label = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Guardando…';
+    message(state, '');
+    var data = new FormData(form);
+    if (state.blob) data.set('image', state.blob, state.blob.type === 'image/png' ? 'equipo.png' : 'equipo.webp');
+    var done = function () {
+      state.saving = false;
+      button.disabled = false;
+      button.textContent = label;
+    };
+    fetch(form.action, { method: 'POST', body: data, credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (body) {
+          done();
+          if (res.ok && body.team) {
+            applySaved(state, body.team);
+            message(state, body.message || 'Equipo guardado.', 'ok');
+          } else if (res.status === 401 || res.status === 403 || res.redirected) {
+            message(state, 'La sesión caducó. Recarga la página e inicia sesión de nuevo; tus cambios siguen aquí hasta entonces.', 'error');
+          } else {
+            message(state, body.error || 'No se pudo guardar el equipo. Inténtalo de nuevo.', 'error');
+          }
+        });
+      })
+      .catch(function () {
+        done();
+        message(state, 'No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.', 'error');
+      });
+  }
+
+  states.forEach(function (state) {
+    render(state);
+    if (!state.row) return;
+    var form = document.getElementById(state.formId);
+    if (form && window.fetch && window.FormData) {
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        save(state, form);
+      });
+    }
+    var undoButton = state.row.querySelector('[data-undo]');
+    if (undoButton) undoButton.addEventListener('click', function () { undo(state); });
+  });
+
+  // Typing in any field of a row marks that row as unsaved.
+  document.addEventListener('input', function (event) {
+    var formId = event.target && event.target.getAttribute && event.target.getAttribute('form');
+    if (!formId) return;
+    states.forEach(function (state) {
+      if (state.formId !== formId) return;
+      if (state.row) message(state, '');
+      refreshDirty(state);
+    });
+  });
+
+  // Leaving with unsaved edits asks first; a row's own plain (no-JavaScript) submit is the one exception.
+  var leaving = false;
+  document.addEventListener('submit', function (event) {
+    var form = event.target;
+    if (form && form.matches && form.matches('[data-team-form], #team-new')) {
+      leaving = true;
+      setTimeout(function () { leaving = false; }, 0);
+    }
+  }, true);
+  window.addEventListener('beforeunload', function (event) {
+    if (leaving || !states.some(isDirty)) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
+})();
+
 // Custom team image: pick a file, crop it to 16:9 with Cropper.js, upload the result.
 (function () {
   var modal = document.getElementById('imageModal');
@@ -183,7 +484,7 @@
   var fitButton = document.getElementById('cropFit');
   var cropper = null;
   var objectUrl = null;
-  var uploadUrl = null;
+  var targetCell = null;
   var saving = false;
   var loadToken = 0;
   var rotation = 0;
@@ -200,7 +501,7 @@
     saving = false;
     saveButton.disabled = false;
     cancelButton.disabled = false;
-    saveButton.textContent = 'Guardar';
+    saveButton.textContent = 'Usar imagen';
     modal.classList.remove('busy');
   }
 
@@ -389,10 +690,10 @@
     });
   }
 
-  function open(file, url, label) {
+  function open(file, cell, label) {
     cleanup();
     showError('');
-    uploadUrl = url;
+    targetCell = cell;
     teamLabel.textContent = label;
     editor.hidden = false;
     objectUrl = URL.createObjectURL(file);
@@ -430,7 +731,7 @@
       var size = file.size;
       input.value = '';
       if (TYPES.indexOf(type) === -1 || size > MAX_BYTES) return openError(WRONG, label);
-      open(file, button.getAttribute('data-upload-url'), label);
+      open(file, button.closest('[data-emblem-cell]'), label);
     });
   });
 
@@ -501,7 +802,7 @@
     showError('');
     saveButton.disabled = true;
     cancelButton.disabled = true;
-    saveButton.textContent = 'Guardando…';
+    saveButton.textContent = 'Procesando…';
     modal.classList.add('busy');
     var failed = function (message) {
       idle();
@@ -513,17 +814,12 @@
     toBlob(canvas).then(function (blob) {
       if (!blob) return failed('No se pudo preparar la imagen.');
       if (blob.size > MAX_BYTES) return failed(WRONG);
-      var form = new FormData();
-      form.append('image', blob, blob.type === 'image/webp' ? 'equipo.webp' : 'equipo.png');
-      return fetch(uploadUrl, { method: 'POST', body: form, credentials: 'same-origin', headers: { Accept: 'application/json' } })
-        .then(function (res) {
-          return res.json().catch(function () { return {}; }).then(function (body) {
-            if (res.ok) { window.location.reload(); return; }
-            failed(body.error || 'No se pudo guardar la imagen. Inténtalo de nuevo.');
-          });
-        });
+      // Staged in the row: nothing is uploaded until that row's Guardar.
+      window.teamRows.stageImage(targetCell, blob);
+      idle();
+      modal.close();
     }).catch(function () {
-      failed('No se pudo subir la imagen. Revisa tu conexión e inténtalo de nuevo.');
+      failed('No se pudo preparar la imagen. Inténtalo de nuevo.');
     });
   });
 })();
@@ -545,7 +841,7 @@
     pop.style.top = '0px';
     pop.style.left = '0px';
     var box = pop.getBoundingClientRect();
-    var left = Math.max(8, Math.min(anchor.left, window.innerWidth - box.width - 8));
+    var left = Math.max(8, Math.min(anchor.left, document.documentElement.clientWidth - box.width - 8));
     var top = anchor.bottom + 4;
     if (top + box.height > window.innerHeight - 8) top = Math.max(8, anchor.top - box.height - 4);
     pop.style.left = left + 'px';
@@ -577,20 +873,21 @@
   window.addEventListener('resize', function () { closeMenus(); });
   window.addEventListener('scroll', function () { closeMenus(); }, true);
 
-  // Removal asks first; without JavaScript the form simply submits.
+  // Removal asks first, then is staged in the row like every other emblem change.
   var removeDialog = document.getElementById('removeImageDialog');
   if (removeDialog && typeof removeDialog.showModal === 'function') {
-    var pending = null;
-    document.querySelectorAll('form[data-remove-image]').forEach(function (form) {
-      form.addEventListener('submit', function (event) {
-        event.preventDefault();
-        pending = form;
-        removeDialog.querySelector('[data-remove-team]').textContent = form.getAttribute('data-team-label') || 'El equipo';
+    var pendingCell = null;
+    document.querySelectorAll('[data-remove-image]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        pendingCell = button.closest('[data-emblem-cell]');
+        removeDialog.querySelector('[data-remove-team]').textContent = button.getAttribute('data-team-label') || 'El equipo';
         removeDialog.showModal();
       });
     });
     removeDialog.querySelector('[data-remove-confirm]').addEventListener('click', function () {
-      if (pending) HTMLFormElement.prototype.submit.call(pending);
+      if (pendingCell) window.teamRows.stageRemoval(pendingCell);
+      pendingCell = null;
+      removeDialog.close();
     });
   }
 

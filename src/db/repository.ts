@@ -275,13 +275,18 @@ export function createRepository(db: Database.Database) {
     ...instants(m.tournamentId, m),
   });
 
-  /** Reads the current image key and replaces it in one transaction, so concurrent swaps each see a distinct previous key. */
-  const swapImageKeyTx = db.transaction((teamId: number, key: string | null): { previous: string | null } | undefined => {
-    const row = db.prepare('SELECT image_key AS imageKey FROM teams WHERE id = ?').get(teamId) as { imageKey: string | null } | undefined;
-    if (!row) return undefined;
-    db.prepare('UPDATE teams SET image_key = ? WHERE id = ?').run(key, teamId);
-    return { previous: row.imageKey };
-  });
+  /**
+   * Saves a team's fields and, when `key` is given (null clears it), swaps its image key. The previous key is read
+   * in the same transaction, so concurrent saves each see a distinct previous key and never share an object.
+   */
+  const saveTeamTx = db.transaction(
+    (teamId: number, fields: Pick<Team, 'code' | 'name' | 'captain' | 'hero'>, key: string | null | undefined): { team: Team; previous: string | null } | undefined => {
+      const current = teamById(teamId);
+      if (!current) return undefined;
+      q.updateTeam.run({ ...current, ...fields, imageKey: key === undefined ? current.imageKey : key, id: teamId });
+      return { team: requireRow(teamById(teamId), 'Team'), previous: current.imageKey };
+    },
+  );
 
   const insertMatchesTx = db.transaction((matches: NewMatch[]) => {
     for (const m of matches) q.insertMatch.run(withDefaults(m));
@@ -389,8 +394,11 @@ export function createRepository(db: Database.Database) {
       q.updateTeam.run({ ...current, ...patch, id });
       return requireRow(teamById(id), 'Team');
     },
-    /** Atomically sets the team's image key and returns the key it replaced; undefined when the team no longer exists. */
-    swapTeamImageKey: (id: number, key: string | null) => swapImageKeyTx(id, key),
+    /** Atomically saves fields (+ image key when given) and returns the key it replaced; undefined when the team is gone. */
+    saveTeam(id: number, fields: Pick<Team, 'code' | 'name' | 'captain' | 'hero'>, key?: string | null) {
+      requireHero(fields.hero);
+      return saveTeamTx(id, fields, key);
+    },
     deleteTeam(id: number): void {
       q.deleteTeam.run(id);
     },

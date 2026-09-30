@@ -26,7 +26,7 @@ export interface CreateAppOptions {
 export const MAX_BODY_BYTES = 64 * 1024;
 /** A 5 MB picture plus the multipart envelope. */
 export const MAX_UPLOAD_BYTES = 6 * 1024 * 1024;
-const IMAGE_UPLOAD_PATH = /^\/admin\/t\/\d+\/equipos\/\d+\/imagen$/;
+const IMAGE_UPLOAD_PATH = /^\/admin\/t\/\d+\/equipos\/\d+$/; // the team row save, which may carry the cropped image
 
 export function createApp({ db, config }: CreateAppOptions) {
   const repo = createRepository(db);
