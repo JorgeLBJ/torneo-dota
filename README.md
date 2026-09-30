@@ -9,6 +9,8 @@ Aplicación web ligera y multitorneo para ligas de Dota 2. Genera un fixture de 
 - **Generador de fixture**: todos contra todos a una o dos vueltas, para cualquier número de equipos, con un descanso por ronda cuando el número es impar. Ediciones manuales: mover partidos, agregar rondas o partidos y agregar un partido de desempate.
 - **Resultados y posiciones**: los administradores registran el ganador y las kills/deaths; la tabla siempre se calcula a partir de los resultados (no se guardan puntos).
 - **Playoffs**: clasifican los 4 primeros, semifinales 1.º vs 4.º y 2.º vs 3.º, final y campeón.
+- **Series de varios juegos**: cada fase se juega al mejor de 1, 3 o 5 (por defecto: grupos 1, semifinales 3, final 5; se cambia en Reglas > Formato > «Partidas por partido»). Gana quien llegue primero a la mitad más uno; las kills y deaths del partido son la suma de sus juegos.
+- **Importar un juego desde Dota**: en Resultados y Playoffs cada juego admite un Match ID de Dota. La app consulta OpenDota desde el servidor, autocompleta ganador, kills y deaths, y la web pública muestra «Ver detalle de la partida» con jugadores, héroes y estadísticas (ver «Partidas de Dota» más abajo).
 - **Página pública en vivo** con estética de Dota 2 (interfaz en español): Partidos, En vivo, Posiciones, Playoffs, Reglas. Se actualiza sin recargar.
 - **Pestaña de transmisión**: un enlace de Kick, Twitch o YouTube por torneo, incrustado en la página pública.
 - **Varios torneos**: uno está *activo* y se muestra en `/`; además, cada torneo tiene su propia URL para el archivo histórico.
@@ -118,6 +120,14 @@ Las páginas públicas no envían cabeceras que impidan incrustarlas, por lo que
 - Avanzan los **4 primeros**. Semifinales: 1.º vs 4.º y 2.º vs 3.º. Los ganadores juegan la final.
 - Mientras la fase de grupos está en curso, la pestaña Playoffs muestra una *proyección* con la tabla actual.
 
+### Partidas de Dota
+
+**Cómo obtener el Match ID.** En el cliente de Dota 2 abre tu perfil, entra en el historial de partidas y elige la partida: el número de 10 dígitos aparece en el detalle (junto al título, con un botón para copiarlo). También es el número al final de la dirección de la partida en Dotabuff u OpenDota.
+
+**Cómo importarlo.** En **Resultados** (o **Playoffs**), abre «Importar desde Dota» en el juego, pega el Match ID y pulsa **Buscar**. Si aparece «✓ Partida encontrada · mm:ss · Radiant ganó X – Y», elige qué equipo jugó de Radiant y pulsa **Autocompletar**: se rellenan el ganador y las kills/deaths (kills = puntaje de cada bando; deaths = suma de las muertes de sus jugadores). Revisa y **Guarda**: el detalle de la partida se guarda con el juego. Si cambias los números a mano después de autocompletar, la app no guarda el detalle (no podría coincidir con el marcador); quita el Match ID para cargar el juego solo a mano. Sin Match ID todo funciona como siempre.
+
+**Privacidad.** OpenDota solo tiene las partidas de jugadores que activaron **«Exponer datos públicos de partidas»** (en Dota 2: Ajustes > Opciones > Avanzadas). Si ningún jugador lo activó, la partida no se encuentra o sus jugadores salen como «Anónimo». De cada partida se guarda solo lo necesario para mostrarla: nick público, héroe, kills/deaths/asistencias, nivel, oro y experiencia por minuto, last hits/denies, daño, baneos, duración y primera sangre; no se guardan IDs de cuenta ni la respuesta completa del proveedor. Las consultas a OpenDota se hacen siempre desde el servidor (timeout de 8 s, un reintento ante errores 5xx, caché de 10 minutos) y con límite de frecuencia por administrador.
+
 ### Zonas horarias
 
 | Dónde | Comportamiento |
@@ -167,7 +177,8 @@ src/
   data/               lista de héroes
   storage/            puerto ImageStore y adaptadores (Cloudflare R2 con SigV4, carpeta local)
   images/             validación y conversión de imágenes con sharp
-migrations/           archivos SQL solo hacia adelante: 001_init.sql ... 006_team_images.sql
+  dota/               puerto DotaMatchSource, adaptador de OpenDota y mapeo a una ficha compacta de la partida
+migrations/           archivos SQL solo hacia adelante: 001_init.sql ... 008_match_games.sql
 deploy/               despliegue con Docker: compose, .env de ejemplo, bloque de Caddy y guía
 Dockerfile            imagen de producción (varias etapas, compila a dist/)
 public/               archivos estáticos: CSS, JS del cliente, retratos de héroes, imágenes

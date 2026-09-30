@@ -14,6 +14,7 @@ import type {
   PublicMatch,
   PublicModel,
   PublicRound,
+  PublicSeries,
   PublicStandingRow,
 } from './model.js';
 
@@ -101,7 +102,14 @@ export const PublicDocument: FC<PropsWithChildren<{ meta: PageMeta; links?: Page
             </a>
           </div>
         </footer>
+        <dialog id="matchDetail" class="detail" aria-labelledby="mdTitle">
+          <button type="button" class="d-close" data-detail-close aria-label="Cerrar">
+            ×
+          </button>
+          <div id="mdContent" class="d-content"></div>
+        </dialog>
         <script src={assetUrl('site-core.js')} defer></script>
+        <script src={assetUrl('match-detail.js')} defer></script>
         <script src={assetUrl('site.js')} defer></script>
       </body>
     </html>
@@ -186,19 +194,46 @@ const MatchSide: FC<{ team: Team | null; side: 'a' | 'b'; match: PublicMatch; in
   );
 };
 
-const MatchCard: FC<{ match: PublicMatch; time: string | null; live: boolean }> = ({ match, time, live }) => {
+/** "Ver detalle de la partida": only when a game of the match was imported from Dota. */
+const DetailButton: FC<{ url: string }> = ({ url }) => (
+  <button type="button" class="detail-btn" data-detail-url={url}>
+    ▸ Ver detalle de la partida
+  </button>
+);
+
+/** One small result per game of a series: J1 AA, J2 BB... */
+const GameChips: FC<{ series: PublicSeries; teamA: Team | null; teamB: Team | null }> = ({ series, teamA, teamB }) => (
+  <div class="games" aria-label="Resultados por juego">
+    {series.games.map((g) => {
+      const team = g.winnerId === teamA?.id ? teamA : teamB;
+      return (
+        <span class={`g ${g.winnerId === teamA?.id ? 'a' : 'b'}`} title={`Juego ${g.number}: ganó ${team?.name ?? ''}`}>
+          J{g.number} <b>{team?.code ?? ''}</b>
+        </span>
+      );
+    })}
+  </div>
+);
+
+const MatchCard: FC<{ match: PublicMatch; time: string | null; live: boolean; detailBase: string }> = ({ match, time, live, detailBase }) => {
   const aWon = match.winnerId !== null && match.winnerId === match.teamA?.id;
+  const series = match.series;
+  // A match of several games shows its series score; a single game shows 1 - 0 as always.
+  const scoreA = series ? series.wins[0] : aWon ? 1 : 0;
+  const scoreB = series ? series.wins[1] : aWon ? 0 : 1;
+  const running = series !== null && !match.played && series.games.length > 0;
   const teamIds = [match.teamA?.id, match.teamB?.id].filter((id) => id !== undefined).join(' ');
   return (
     <article class={`match ${match.isNext ? 'is-next' : ''} ${live ? 'is-live' : ''}`} data-teams={teamIds}>
       <MatchSide team={match.teamA} side="a" match={match} index={0} />
-      {match.played ? (
+      {match.played || running ? (
         <div class="mid">
           {match.isTiebreak ? <span class="tag extra">Juego adicional</span> : null}
+          {running ? <span class="tag live">Serie en juego</span> : null}
           <div class="res">
-            <span class={aWon ? 'w' : 'l'}>{aWon ? 1 : 0}</span>
+            <span class={match.played ? (aWon ? 'w' : 'l') : 'n'}>{scoreA}</span>
             <i>–</i>
-            <span class={aWon ? 'l' : 'w'}>{aWon ? 0 : 1}</span>
+            <span class={match.played ? (aWon ? 'l' : 'w') : 'n'}>{scoreB}</span>
           </div>
           <small>Partido {match.number}</small>
         </div>
@@ -215,11 +250,13 @@ const MatchCard: FC<{ match: PublicMatch; time: string | null; live: boolean }> 
         </div>
       )}
       <MatchSide team={match.teamB} side="b" match={match} index={1} />
+      {series && series.games.length > 0 ? <GameChips series={series} teamA={match.teamA} teamB={match.teamB} /> : null}
+      {match.hasDetail ? <DetailButton url={`${detailBase}/${match.id}/detalle`} /> : null}
     </article>
   );
 };
 
-const RoundBlock: FC<{ round: PublicRound }> = ({ round }) => (
+const RoundBlock: FC<{ round: PublicRound; detailBase: string }> = ({ round, detailBase }) => (
   <div class="round" data-matches={round.matches.length} data-bye={round.bye?.id} data-start={round.startsAt ?? undefined}>
     <div class="round-head">
       <b>Ronda {round.number}</b>
@@ -239,7 +276,7 @@ const RoundBlock: FC<{ round: PublicRound }> = ({ round }) => (
     </div>
     <div class="matches">
       {round.matches.map((match) => (
-        <MatchCard match={match} time={round.startTime} live={round.status === 'live'} />
+        <MatchCard match={match} time={round.startTime} live={round.status === 'live'} detailBase={detailBase} />
       ))}
     </div>
   </div>
@@ -250,7 +287,7 @@ const RoundBlock: FC<{ round: PublicRound }> = ({ round }) => (
  * visitor's own calendar day (a late match can fall on the next day elsewhere), the server groups by the
  * tournament's zone as the no-JavaScript fallback.
  */
-const DayList: FC<{ days: PublicDay[] }> = ({ days }) => (
+const DayList: FC<{ days: PublicDay[]; detailBase: string }> = ({ days, detailBase }) => (
   <>
     {days.map((day) => (
       <>
@@ -259,7 +296,7 @@ const DayList: FC<{ days: PublicDay[] }> = ({ days }) => (
           <span>Fase de grupos</span>
         </div>
         {day.rounds.map((round) => (
-          <RoundBlock round={round} />
+          <RoundBlock round={round} detailBase={detailBase} />
         ))}
       </>
     ))}
@@ -284,7 +321,7 @@ const MatchesPanel: FC<{ model: PublicModel }> = ({ model }) => (
     </p>
     <div class="days">
       {model.days.length === 0 ? <p class="empty">El fixture todavía no está publicado.</p> : null}
-      <DayList days={model.days} />
+      <DayList days={model.days} detailBase={model.detailBase} />
     </div>
   </>
 );
@@ -430,6 +467,11 @@ const BracketSlot: FC<{ slot: BracketSlotView }> = ({ slot }) =>
         <strong title={slot.team.name}>{slot.team.name}</strong>
         <small>{slot.isWinner ? 'Victoria' : slot.seedLabel}</small>
       </div>
+      {slot.wins !== null ? (
+        <b class="wins" aria-label={`${slot.wins} juegos ganados`}>
+          {slot.wins}
+        </b>
+      ) : null}
     </div>
   ) : (
     <div class="slot tbd">
@@ -441,10 +483,13 @@ const BracketSlot: FC<{ slot: BracketSlotView }> = ({ slot }) =>
     </div>
   );
 
-const BracketMatch: FC<{ match: BracketMatchView }> = ({ match }) => (
+const BracketMatch: FC<{ match: BracketMatchView; detailBase: string }> = ({ match, detailBase }) => (
   <div class="bm">
     <header>
-      <span>{match.title}</span>
+      <span>
+        {match.title}
+        {match.series ? <em class="bo"> · al mejor de {match.series.length}</em> : null}
+      </span>
       {match.when ? (
         <b data-start={match.startsAt ?? undefined} data-format="short">
           {match.when}
@@ -453,6 +498,7 @@ const BracketMatch: FC<{ match: BracketMatchView }> = ({ match }) => (
     </header>
     <BracketSlot slot={match.slots[0]} />
     <BracketSlot slot={match.slots[1]} />
+    {match.hasDetail && match.matchId !== null ? <DetailButton url={`${detailBase}/${match.matchId}/detalle`} /> : null}
   </div>
 );
 
@@ -479,12 +525,12 @@ const BracketPanel: FC<{ model: PublicModel }> = ({ model }) => {
       <div class="notice">{bracket.note}</div>
       <div class="bracket">
         <div class="col">
-          <BracketMatch match={bracket.semifinals[0]} />
-          <BracketMatch match={bracket.semifinals[1]} />
+          <BracketMatch match={bracket.semifinals[0]} detailBase={model.detailBase} />
+          <BracketMatch match={bracket.semifinals[1]} detailBase={model.detailBase} />
         </div>
         <div class="link"></div>
         <div class="col">
-          <BracketMatch match={bracket.final} />
+          <BracketMatch match={bracket.final} detailBase={model.detailBase} />
         </div>
         <div class="link single"></div>
         <div class={`aegis ${bracket.champion ? 'won' : ''}`}>

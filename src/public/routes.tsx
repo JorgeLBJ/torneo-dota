@@ -12,6 +12,7 @@ import { clientKey, publicOrigin, requestHost } from '../security.js';
 import { NO_TOURNAMENT_SHARE, buildShare, type Share } from './share.js';
 import type { Events } from '../events.js';
 import { loadState } from '../services/state.js';
+import { buildMatchDetail } from './detail.js';
 import { buildPublicModel } from './model.js';
 import {
   ComingSoonContent,
@@ -107,6 +108,21 @@ export function publicApp({ repo, events, config, now, images = null }: PublicDe
     if (!tournament) return c.text('Torneo no encontrado.', 404);
     return fragment(c, tournament);
   });
+
+  /** JSON behind "Ver detalle de la partida": only matches with at least one game imported from Dota have it. */
+  const detail = (c: Context, tournament: Tournament | undefined) => {
+    const id = Number(c.req.param('id'));
+    const match = Number.isInteger(id) ? repo.getMatch(id) : undefined;
+    if (!tournament || !match || match.tournamentId !== tournament.id) return c.json({ error: 'No encontrado.' }, 404);
+    const games = repo.listGames(match.id);
+    if (!games.some((g) => g.dotaMatchId !== null)) return c.json({ error: 'No encontrado.' }, 404);
+    const found = buildMatchDetail(loadState(repo, tournament), match, games, sources);
+    if (!found) return c.json({ error: 'No encontrado.' }, 404);
+    c.header('Cache-Control', 'no-cache');
+    return c.json(found);
+  };
+  app.get('/partido/:id/detalle', (c) => detail(c, repo.getActiveTournament()));
+  app.get('/t/:slug/partido/:id/detalle', (c) => detail(c, repo.getTournamentBySlug(c.req.param('slug'))));
 
   // ---- Server-sent events ----------------------------------------------------------------------
 

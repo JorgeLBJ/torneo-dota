@@ -1,4 +1,5 @@
-import type { Match, ScheduleDay, Team, TiebreakerKey } from '../db/repository.js';
+import type { Game, Match, ScheduleDay, Team, TiebreakerKey } from '../db/repository.js';
+import { resolveSeries, seriesLengthFor, type SeriesLength } from '../domain/series.js';
 import { describeStream, type StreamView } from '../domain/stream.js';
 import { zonedToUtc } from '../format/timezone.js';
 import type { QualificationStatus, StandingRow } from '../domain/standings.js';
@@ -47,6 +48,33 @@ export const shortDate = (date: string) => {
 
 const points = (n: number) => `${n} ${n === 1 ? 'pt' : 'pts'}`;
 
+/** The running or final state of a match that is played over several games. */
+export interface PublicSeries {
+  length: SeriesLength;
+  /** Game wins of [team A, team B]. */
+  wins: [number, number];
+  decided: boolean;
+  games: { number: number; winnerId: number }[];
+}
+
+/** Series of a match, or null for a single game (best of 1) and for a match without teams. */
+export function buildSeries(state: TournamentState, match: Match): PublicSeries | null {
+  const length = seriesLengthFor(state.tournament, match.phase, match.isTiebreak);
+  if (length === 1 || match.team1Id === null || match.team2Id === null) return null;
+  const games = state.gamesByMatch.get(match.id) ?? [];
+  const resolved = resolveSeries(match.team1Id, match.team2Id, length, games);
+  return {
+    length,
+    wins: resolved.wins,
+    decided: resolved.decided,
+    games: games.map((g: Game) => ({ number: g.gameNumber, winnerId: g.winnerId })),
+  };
+}
+
+/** True when at least one game of the match was imported from a Dota match (the detail modal has data). */
+export const hasDetail = (state: TournamentState, matchId: number): boolean =>
+  (state.gamesByMatch.get(matchId) ?? []).some((g) => g.dotaMatchId !== null);
+
 export interface PublicMatch {
   id: number;
   number: number;
@@ -62,6 +90,8 @@ export interface PublicMatch {
   isNext: boolean;
   /** An extra game to break a tie (shown tagged, never counted in the progress). */
   isTiebreak: boolean;
+  series: PublicSeries | null;
+  hasDetail: boolean;
 }
 
 export interface PublicRound {
@@ -104,10 +134,15 @@ export interface BracketSlotView {
   team: Team | null;
   seedLabel: string;
   isWinner: boolean;
+  /** Games won in the series, or null when nothing has been played (or the series is a single game). */
+  wins: number | null;
 }
 
 export interface BracketMatchView {
   title: string;
+  matchId: number | null;
+  series: PublicSeries | null;
+  hasDetail: boolean;
   /** ISO UTC start; the visible `when` text is the server-side (tournament zone) fallback. */
   startsAt: string | null;
   when: string | null;
@@ -124,6 +159,8 @@ export interface PublicPhase {
 export interface PublicModel {
   name: string;
   slug: string;
+  /** Where the JSON of a match's Dota detail lives: `${detailBase}/${matchId}/detalle`. */
+  detailBase: string;
   /** IANA zone the server-rendered times are shown in (visitors' browsers re-render in their own). */
   timezone: string;
   kicker: string;
@@ -211,6 +248,8 @@ function buildDays(state: TournamentState, live: Set<number>, nextRound: number 
     deaths: m.winnerId === null ? null : [m.team1Deaths ?? 0, m.team2Deaths ?? 0],
     isNext: m.round === nextRound,
     isTiebreak: m.isTiebreak,
+    series: buildSeries(state, m),
+    hasDetail: hasDetail(state, m.id),
   });
 
   const byDate = new Map<string | null, Match[]>();
@@ -312,18 +351,32 @@ function buildBracket(state: TournamentState, days: ScheduleDay[]): PublicModel[
       const [a, b] = seedPairs[i]!;
       ids = [standings[a]?.teamId ?? null, standings[b]?.teamId ?? null];
     }
-    const view = (id: number | null): BracketSlotView => ({
+    const stored = playoffMatches.find((m) => m.id === slot.matchId);
+    const series = stored ? buildSeries(state, stored) : null;
+    const view = (id: number | null, index: 0 | 1): BracketSlotView => ({
       team: team(id),
       seedLabel: seeded(id) || 'Por definir',
       isWinner: id !== null && slot.winnerId === id,
+      wins: series && series.games.length > 0 && stored && id !== null && id === (index === 0 ? stored.team1Id : stored.team2Id) ? series.wins[index] : null,
     });
-    return { title: `Semifinal ${i + 1}`, startsAt: startsAt('semifinal', i + 1), when: when('semifinal', i + 1), slots: [view(ids[0]), view(ids[1])] };
+    return {
+      title: `Semifinal ${i + 1}`,
+      matchId: stored?.id ?? null,
+      series,
+      hasDetail: stored ? hasDetail(state, stored.id) : false,
+      startsAt: startsAt('semifinal', i + 1),
+      when: when('semifinal', i + 1),
+      slots: [view(ids[0], 0), view(ids[1], 1)],
+    };
   }) as [BracketMatchView, BracketMatchView];
 
-  const finalView = (id: number | null, label: string): BracketSlotView => ({
+  const finalStored = playoffMatches.find((m) => m.id === bracket.final.matchId);
+  const finalSeries = finalStored ? buildSeries(state, finalStored) : null;
+  const finalView = (id: number | null, label: string, index: 0 | 1): BracketSlotView => ({
     team: team(id),
     seedLabel: label,
     isWinner: id !== null && bracket.final.winnerId === id,
+    wins: finalSeries && finalSeries.games.length > 0 && finalStored && id !== null && id === (index === 0 ? finalStored.team1Id : finalStored.team2Id) ? finalSeries.wins[index] : null,
   });
 
   let note: string;
@@ -340,9 +393,12 @@ function buildBracket(state: TournamentState, days: ScheduleDay[]): PublicModel[
     semifinals,
     final: {
       title: 'Gran final',
+      matchId: finalStored?.id ?? null,
+      series: finalSeries,
+      hasDetail: finalStored ? hasDetail(state, finalStored.id) : false,
       startsAt: startsAt('final', 1),
       when: when('final', 1),
-      slots: [finalView(bracket.final.team1Id, 'Ganador SF1'), finalView(bracket.final.team2Id, 'Ganador SF2')],
+      slots: [finalView(bracket.final.team1Id, 'Ganador SF1', 0), finalView(bracket.final.team2Id, 'Ganador SF2', 1)],
     },
     champion: team(bracket.championId),
   };
@@ -393,6 +449,7 @@ export function buildPublicModel(state: TournamentState, scheduleDays: ScheduleD
   return {
     name: tournament.name,
     slug: tournament.slug,
+    detailBase: `/t/${tournament.slug}/partido`,
     timezone: tournament.timezone,
     kicker,
     serverNow: now.toISOString(),

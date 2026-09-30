@@ -244,6 +244,7 @@
     if (!(window.SiteCore && patchRegions(html))) app.innerHTML = html;
     apply();
     window.scrollTo(x, y);
+    if (window.MatchDetail) window.MatchDetail.refresh();
   }
 
   if (eventsUrl && partialUrl && window.EventSource && window.SiteCore) {
