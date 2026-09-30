@@ -102,6 +102,15 @@ export function recordPlayoffResult(
   return ok(saved);
 }
 
+/**
+ * Drops the semifinal and final matches (teams, dates and results with them), so the bracket goes back to
+ * automatic seeding from the table. They are recreated on demand from the calendar.
+ */
+export function resetPlayoffs(repo: Repository, tournament: Tournament): void {
+  repo.deleteMatches(tournament.id, 'semifinal');
+  repo.deleteMatches(tournament.id, 'final');
+}
+
 export function clearPlayoffResult(repo: Repository, tournament: Tournament, phase: PlayoffPhase, number: number): void {
   const matches = ensurePlayoffMatches(repo, tournament);
   const match = findMatch(matches, phase, number);

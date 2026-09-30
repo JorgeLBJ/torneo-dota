@@ -87,7 +87,7 @@ export const ResultCard: FC<ResultCardProps> = ({ action, header, team1, team2, 
           </button>
         ) : (
           <button class="btn sm" type="reset">
-            Limpiar
+            Deshacer cambios
           </button>
         )}
         <button class="btn sm pri" type="submit" name="action" value="save">
