@@ -71,7 +71,7 @@
     button.addEventListener('click', function () {
       var cell = button.closest('[data-emblem-cell]');
       current = { cell: cell, input: cell.querySelector('[data-hero-input]') };
-      label.textContent = button.getAttribute('data-team-label') || '';
+      label.textContent = window.teamRows.nameOf(cell);
       search.value = '';
       render();
       modal.showModal();
@@ -184,7 +184,10 @@
 
   function isDirty(state) {
     if (state.blob || state.removeImage) return true;
-    return fieldsOf(state).some(function (el) { return el.value !== el.defaultValue; });
+    // A hidden input's value IS its default value (the two are the same attribute), so the staged hero is compared
+    // with the saved one directly instead of through the input.
+    if (state.hero !== state.saved.hero) return true;
+    return fieldsOf(state).some(function (el) { return el !== state.heroInput && el.value !== el.defaultValue; });
   }
 
   function message(state, text, kind) {
@@ -260,7 +263,7 @@
       tile.textContent = state.saved.code || '?';
       thumb.appendChild(tile);
     }
-    var name = state.cell.getAttribute('data-team-name') || '';
+    var name = state.row ? api.nameOf(state.cell) : '';
     thumb.disabled = !full;
     ['data-full', 'data-fallback', 'data-source', 'aria-label'].forEach(function (attr) { thumb.removeAttribute(attr); });
     if (full) {
@@ -282,6 +285,22 @@
 
   function stateOf(cell) {
     return cell.teamRowState;
+  }
+
+  /** The team's name as currently typed in its row (the saved name when that field is empty). */
+  api.nameOf = function (cell) {
+    var input = document.querySelector('[form="' + formIdOf(cell) + '"][name="name"]');
+    var typed = input ? input.value.trim() : '';
+    return typed || cell.getAttribute('data-team-name') || 'el equipo';
+  };
+
+  /** Labels built from the name follow what is typed. */
+  function refreshNames(state) {
+    var name = api.nameOf(state.cell);
+    state.thumb.setAttribute('data-name', state.row ? name : '');
+    if (state.thumb.getAttribute('aria-label')) state.thumb.setAttribute('aria-label', 'Ver emblema de ' + name);
+    var file = state.cell.querySelector('[data-image-file]');
+    if (file) file.setAttribute('aria-label', 'Imagen del equipo ' + name);
   }
 
   // ---------- Staging ----------
@@ -438,6 +457,7 @@
     states.forEach(function (state) {
       if (state.formId !== formId) return;
       if (state.row) message(state, '');
+      if (event.target.name === 'name') refreshNames(state);
       refreshDirty(state);
     });
   });
@@ -722,7 +742,6 @@
 
   document.querySelectorAll('[data-image-pick]').forEach(function (button) {
     var input = button.parentElement.querySelector('[data-image-file]');
-    var label = button.getAttribute('data-team-label') || '';
     button.addEventListener('click', function () { input.click(); });
     input.addEventListener('change', function () {
       var file = input.files && input.files[0];
@@ -730,8 +749,11 @@
       var type = file.type;
       var size = file.size;
       input.value = '';
+      // The dialog names the team as it is typed in the row right now, not as it was last saved.
+      var cell = button.closest('[data-emblem-cell]');
+      var label = window.teamRows.nameOf(cell);
       if (TYPES.indexOf(type) === -1 || size > MAX_BYTES) return openError(WRONG, label);
-      open(file, button.closest('[data-emblem-cell]'), label);
+      open(file, cell, label);
     });
   });
 
@@ -880,7 +902,7 @@
     document.querySelectorAll('[data-remove-image]').forEach(function (button) {
       button.addEventListener('click', function () {
         pendingCell = button.closest('[data-emblem-cell]');
-        removeDialog.querySelector('[data-remove-team]').textContent = button.getAttribute('data-team-label') || 'El equipo';
+        removeDialog.querySelector('[data-remove-team]').textContent = window.teamRows.nameOf(pendingCell);
         removeDialog.showModal();
       });
     });
@@ -915,7 +937,8 @@
     var fallback = thumb.getAttribute('data-fallback');
     picture.onerror = fallback && picture.src !== fallback ? function () { picture.onerror = null; picture.src = fallback; } : null;
     picture.src = thumb.getAttribute('data-full');
-    var name = thumb.getAttribute('data-name') || '';
+    var viewerCell = thumb.closest('[data-emblem-cell]');
+    var name = viewerCell ? window.teamRows.nameOf(viewerCell) : thumb.getAttribute('data-name') || '';
     var source = thumb.getAttribute('data-source') || '';
     picture.alt = name;
     caption.textContent = source ? name + ' · ' + source : name;

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Team, Tournament } from '../src/db/repository.js';
 import { regenerateFixture } from '../src/services/fixture.js';
@@ -204,5 +205,41 @@ describe('choosing a hero over a custom image', () => {
     await save({ hero: 'not-a-hero', clear_image: '1' });
     expect(t.repo.getTeam(alpha.id)!.imageKey).toBe(KEY);
     expect(store.keys()).toHaveLength(2);
+  });
+});
+
+describe('dialogs name the team as typed in the row', () => {
+  // The page script has no DOM test harness here, so this guards the wiring: every dialog that names a team reads
+  // the row's current name input (teamRows.nameOf), never an attribute frozen at render time.
+  const script = readFileSync(new URL('../public/admin.js', import.meta.url), 'utf8');
+
+  it('hero picker, crop dialog, removal confirm and lightbox all use the current name', () => {
+    expect(script).not.toContain("getAttribute('data-team-label')");
+    expect(script).toMatch(/label\.textContent = window\.teamRows\.nameOf\(cell\)/);
+    expect(script).toMatch(/var label = window\.teamRows\.nameOf\(cell\)/);
+    expect(script).toMatch(/\[data-remove-team\]'\)\.textContent = window\.teamRows\.nameOf\(pendingCell\)/);
+    expect(script).toMatch(/var name = viewerCell \? window\.teamRows\.nameOf\(viewerCell\)/);
+  });
+
+  it('labels built from the name follow the name input as the user types', () => {
+    expect(script).toMatch(/event\.target\.name === 'name'\) refreshNames\(state\)/);
+    expect(script).toContain("'Ver emblema de ' + name");
+  });
+
+  it('nameOf falls back to the saved name when the input is empty', () => {
+    expect(script).toMatch(/return typed \|\| cell\.getAttribute\('data-team-name'\) \|\| 'el equipo'/);
+  });
+});
+
+describe('what counts as an unsaved change in a row', () => {
+  const script = readFileSync(new URL('../public/admin.js', import.meta.url), 'utf8');
+
+  it('a staged hero marks the row dirty without going through the hidden input (its value is its default)', () => {
+    expect(script).toMatch(/if \(state\.hero !== state\.saved\.hero\) return true;/);
+    expect(script).toMatch(/el !== state\.heroInput && el\.value !== el\.defaultValue/);
+  });
+
+  it('every staged change is part of the check: image, removal, hero and the text fields', () => {
+    expect(script).toMatch(/if \(state\.blob \|\| state\.removeImage\) return true;/);
   });
 });
