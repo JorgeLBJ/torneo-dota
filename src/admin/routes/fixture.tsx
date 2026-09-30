@@ -169,10 +169,10 @@ export function fixtureRoutes(deps: Deps) {
     const tournament = c.get('tournament');
     // Read the tie before adding the blank match: an unplayed match makes the group stage incomplete.
     const tied = tiedTeamIds(loadState(repo, tournament).standings);
-    const match = addRound(repo, tournament.id);
+    const match = addRound(repo, tournament.id, { isTiebreak: true });
     if (tied) repo.updateMatchTeams(match.id, tied[0], tied[1]);
     deps.events.tournamentChanged(tournament.id);
-    setFlash(c, 'ok', 'Partida de desempate creada: completa la fecha y los equipos.');
+    setFlash(c, 'ok', 'Juego adicional creado: completa la fecha y los equipos.');
     return c.redirect(`/admin/t/${tournament.id}/fixture/partidos/${match.id}`, 303);
   });
 

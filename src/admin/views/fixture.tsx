@@ -68,14 +68,14 @@ export const FixtureView: FC<FixtureViewProps> = ({ tournament, teams, matches, 
       </div>
       <div class="note">
         Regenerar crea el fixture y lo reparte en el calendario de grupos. Puedes mover partidos entre rondas, agregar
-        partidos sueltos o rondas extra (por ejemplo, una partida de desempate).
+        partidos sueltos o rondas extra. "Agregar partida de desempate" crea un juego adicional: no cuenta para la tabla y solo lo usa el criterio "Juego adicional" de Reglas.
       </div>
       <div class="card">
         {rounds.length === 0 ? <p class="muted">Todavía no hay partidos. Usa Regenerar para crear el fixture.</p> : null}
         {rounds.map((round) => {
           const inRound = matches.filter((m) => m.round === round);
           const playing = new Set(inRound.flatMap((m) => [m.team1Id, m.team2Id]));
-          const resting = teams.length % 2 === 1 ? teams.filter((t) => !playing.has(t.id)) : [];
+          const resting = teams.length % 2 === 1 && !inRound.every((m) => m.isTiebreak) ? teams.filter((t) => !playing.has(t.id)) : [];
           return (
             <div class="round">
               <div class="rh">
@@ -86,6 +86,7 @@ export const FixtureView: FC<FixtureViewProps> = ({ tournament, teams, matches, 
                 {inRound.map((m) => (
                   <span class="pair">
                     {badge(m.team1Id)} vs {badge(m.team2Id)}
+                    {m.isTiebreak ? <span class="pill next">Juego adicional</span> : null}
                     {m.winnerId !== null ? <span class="pill ok">✓</span> : null}
                     <a class="btn sm" href={`${base}/partidos/${m.id}`} title="Editar" aria-label={`Editar partido ${m.matchNumber}`}>
                       ✎

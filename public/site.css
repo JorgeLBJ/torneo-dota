@@ -158,6 +158,7 @@ footer .credit { margin-top: 8px; font-size: 11px; letter-spacing: .2em; color: 
 .tag { padding: 4px 9px; font: 700 11px/1 var(--fl); letter-spacing: .18em; text-transform: uppercase; border: 1px solid var(--line); }
 .tag.next { color: var(--gold-hi); border-color: var(--gold); background: rgba(200,170,110,.1); }
 .tag.done { color: var(--muted); }
+.tag.extra { color: var(--gold-hi); border-color: var(--line-2); background: rgba(200,170,110,.08); white-space: nowrap; }
 .tag.live { color: #fff; border-color: var(--crimson); background: rgba(194,60,42,.35); }
 .match.is-live { border-color: var(--crimson); box-shadow: 0 0 0 1px rgba(194,60,42,.35); }
 .rest { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
@@ -206,7 +207,7 @@ tr.cut td { border-bottom: 1px solid var(--gold); }
 .team strong { font: 700 15px/1.1 var(--fd); letter-spacing: .03em; text-transform: uppercase; }
 .team small { display: block; margin-top: 3px; font: 500 12px/1.2 var(--fl); color: var(--muted); letter-spacing: .06em; }
 .team small.st { font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
-.st.qualified { color: var(--radiant); } .st.tiebreak { color: var(--gold-hi); }
+.st.qualified { color: var(--radiant); } .st.tiebreak, .st.extra-pending { color: var(--gold-hi); }
 td.pts { font: 800 22px/1 var(--fd); color: var(--gold-hi); }
 .pos-d { color: var(--radiant); } .neg-d { color: var(--dire); }
 .form { display: inline-flex; gap: 3px; }

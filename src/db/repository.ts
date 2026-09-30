@@ -5,7 +5,7 @@ import { isValidTimeZone, utcToZoned, zonedToUtc } from '../format/timezone.js';
 // All SQL of the application lives in this module.
 
 export type Phase = 'group' | 'semifinal' | 'final';
-export type TiebreakerKey = 'kd' | 'kills' | 'h2h';
+export type TiebreakerKey = 'kd' | 'kills' | 'h2h' | 'extra';
 
 export interface Tournament {
   id: number;
@@ -54,6 +54,8 @@ export interface Match {
   phase: Phase;
   round: number;
   matchNumber: number;
+  /** An extra game played to break a tie: outside the table statistics, used only by the `extra` criterion. */
+  isTiebreak: boolean;
   /** Start and end as ISO UTC instants (the stored truth). */
   startsAt: string | null;
   endsAt: string | null;
@@ -75,6 +77,7 @@ export interface NewMatch {
   phase: Phase;
   round: number;
   matchNumber: number;
+  isTiebreak?: boolean;
   scheduledDate?: string | null;
   startTime?: string | null;
   endTime?: string | null;
@@ -115,12 +118,12 @@ export interface Session {
   expiresAt: string;
 }
 
-export const TIEBREAKER_KEYS = ['kd', 'kills', 'h2h'] as const;
+export const TIEBREAKER_KEYS = ['kd', 'kills', 'h2h', 'extra'] as const;
 
 const TOURNAMENT_COLS = `id, name, slug, qualifiers, game, points_win AS pointsWin, points_loss AS pointsLoss,
   tiebreakers, group_legs AS groupLegs, rules_text AS rulesText, timezone, stream_url AS streamUrl, is_active AS isActive, created_at AS createdAt`;
 const TEAM_COLS = 'id, tournament_id AS tournamentId, code, name, captain, hero';
-const MATCH_COLS = `m.id, m.tournament_id AS tournamentId, m.phase, m.round, m.match_number AS matchNumber,
+const MATCH_COLS = `m.id, m.tournament_id AS tournamentId, m.phase, m.round, m.match_number AS matchNumber, m.is_tiebreak AS isTiebreak,
   m.starts_at AS startsAt, m.ends_at AS endsAt, t.timezone AS timezone,
   m.team1_id AS team1Id, m.team2_id AS team2Id, m.winner_id AS winnerId,
   m.team1_kills AS team1Kills, m.team1_deaths AS team1Deaths, m.team2_kills AS team2Kills, m.team2_deaths AS team2Deaths`;
@@ -129,12 +132,12 @@ const ADMIN_COLS = 'id, username, password_hash AS passwordHash, created_at AS c
 const SESSION_COLS = 'id, admin_id AS adminId, expires_at AS expiresAt';
 
 type TournamentRow = Omit<Tournament, 'tiebreakers' | 'isActive'> & { tiebreakers: string; isActive: number };
-type MatchRow = Omit<Match, 'scheduledDate' | 'startTime' | 'endTime'> & { timezone: string };
+type MatchRow = Omit<Match, 'scheduledDate' | 'startTime' | 'endTime' | 'isTiebreak'> & { timezone: string; isTiebreak: number };
 
 function toMatch({ timezone, ...row }: MatchRow): Match {
   const start = row.startsAt ? utcToZoned(row.startsAt, timezone) : null;
   const end = row.endsAt ? utcToZoned(row.endsAt, timezone) : null;
-  return { ...row, scheduledDate: start?.date ?? null, startTime: start?.time ?? null, endTime: end?.time ?? null };
+  return { ...row, isTiebreak: row.isTiebreak === 1, scheduledDate: start?.date ?? null, startTime: start?.time ?? null, endTime: end?.time ?? null };
 }
 
 type ScheduleDayRow = Omit<ScheduleDay, 'startTimes'> & { startTimes: string };
@@ -184,8 +187,8 @@ export function createRepository(db: Database.Database) {
       .pluck(),
 
     insertMatch: db.prepare(
-      `INSERT INTO matches (tournament_id, phase, round, match_number, starts_at, ends_at, team1_id, team2_id)
-       VALUES (@tournamentId, @phase, @round, @matchNumber, @startsAt, @endsAt, @team1Id, @team2Id)`,
+      `INSERT INTO matches (tournament_id, phase, round, match_number, is_tiebreak, starts_at, ends_at, team1_id, team2_id)
+       VALUES (@tournamentId, @phase, @round, @matchNumber, @isTiebreak, @startsAt, @endsAt, @team1Id, @team2Id)`,
     ),
     matchById: db.prepare(`SELECT ${MATCH_COLS} ${MATCH_FROM} WHERE m.id = ?`),
     tournamentZone: db.prepare('SELECT timezone FROM tournaments WHERE id = ?').pluck(),
@@ -266,6 +269,7 @@ export function createRepository(db: Database.Database) {
     team1Id: null,
     team2Id: null,
     ...m,
+    isTiebreak: m.isTiebreak ? 1 : 0,
     ...instants(m.tournamentId, m),
   });
 

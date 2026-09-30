@@ -19,15 +19,15 @@ export function resultRoutes(deps: Deps) {
   app.get('/resultados', (c) => {
     const tournament = c.get('tournament');
     const state = loadState(repo, tournament);
-    const dates = [...new Set(state.groupMatches.map((m) => m.scheduledDate).filter((d): d is string => d !== null))].sort();
-    const hasUndated = state.groupMatches.some((m) => m.scheduledDate === null);
+    const dates = [...new Set(state.allGroupMatches.map((m) => m.scheduledDate).filter((d): d is string => d !== null))].sort();
+    const hasUndated = state.allGroupMatches.some((m) => m.scheduledDate === null);
 
     // Default: the first day that still has a playable pending match, otherwise everything.
     const pendingDay = dates.find((d) =>
-      state.groupMatches.some((m) => m.scheduledDate === d && m.winnerId === null && m.team1Id !== null && m.team2Id !== null),
+      state.allGroupMatches.some((m) => m.scheduledDate === d && m.winnerId === null && m.team1Id !== null && m.team2Id !== null),
     );
     const filter = parseFilter(c.req.query('fecha')) ?? pendingDay ?? 'todos';
-    const shown = state.groupMatches.filter((m) =>
+    const shown = state.allGroupMatches.filter((m) =>
       filter === 'todos' ? true : filter === 'sin-fecha' ? m.scheduledDate === null : m.scheduledDate === filter,
     );
 

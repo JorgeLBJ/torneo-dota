@@ -62,7 +62,7 @@ export function regenerateFixture(repo: Repository, tournament: Tournament): Reg
 }
 
 /** Adds an empty match to an existing round, inheriting the round's date and time. */
-export function addBlankMatch(repo: Repository, tournamentId: number, round: number): Match {
+export function addBlankMatch(repo: Repository, tournamentId: number, round: number, options: { isTiebreak?: boolean } = {}): Match {
   const group = repo.listMatches(tournamentId, 'group');
   const sibling = group.find((m) => m.round === round);
   const match = repo.createMatch({
@@ -70,6 +70,7 @@ export function addBlankMatch(repo: Repository, tournamentId: number, round: num
     phase: 'group',
     round,
     matchNumber: group.reduce((max, m) => Math.max(max, m.matchNumber), 0) + 1,
+    isTiebreak: options.isTiebreak ?? false,
     scheduledDate: sibling?.scheduledDate ?? null,
     startTime: sibling?.startTime ?? null,
     endTime: sibling?.endTime ?? null,
@@ -79,8 +80,8 @@ export function addBlankMatch(repo: Repository, tournamentId: number, round: num
 }
 
 /** Adds a new round after the last one, holding one empty match. */
-export function addRound(repo: Repository, tournamentId: number): Match {
-  return addBlankMatch(repo, tournamentId, repo.maxRound(tournamentId, 'group') + 1);
+export function addRound(repo: Repository, tournamentId: number, options: { isTiebreak?: boolean } = {}): Match {
+  return addBlankMatch(repo, tournamentId, repo.maxRound(tournamentId, 'group') + 1, options);
 }
 
 /**
@@ -97,6 +98,6 @@ export function editMatch(repo: Repository, match: Match, edit: MatchEdit): { ma
 
 /** The first two teams tied across the qualification cutoff, if the standings need a tiebreak match. */
 export function tiedTeamIds(standings: StandingRow[]): [number, number] | null {
-  const tied = standings.filter((r) => r.status === 'tiebreak' && r.unresolvedTie);
+  const tied = standings.filter((r) => (r.status === 'tiebreak' || r.status === 'extra-pending') && r.unresolvedTie);
   return tied.length >= 2 ? [tied[0]!.teamId, tied[1]!.teamId] : null;
 }

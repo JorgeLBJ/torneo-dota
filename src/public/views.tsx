@@ -188,6 +188,7 @@ const MatchCard: FC<{ match: PublicMatch; time: string | null; live: boolean }> 
       <MatchSide team={match.teamA} side="a" match={match} index={0} />
       {match.played ? (
         <div class="mid">
+          {match.isTiebreak ? <span class="tag extra">Juego adicional</span> : null}
           <div class="res">
             <span class={aWon ? 'w' : 'l'}>{aWon ? 1 : 0}</span>
             <i>–</i>
@@ -197,6 +198,7 @@ const MatchCard: FC<{ match: PublicMatch; time: string | null; live: boolean }> 
         </div>
       ) : (
         <div class="mid">
+          {match.isTiebreak ? <span class="tag extra">Juego adicional</span> : null}
           <span class="vs">VS</span>
           {time ? (
             <span class="time" data-start={match.startsAt ?? undefined}>
@@ -328,6 +330,7 @@ const STATUS_LABEL: Partial<Record<PublicStandingRow['status'], string>> = {
   qualified: 'Clasificado',
   eliminated: 'Eliminado',
   tiebreak: 'Empate sin resolver',
+  'extra-pending': 'Pendiente de juego adicional',
 };
 
 const StandingRowView: FC<{ row: PublicStandingRow }> = ({ row }) => {
