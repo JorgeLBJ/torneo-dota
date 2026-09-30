@@ -4,11 +4,15 @@ import { PageHead, Rulebook, Select } from './parts.js';
 
 export const TIEBREAKER_LABELS: Record<TiebreakerKey, string> = {
   kd: 'Diferencia K − D',
+  h2h: 'Resultado directo',
   kills: 'Más kills',
 };
 
+const ALL_CRITERIA: TiebreakerKey[] = ['kd', 'h2h', 'kills'];
+
 export const RulesView: FC<{ tournament: Tournament }> = ({ tournament }) => {
   const order = tournament.tiebreakers;
+  const unused = ALL_CRITERIA.filter((key) => !order.includes(key));
   return (
     <form method="post" action={`/admin/t/${tournament.id}/reglas`} class="stack">
       <button type="submit" name="action" value="save" class="sr-only" tabindex={-1} aria-hidden="true">
@@ -38,38 +42,66 @@ export const RulesView: FC<{ tournament: Tournament }> = ({ tournament }) => {
           </div>
           <h2 style="margin-top:6px">Desempate</h2>
           <p class="muted" style="margin:-6px 0 0;font-size:12px">
-            Se aplican en este orden. Usa las flechas para reordenar y guarda.
+            Se aplican en este orden a los equipos que siguen empatados. Usa las flechas para reordenar, × para quitar
+            uno y guarda.
           </p>
-          <ol class="tb-list">
-            {order.map((key, i) => (
-              <li>
-                <span class="pair">{TIEBREAKER_LABELS[key]}</span>
-                <button
-                  class="btn sm"
-                  type="submit"
-                  name="action"
-                  value={`up:${key}`}
-                  disabled={i === 0}
-                  aria-label={`Subir ${TIEBREAKER_LABELS[key]}`}
-                >
-                  ↑
-                </button>
-                <button
-                  class="btn sm"
-                  type="submit"
-                  name="action"
-                  value={`down:${key}`}
-                  disabled={i === order.length - 1}
-                  aria-label={`Bajar ${TIEBREAKER_LABELS[key]}`}
-                >
-                  ↓
-                </button>
-              </li>
-            ))}
-            <li>
-              <span class="pair bye">Si siguen empatados: partida de desempate</span>
-            </li>
-          </ol>
+          {order.length > 0 ? (
+            <ol class="tb-list">
+              {order.map((key, i) => (
+                <li>
+                  <span class="pair">{TIEBREAKER_LABELS[key]}</span>
+                  <button
+                    class="btn sm"
+                    type="submit"
+                    name="action"
+                    value={`up:${key}`}
+                    disabled={i === 0}
+                    aria-label={`Subir ${TIEBREAKER_LABELS[key]}`}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    class="btn sm"
+                    type="submit"
+                    name="action"
+                    value={`down:${key}`}
+                    disabled={i === order.length - 1}
+                    aria-label={`Bajar ${TIEBREAKER_LABELS[key]}`}
+                  >
+                    ↓
+                  </button>
+                  <button
+                    class="btn sm danger"
+                    type="submit"
+                    name="action"
+                    value={`remove:${key}`}
+                    aria-label={`Quitar ${TIEBREAKER_LABELS[key]}`}
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p class="muted" style="margin:0">
+              Sin criterios: los equipos con los mismos puntos quedan empatados.
+            </p>
+          )}
+          {unused.length > 0 ? (
+            <div class="tb-add">
+              <Select name="new_tiebreaker" aria-label="Criterio para agregar">
+                {unused.map((key) => (
+                  <option value={key}>{TIEBREAKER_LABELS[key]}</option>
+                ))}
+              </Select>
+              <button class="btn sm" type="submit" name="action" value="add">
+                + Agregar
+              </button>
+            </div>
+          ) : null}
+          <p class="muted" style="margin:0;font-size:12px">
+            Si siguen empatados, el torneo queda con empate sin resolver y los cruces de semifinales se eligen a mano.
+          </p>
         </div>
         <div class="card stack" style="align-content:start">
           <h2>Formato</h2>

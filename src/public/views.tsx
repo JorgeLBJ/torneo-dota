@@ -327,7 +327,7 @@ const StreamPanel: FC<{ model: PublicModel }> = ({ model }) => {
 const STATUS_LABEL: Partial<Record<PublicStandingRow['status'], string>> = {
   qualified: 'Clasificado',
   eliminated: 'Eliminado',
-  tiebreak: 'Desempate',
+  tiebreak: 'Empate sin resolver',
 };
 
 const StandingRowView: FC<{ row: PublicStandingRow }> = ({ row }) => {
@@ -522,11 +522,15 @@ const RulesPanel: FC<{ model: PublicModel }> = ({ model }) => (
     <div class="rules-grid">
       <article class="rbox">
         <h3>Desempate</h3>
-        <ol>
-          {model.rules.tiebreakers.map((text) => (
-            <li>{text}</li>
-          ))}
-        </ol>
+        {model.rules.tiebreakers.length > 0 ? (
+          <ol>
+            {model.rules.tiebreakers.map((text) => (
+              <li>{text}</li>
+            ))}
+          </ol>
+        ) : (
+          <p>Sin criterios de desempate: los equipos con los mismos puntos quedan empatados.</p>
+        )}
       </article>
       {toBoxes(model.rules.blocks).map((box) => (
         <article class="rbox">

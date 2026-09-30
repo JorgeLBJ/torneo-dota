@@ -103,7 +103,8 @@ Las páginas públicas no envían cabeceras que impidan incrustarlas, por lo que
 ### Reglas
 
 - Los puntos por victoria y por derrota se configuran en cada torneo (por defecto **victoria 1, derrota 0**; no hay empates).
-- Clasificación: puntos y, después, los criterios de desempate configurados; por defecto, **diferencia de kills (K−D)** y luego **total de kills**. Si persiste un empate, se marca como sin resolver; se resuelve con un partido de desempate (en el panel: Fixture) o eligiendo a mano los equipos de las semifinales.
+- Clasificación: primero los puntos y, después, los criterios de desempate configurados **en el orden elegido** (Reglas > Desempate): **Diferencia K − D**, **Resultado directo** y **Más kills**. Se pueden reordenar, quitar (incluso todos) y agregar. Cada criterio se aplica solo a los equipos que siguen empatados; con **Resultado directo**, entre 2 equipos gana quien ganó su partido, y entre 3 o más cuenta una mini-liga con los partidos jugados solo entre ellos (por defecto: K−D y luego más kills).
+- Si un empate sobrevive a todos los criterios, se marca como **"Empate sin resolver"** y los equipos de las semifinales se eligen a mano (Playoffs > Elegir equipos manualmente).
 - Avanzan los **4 primeros**. Semifinales: 1.º vs 4.º y 2.º vs 3.º. Los ganadores juegan la final.
 - Mientras la fase de grupos está en curso, la pestaña Playoffs muestra una *proyección* con la tabla actual.
 

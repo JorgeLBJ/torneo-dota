@@ -38,7 +38,7 @@ export interface StandingRow {
   status: QualificationStatus;
 }
 
-export type TiebreakCriterion = 'kd' | 'kills';
+export type TiebreakCriterion = 'kd' | 'kills' | 'h2h';
 
 export interface StandingsRules {
   pointsWin?: number;
@@ -47,10 +47,13 @@ export interface StandingsRules {
   tiebreakers?: TiebreakCriterion[];
 }
 
-const CRITERION_VALUE: Record<TiebreakCriterion, (row: StandingRow) => number> = {
+/** Criteria that give each team a number (higher is better). Head-to-head is handled apart: it looks at matches. */
+const CRITERION_VALUE: Record<'kd' | 'kills', (row: StandingRow) => number> = {
   kd: (row) => row.diff,
   kills: (row) => row.kills,
 };
+
+const KNOWN_CRITERIA = new Set<string>(['kd', 'kills', 'h2h']);
 
 interface Acc extends StandingRow {
   results: { matchNumber: number; result: 'W' | 'L' }[];
@@ -58,8 +61,9 @@ interface Acc extends StandingRow {
 
 /**
  * Standings derived purely from played group matches (winner set).
- * Order: points desc, then the configured tiebreakers (default kill diff desc,
- * kills desc), then team code for a stable display only. Ties on every
+ * Order: points desc, then the configured tiebreakers in order (default kill diff desc, kills desc;
+ * `h2h` is the result between the tied teams), then team code for a stable display only.
+ * Each criterion is applied only to the teams still level after the previous ones. Ties that survive every
  * criterion are flagged, never broken by name.
  */
 export function computeStandings(
@@ -70,7 +74,7 @@ export function computeStandings(
 ): StandingRow[] {
   const { pointsWin = 1, pointsLoss = 0, tiebreakers = ['kd', 'kills'] } = rules;
   // Stored values are not trusted: unknown or repeated criteria are skipped.
-  const criteria = [...new Set(tiebreakers)].flatMap((name) => (Object.hasOwn(CRITERION_VALUE, name) ? [CRITERION_VALUE[name]] : []));
+  const criteria = [...new Set(tiebreakers)].filter((name) => KNOWN_CRITERIA.has(name));
   const acc = new Map<number, Acc>();
   for (const t of teams) {
     acc.set(t.id, {
@@ -120,27 +124,49 @@ export function computeStandings(
     row.last5 = row.results.slice(-5).map((r) => r.result);
   }
 
-  const compare = (a: Acc, b: Acc): number => {
-    if (a.points !== b.points) return b.points - a.points;
-    for (const value of criteria) {
-      const delta = value(b) - value(a);
-      if (delta !== 0) return delta;
+  // Wins of each team in the mini-league formed by `group` alone: only played matches between two members count.
+  const headToHeadWins = (group: Acc[]): Map<number, number> => {
+    const members = new Set(group.map((row) => row.teamId));
+    const wins = new Map(group.map((row) => [row.teamId, 0]));
+    for (const match of groupMatches) {
+      if (match.winnerId === null || match.team1Id === null || match.team2Id === null) continue;
+      if (!members.has(match.team1Id) || !members.has(match.team2Id)) continue;
+      wins.set(match.winnerId, (wins.get(match.winnerId) ?? 0) + 1);
     }
-    return 0;
+    return wins;
   };
 
-  rows.sort((a, b) => compare(a, b) || (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
+  // Splits a set of tied teams into ordered blocks of teams that are still level, applying the criteria in order.
+  const split = (group: Acc[], from: number): Acc[][] => {
+    const name = criteria[from];
+    if (group.length < 2 || name === undefined) return [group];
+    const scoreOf: (row: Acc) => number =
+      name === 'h2h'
+        ? ((wins) => (row: Acc) => wins.get(row.teamId) ?? 0)(headToHeadWins(group))
+        : CRITERION_VALUE[name as 'kd' | 'kills'];
+    const levels = new Map<number, Acc[]>();
+    for (const row of group) levels.set(scoreOf(row), [...(levels.get(scoreOf(row)) ?? []), row]);
+    return [...levels.keys()]
+      .sort((x, y) => y - x)
+      .flatMap((score) => split(levels.get(score)!, from + 1));
+  };
 
-  const sameKey = (a: Acc, b: Acc) => compare(a, b) === 0;
+  const byPoints = new Map<number, Acc[]>();
+  for (const row of rows) byPoints.set(row.points, [...(byPoints.get(row.points) ?? []), row]);
+  const blocks = [...byPoints.keys()]
+    .sort((x, y) => y - x)
+    .flatMap((points) => split(byPoints.get(points)!, 0))
+    .map((block) => [...block].sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0)));
 
-  // Group consecutive rows that tie on every criterion.
+  const ordered = blocks.flat();
+  // Group consecutive rows that are level on every criterion.
   const groups: { start: number; end: number }[] = [];
-  for (let i = 0; i < rows.length; ) {
-    let j = i;
-    while (j + 1 < rows.length && sameKey(rows[i]!, rows[j + 1]!)) j++;
-    groups.push({ start: i, end: j });
-    i = j + 1;
+  let cursor = 0;
+  for (const block of blocks) {
+    groups.push({ start: cursor, end: cursor + block.length - 1 });
+    cursor += block.length;
   }
+  rows.splice(0, rows.length, ...ordered);
 
   const complete = groupMatches.length > 0 && groupMatches.every((mt) => mt.winnerId !== null);
 

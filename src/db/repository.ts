@@ -5,7 +5,7 @@ import { isValidTimeZone, utcToZoned, zonedToUtc } from '../format/timezone.js';
 // All SQL of the application lives in this module.
 
 export type Phase = 'group' | 'semifinal' | 'final';
-export type TiebreakerKey = 'kd' | 'kills';
+export type TiebreakerKey = 'kd' | 'kills' | 'h2h';
 
 export interface Tournament {
   id: number;
@@ -115,7 +115,7 @@ export interface Session {
   expiresAt: string;
 }
 
-export const TIEBREAKER_KEYS = ['kd', 'kills'] as const;
+export const TIEBREAKER_KEYS = ['kd', 'kills', 'h2h'] as const;
 
 const TOURNAMENT_COLS = `id, name, slug, qualifiers, game, points_win AS pointsWin, points_loss AS pointsLoss,
   tiebreakers, group_legs AS groupLegs, rules_text AS rulesText, timezone, stream_url AS streamUrl, is_active AS isActive, created_at AS createdAt`;
