@@ -153,7 +153,7 @@ describe('the standings follow the saved criteria', () => {
     const order = async () => {
       const html = await (await t.get('/')).text();
       const std = html.slice(html.indexOf('<tbody>', html.indexOf('id="p-posiciones"')));
-      return [...std.matchAll(/<strong>Equipo ([ABC])<\/strong>/g)].map((m) => m[1]).join('');
+      return [...std.matchAll(/<strong title="Equipo [ABC]">Equipo ([ABC])<\/strong>/g)].map((m) => m[1]).join('');
     };
     t.repo.updateTournament(tournament.id, { tiebreakers: ['kd', 'h2h'] });
     expect((await order()).slice(0, 2)).toBe('AB');
