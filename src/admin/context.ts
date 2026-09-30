@@ -3,6 +3,7 @@ import type { LoginRateLimiter } from '../auth/rate-limit.js';
 import type { AppConfig } from '../config.js';
 import type { Admin, Repository, Tournament } from '../db/repository.js';
 import type { Events } from '../events.js';
+import type { ImageStore } from '../storage/image-store.js';
 
 export interface Deps {
   repo: Repository;
@@ -13,6 +14,10 @@ export interface Deps {
   /** Change-password attempts, keyed by admin id, so they cannot lock anyone out of logging in. */
   accountLimiter: LoginRateLimiter;
   now: Clock;
+  /** Where custom team images live, or null when they are switched off. */
+  images: ImageStore | null;
+  /** Image uploads, keyed by admin id. */
+  uploadLimiter: LoginRateLimiter;
 }
 
 /** `tournament` is only set on routes under /t/:tid (see tournamentScope). */

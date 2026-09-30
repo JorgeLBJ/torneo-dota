@@ -5,8 +5,11 @@ import type { AdminEnv, Deps } from '../context.js';
 import { readBody, str, type Body } from '../form.js';
 import { setFlash } from '../flash.js';
 import { renderPage } from '../render.js';
+import { ImageStorageError, deleteTeamImage, removeTeamImage, setTeamImage } from '../../services/team-image.js';
 import { fail, ok, type Checked } from '../validate.js';
 import { TeamsView } from '../views/teams.js';
+
+const INVALID_IMAGE = 'La imagen debe ser JPG, PNG o WebP de hasta 5 MB.';
 
 interface TeamInput {
   code: string;
@@ -92,7 +95,7 @@ export function teamRoutes(deps: Deps) {
     return c.redirect(`/admin/t/${tournament.id}/equipos`, 303);
   });
 
-  app.post('/equipos/:teamId/eliminar', (c) => {
+  app.post('/equipos/:teamId/eliminar', async (c) => {
     const tournament = c.get('tournament');
     const team = ownTeam(tournament.id, c.req.param('teamId'));
     if (!team) return c.text('Equipo no encontrado.', 404);
@@ -104,9 +107,44 @@ export function teamRoutes(deps: Deps) {
       );
     } else {
       repo.deleteTeam(team.id);
+      await deleteTeamImage(deps.images, team);
       deps.events.tournamentChanged(tournament.id);
       setFlash(c, 'ok', `Equipo ${team.code} eliminado.`);
     }
+    return c.redirect(`/admin/t/${tournament.id}/equipos`, 303);
+  });
+
+  // Custom image: the browser crops it to 16:9 and posts it as multipart; the server re-checks and converts it.
+  app.post('/equipos/:teamId/imagen', async (c) => {
+    const tournament = c.get('tournament');
+    const team = ownTeam(tournament.id, c.req.param('teamId'));
+    if (!team) return c.json({ error: 'Equipo no encontrado.' }, 404);
+    if (!deps.images) return c.json({ error: 'Las imágenes personalizadas no están disponibles en este servidor.' }, 503);
+    if (!deps.uploadLimiter.consume(`admin:${c.get('admin').id}`)) {
+      return c.json({ error: 'Demasiadas subidas seguidas: espera un minuto.' }, 429);
+    }
+    const file = (await c.req.parseBody())['image'];
+    if (!(file instanceof File)) return c.json({ error: INVALID_IMAGE }, 400);
+
+    try {
+      const saved = await setTeamImage(repo, deps.images, team, new Uint8Array(await file.arrayBuffer()));
+      if (!saved.ok) return c.json({ error: saved.error }, 400);
+    } catch (error) {
+      if (!(error instanceof ImageStorageError)) throw error;
+      return c.json({ error: 'No se pudo guardar la imagen. Inténtalo de nuevo.' }, 502);
+    }
+    deps.events.tournamentChanged(tournament.id);
+    setFlash(c, 'ok', `Imagen del equipo ${team.code} actualizada.`);
+    return c.json({ ok: true });
+  });
+
+  app.post('/equipos/:teamId/imagen/quitar', async (c) => {
+    const tournament = c.get('tournament');
+    const team = ownTeam(tournament.id, c.req.param('teamId'));
+    if (!team) return c.text('Equipo no encontrado.', 404);
+    await removeTeamImage(repo, deps.images, team);
+    deps.events.tournamentChanged(tournament.id);
+    setFlash(c, 'ok', `Imagen del equipo ${team.code} quitada.`);
     return c.redirect(`/admin/t/${tournament.id}/equipos`, 303);
   });
 
