@@ -2,6 +2,8 @@ import { fail, ok, type Checked } from '../checked.js';
 import type { Match, Phase, Repository, Schedule, Tournament } from '../db/repository.js';
 import { addMinutes } from '../domain/fixture.js';
 import { deleteGameResult, saveGameResult, type ImportChoice } from './games.js';
+import { liveEligibility } from '../domain/live.js';
+import { seriesLengthFor } from '../domain/series.js';
 import { markLive } from './live.js';
 import { validateResult, type RawResult } from './results.js';
 import type { TournamentState } from './state.js';
@@ -125,6 +127,17 @@ export function markPlayoffLive(
   const slot = phase === 'final' ? (number === 1 ? state.bracket.final : undefined) : state.bracket.semifinals[number - 1];
   if (!slot) return fail('Partido de playoffs no encontrado.');
   if (slot.team1Id === null || slot.team2Id === null) return fail('El partido todavía no tiene los dos equipos definidos.');
+  // Validate first, against what the series will look like after the teams are aligned: a refusal changes nothing.
+  const existing = repo.listMatches(tournament.id, phase).find((m) => m.matchNumber === number);
+  const realigned = !existing || existing.team1Id !== slot.team1Id || existing.team2Id !== slot.team2Id;
+  const refusal = liveEligibility(
+    slot.team1Id,
+    slot.team2Id,
+    seriesLengthFor(tournament, phase, false),
+    realigned || !existing ? [] : repo.listGames(existing.id),
+    gameNumber,
+  );
+  if (refusal) return fail(refusal);
   const matches = ensurePlayoffMatches(repo, tournament);
   let match = findMatch(matches, phase, number)!;
   if (match.team1Id !== slot.team1Id || match.team2Id !== slot.team2Id) {

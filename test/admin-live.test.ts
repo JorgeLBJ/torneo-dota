@@ -74,6 +74,20 @@ describe('Resultados: marcar en vivo', () => {
     expect((await mark(m, 1, 'clear')).status).toBe(303);
   });
 
+  it('a stale "Quitar en vivo" from another match or game leaves the current live game alone', async () => {
+    t.repo.updateTournament(tournament.id, { groupGames: 3 });
+    const m1 = groupMatch(1);
+    const m2 = groupMatch(2, c, d);
+    await mark(m2);
+    const res = await mark(m1, 1, 'clear');
+    expect(await flashText(t, res, cookie)).toContain('Ese partido ya no estaba en vivo.');
+    expect(fresh().live).toMatchObject({ matchId: m2.id, gameNumber: 1 });
+    await mark(m2, 2, 'clear');
+    expect(fresh().live).toMatchObject({ matchId: m2.id, gameNumber: 1 });
+    await mark(m2, 1, 'clear');
+    expect(fresh().live).toBeNull();
+  });
+
   it('saving the result of the live game turns it off by itself', async () => {
     const m = groupMatch();
     await mark(m);
@@ -153,6 +167,15 @@ describe('Playoffs: marcar en vivo', () => {
     expect(html).toMatch(/disabled=""[^>]*>\s*▶ Marcar en vivo/);
     const res = await markPlayoff('final', 1);
     expect(await flashText(t, res, cookie)).toContain('El partido todavía no tiene los dos equipos definidos.');
+  });
+
+  it('a stale clear from another playoff match leaves the live one alone', async () => {
+    await setup();
+    await markPlayoff('semifinal', 2);
+    await markPlayoff('semifinal', 1, 1, 'clear');
+    expect(fresh().live).not.toBeNull();
+    await markPlayoff('semifinal', 2, 1, 'clear');
+    expect(fresh().live).toBeNull();
   });
 
   it('refuses unknown playoff matches and clears by hand', async () => {

@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
+import { jsx } from 'hono/jsx';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Match, Team, Tournament } from '../src/db/repository.js';
 import { buildPublicModel } from '../src/public/model.js';
+import { PublicContent } from '../src/public/views.js';
 import { buildShare } from '../src/public/share.js';
 import { assignSemifinalTeams } from '../src/services/playoffs.js';
 import { loadState } from '../src/services/state.js';
@@ -114,6 +116,24 @@ describe('public model: the live game', () => {
     goLive(sf1);
     expect(model().bracket.semifinals[0].liveGame).toBe(1);
     expect(model().bracket.semifinals[1].liveGame).toBeNull();
+  });
+});
+
+describe('elapsed time', () => {
+  const strip = (mutate: (m: ReturnType<typeof model>) => void) => {
+    const m = model();
+    mutate(m);
+    return jsx(PublicContent, { model: m }).toString();
+  };
+  it('is left out, not shown as NaN, when the start or the server clock is unusable', () => {
+    goLive(groupMatch());
+    expect(strip(() => {})).toContain('Empezó hace');
+    const badStart = strip((m) => { m.live!.startedAt = 'garbage'; });
+    expect(badStart).not.toContain('Empezó hace');
+    expect(badStart).not.toContain('NaN');
+    const badClock = strip((m) => { m.serverNow = ''; });
+    expect(badClock).not.toContain('Empezó hace');
+    expect(badClock).not.toContain('NaN');
   });
 });
 

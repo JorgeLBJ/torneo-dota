@@ -106,8 +106,8 @@ export function resultRoutes(deps: Deps) {
       return c.redirect(back, 303);
     }
     if (str(body, 'action') === 'clear') {
-      clearLive(repo, tournament);
-      setFlash(c, 'ok', 'Partida en vivo quitada.');
+      if (clearLive(repo, tournament, match.id, gameNumber)) setFlash(c, 'ok', 'Partida en vivo quitada.');
+      else setFlash(c, 'warn', 'Ese partido ya no estaba en vivo.');
     } else {
       const marked = markLive(repo, tournament, match, gameNumber, deps.now());
       if (!marked.ok) setFlash(c, 'error', marked.error);

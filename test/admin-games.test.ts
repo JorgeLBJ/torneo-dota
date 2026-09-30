@@ -216,6 +216,20 @@ describe('Dota lookups for the forms', () => {
     });
   });
 
+  it('autocompletar when Dire won: the winner is the Dire side and the other team was Radiant', async () => {
+    direWins = true;
+    const res = await postJson('/dota/autocompletar', { dota_match_id: '9023462170', winner: String(a.id), team1_id: String(a.id), team2_id: String(b.id) });
+    expect(await res.json()).toEqual({
+      ok: true,
+      summary: 'Partida encontrada · 66:06 · 41 – 42',
+      winnerId: a.id,
+      team1Kills: 41,
+      team1Deaths: deaths('dire'),
+      team2Kills: 42,
+      team2Deaths: deaths('radiant'),
+    });
+  });
+
   it('autocompletar refuses teams of another tournament or a winner that is neither team', async () => {
     const other = t.repo.createTournament({ name: 'Otra', slug: 'otra' });
     const foreign = t.repo.createTeam(other.id, { code: 'ZZ', name: 'Foreign' });

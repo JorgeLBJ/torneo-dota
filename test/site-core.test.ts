@@ -128,6 +128,7 @@ describe('elapsedText', () => {
     expect(core.elapsedText(start, at(-5))).toBe('0 min');
     expect(core.elapsedText('nonsense', at(3))).toBe('');
     expect(core.elapsedText(null, at(3))).toBe('');
+    expect(core.elapsedText(start, Number.NaN)).toBe('');
   });
 });
 

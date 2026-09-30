@@ -97,7 +97,7 @@
 
   /** "23 min" / "1 h 05 min" since an instant, never negative; empty when the instant is unusable. */
   function elapsedText(startIso, nowMs) {
-    if (!isInstant(startIso)) return '';
+    if (!isInstant(startIso) || typeof nowMs !== 'number' || !isFinite(nowMs)) return '';
     var minutes = Math.max(0, Math.floor((nowMs - Date.parse(startIso)) / 60000));
     if (minutes < 60) return minutes + ' min';
     var rest = minutes % 60;

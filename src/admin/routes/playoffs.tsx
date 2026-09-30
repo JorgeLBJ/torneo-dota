@@ -120,8 +120,9 @@ export function playoffRoutes(deps: Deps) {
       return c.redirect(back, 303);
     }
     if (str(body, 'action') === 'clear') {
-      clearLive(repo, tournament);
-      setFlash(c, 'ok', 'Partida en vivo quitada.');
+      const stored = repo.listMatches(tournament.id, phase as 'semifinal' | 'final').find((m) => m.matchNumber === number);
+      if (clearLive(repo, tournament, stored?.id ?? null, gameNumber)) setFlash(c, 'ok', 'Partida en vivo quitada.');
+      else setFlash(c, 'warn', 'Ese partido ya no estaba en vivo.');
     } else {
       const marked = markPlayoffLive(repo, tournament, loadState(repo, tournament), phase as 'semifinal' | 'final', number, gameNumber, deps.now());
       if (!marked.ok) setFlash(c, 'error', marked.error);

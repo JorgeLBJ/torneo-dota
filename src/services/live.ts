@@ -18,6 +18,13 @@ export function markLive(repo: Repository, tournament: Tournament, match: Match,
   return ok(undefined);
 }
 
-export function clearLive(repo: Repository, tournament: Tournament): void {
+/**
+ * Clears the live mark only when it is still this match and game: a stale button (another match was marked since
+ * the page was drawn) must not switch off a game it never showed. Returns whether anything was cleared.
+ */
+export function clearLive(repo: Repository, tournament: Tournament, matchId: number | null, gameNumber: number): boolean {
+  const current = repo.getTournamentById(tournament.id)?.live;
+  if (!current || matchId === null || current.matchId !== matchId || current.gameNumber !== gameNumber) return false;
   repo.setLive(tournament.id, null);
+  return true;
 }

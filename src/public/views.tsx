@@ -131,10 +131,21 @@ const defaultSources = emblemSourcesFor(null);
 
 const teamName = (team: Team | null) => team?.name ?? 'Por definir';
 
+/**
+ * Attributes that let a team name shrink to fit its box instead of breaking in the middle of a word: the length of
+ * its longest word (the CSS sizes the font from it and the box width) and the full name as a tooltip.
+ */
+const fitName = (name: string) => ({
+  class: /\s/.test(name.trim()) ? 'fit' : 'fit one',
+  title: name,
+  style: `--n:${Math.max(1, ...name.split(/\s+/).map((word) => word.length))}`,
+});
+
 // ---------- Live game ----------
 
 /** "23 min" (or "1 h 05 min") between the mark and the server's clock. */
 export function elapsedText(startedAt: string, nowIso: string): string {
+  if (Number.isNaN(Date.parse(startedAt)) || Number.isNaN(Date.parse(nowIso))) return '';
   const minutes = Math.max(0, Math.floor((Date.parse(nowIso) - Date.parse(startedAt)) / 60000));
   return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')} min`;
 }
@@ -167,7 +178,7 @@ const LiveSide: FC<{ team: Team; subtitle: string; side: 'a' | 'b' }> = ({ team,
       <Portrait team={team} />
     </div>
     <div>
-      <strong>{team.name}</strong>
+      <strong {...fitName(team.name)}>{team.name}</strong>
       {subtitle ? <small>{subtitle}</small> : null}
     </div>
   </div>
@@ -176,6 +187,7 @@ const LiveSide: FC<{ team: Team; subtitle: string; side: 'a' | 'b' }> = ({ team,
 /** The strip above the player: phase, teams, series score and games (best of 3/5 only) and the elapsed time. */
 const LiveStrip: FC<{ live: PublicLive; now: string }> = ({ live, now }) => {
   const { series, teamA, teamB } = live;
+  const elapsed = elapsedText(live.startedAt, now);
   const chip = (g: { number: number; winnerId: number }) => (
     <span class={g.winnerId === teamA.id ? 'w1' : 'w2'}>
       J{g.number} · {g.winnerId === teamA.id ? teamA.name : teamB.name}
@@ -200,9 +212,11 @@ const LiveStrip: FC<{ live: PublicLive; now: string }> = ({ live, now }) => {
             </div>
           </>
         ) : null}
-        <span class="ls-elapsed">
-          Empezó hace <b data-live-start={live.startedAt}>{elapsedText(live.startedAt, now)}</b>
-        </span>
+        {elapsed ? (
+          <span class="ls-elapsed">
+            Empezó hace <b data-live-start={live.startedAt}>{elapsed}</b>
+          </span>
+        ) : null}
       </div>
       <LiveSide team={teamB} subtitle={live.subtitleB} side="b" />
     </div>
@@ -267,7 +281,7 @@ const MatchSide: FC<{ team: Team | null; side: 'a' | 'b'; match: PublicMatch; in
         {result === 'win' ? <span class="crown">Victoria</span> : null}
       </div>
       <div class="who">
-        <strong title={teamName(team)}>{teamName(team)}</strong>
+        <strong {...fitName(teamName(team))}>{teamName(team)}</strong>
         <small>{detail}</small>
       </div>
     </div>
@@ -546,7 +560,7 @@ const BracketSlot: FC<{ slot: BracketSlotView }> = ({ slot }) =>
     <div class={`slot ${slot.isWinner ? 'win' : ''}`}>
       <Portrait team={slot.team} />
       <div>
-        <strong title={slot.team.name}>{slot.team.name}</strong>
+        <strong {...fitName(slot.team.name)}>{slot.team.name}</strong>
         <small>{slot.isWinner ? 'Victoria' : slot.seedLabel}</small>
       </div>
       {slot.wins !== null ? (

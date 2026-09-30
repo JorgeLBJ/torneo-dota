@@ -87,9 +87,9 @@ describe('clearLive and the automatic clearing', () => {
   it('clears by hand, and clearing nothing is fine', () => {
     const m = groupMatch();
     markLive(repo, fresh(), m, 1, NOW);
-    clearLive(repo, fresh());
+    expect(clearLive(repo, fresh(), m.id, 1)).toBe(true);
     expect(live()).toBeNull();
-    expect(() => clearLive(repo, fresh())).not.toThrow();
+    expect(clearLive(repo, fresh(), m.id, 1)).toBe(false);
   });
 
   it('saving the result of the live game turns it off through the normal save', () => {
@@ -155,5 +155,30 @@ describe('playoffs', () => {
     mark('semifinal', 1, 1);
     assignSemifinalTeams(repo, tournament, [teams[1]!.id, teams[2]!.id, teams[0]!.id, teams[3]!.id]);
     expect(live()).toBeNull();
+  });
+});
+
+describe('markPlayoffLive validates before it mutates', () => {
+  it('a refused mark leaves the stored match, its teams and its games untouched', async () => {
+    const { makeApp } = await import('./helpers/app.js');
+    const { loadState } = await import('../src/services/state.js');
+    const { assignSemifinalTeams, markPlayoffLive } = await import('../src/services/playoffs.js');
+    const t = await makeApp({});
+    const tournament = t.repo.createTournament({ name: 'C', slug: 'c' });
+    const [a, b, c, d] = ['A', 'B', 'C', 'D'].map((code) => t.repo.createTeam(tournament.id, { code, name: code })) as { id: number }[] as { id: number }[];
+    assignSemifinalTeams(t.repo, tournament, [a!.id, d!.id, b!.id, c!.id]);
+    const sf1 = t.repo.listMatches(tournament.id, 'semifinal').find((m) => m.matchNumber === 1)!;
+    t.repo.saveGame(sf1.id, { gameNumber: 1, winnerId: a!.id, team1Kills: 20, team1Deaths: 10, team2Kills: 10, team2Deaths: 20 });
+    const state = loadState(t.repo, tournament);
+    // the derived bracket now says a different pairing for this slot
+    state.bracket.semifinals[0] = { ...state.bracket.semifinals[0]!, team1Id: a!.id, team2Id: c!.id };
+    // game 2 of a realigned (empty) series is not the next game: refused
+    const result = markPlayoffLive(t.repo, tournament, state, 'semifinal', 1, 2, new Date());
+    expect(result.ok).toBe(false);
+    const after = t.repo.listMatches(tournament.id, 'semifinal').find((m) => m.matchNumber === 1)!;
+    expect([after.team1Id, after.team2Id]).toEqual([a!.id, d!.id]);
+    expect(t.repo.listGames(sf1.id)).toHaveLength(1);
+    expect(t.repo.getTournamentById(tournament.id)!.live).toBeNull();
+    t.db.close();
   });
 });

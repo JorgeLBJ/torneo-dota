@@ -440,3 +440,19 @@ dialog.detail::backdrop { background: rgba(0,0,0,.78); }
   .ls-emb { width: 96px; }
   .ls-side strong { font-size: 16px; }
 }
+
+/* Team names wrap between words only; a long single word shrinks to fit its box (--n = its length in characters). */
+.who, .slot > div, .ls-side > div:last-child { container-type: inline-size; min-width: 0; }
+.slot > div, .ls-side > div:last-child { flex: 1 1 0; }
+strong.fit { --fs: 15px; overflow-wrap: normal; word-break: normal; hyphens: none;
+  font-size: clamp(9px, calc(100cqw / (var(--n) * .86)), var(--fs)); }
+.slot strong.fit { --fs: 14px; }
+.ls-side strong.fit { --fs: 20px; }
+/* A single long word that still does not fit even at the smallest size is cut with an ellipsis (full name in the tooltip). */
+strong.fit.one { display: block; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+@media (max-width: 760px) {
+  .ls-side strong.fit { --fs: 16px; }
+  .ls-side, .ls-side.b { align-items: stretch; }
+  .ls-side .ls-emb { align-self: center; }
+  .ls-side > div:last-child { flex: 0 0 auto; }
+}
