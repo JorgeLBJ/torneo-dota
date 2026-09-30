@@ -162,6 +162,7 @@
   var OUT = { width: 1024, height: 576 };
   var DARK = '#0f1114'; // the public site's panel colour
   var BLUR_PX = 24; // at 1024 px wide; scaled for smaller renders
+  var MIN_OVERLAP = 0.02; // less of the frame than this covered by the picture would upload a blank image
   var SOURCE_MAX = 1600; // longest side of the copy used for the blurred backdrop
 
   var image = document.getElementById('cropImage');
@@ -450,6 +451,16 @@
   modal.addEventListener('cancel', function (event) { if (saving) event.preventDefault(); });
   modal.addEventListener('close', cleanup);
 
+  /** Share of the 16:9 frame that the picture covers (0 when it was dragged completely outside). */
+  function overlapShare() {
+    var picture = cropper.getCanvasData();
+    var frame = cropper.getCropBoxData();
+    var width = Math.min(picture.left + picture.width, frame.left + frame.width) - Math.max(picture.left, frame.left);
+    var height = Math.min(picture.top + picture.height, frame.top + frame.height) - Math.max(picture.top, frame.top);
+    if (width <= 0 || height <= 0) return 0;
+    return (width * height) / (frame.width * frame.height);
+  }
+
   /** 1024x576: the fill underneath, the framed picture on top. Null when nothing of the picture is inside the frame. */
   function renderOutput() {
     var crop = cropper.getCroppedCanvas({
@@ -490,6 +501,7 @@
       idle();
       showError(message);
     };
+    if (overlapShare() < MIN_OVERLAP) return failed('Mueve la imagen dentro del recuadro antes de guardar.');
     var canvas = renderOutput();
     if (!canvas) return failed('La imagen quedó fuera del recuadro. Acércala o pulsa «Ajustar completa».');
     toBlob(canvas).then(function (blob) {
