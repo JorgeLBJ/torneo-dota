@@ -1,3 +1,5 @@
+import { emblemSourcesFor } from '../emblem-sources.js';
+import { EmblemSourcesContext } from '../emblem-view.js';
 import type { Context } from 'hono';
 import type { Child } from 'hono/jsx';
 import type { Tournament } from '../db/repository.js';
@@ -41,7 +43,7 @@ export function renderPage(c: Context<AdminEnv>, deps: Deps, opts: PageOptions, 
       nav={navFor(deps, opts.tournament)}
       flash={takeFlash(c)}
     >
-      {body}
+      <EmblemSourcesContext.Provider value={emblemSourcesFor(deps.images)}>{body}</EmblemSourcesContext.Provider>
     </Layout>
   );
   return c.html(html, opts.status ?? 200);

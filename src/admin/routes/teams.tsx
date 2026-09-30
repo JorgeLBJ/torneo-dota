@@ -50,6 +50,7 @@ export function teamRoutes(deps: Deps) {
         tournament={tournament}
         teams={repo.listTeams(tournament.id)}
         hasFixture={repo.listMatches(tournament.id, 'group').length > 0}
+        imagesEnabled={deps.images !== null}
       />,
     );
   });

@@ -2,6 +2,7 @@ import type { FC } from 'hono/jsx';
 import { HEROES, getHero } from '../../data/heroes.js';
 import type { Team, Tournament } from '../../db/repository.js';
 import { teamColor } from './layout.js';
+import { EmblemPicture } from '../../emblem-view.js';
 import { PageHead, heroImage } from './parts.js';
 
 const ATTRS: [string, string][] = [
@@ -38,10 +39,32 @@ const HeroSlot: FC<{ formId: string; team?: Team }> = ({ formId, team }) => {
   );
 };
 
-export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: boolean }> = ({
+/** The team's own picture, when it has one (shown next to the hero picker, which still chooses the fallback). */
+const CustomImage: FC<{ team: Team; base: string; enabled: boolean }> = ({ team, base, enabled }) => {
+  if (!enabled) return null;
+  return (
+    <div class="img-row">
+      {team.imageKey ? (
+        <span class="img-thumb">
+          <EmblemPicture team={team} eager />
+        </span>
+      ) : null}
+      {team.imageKey ? (
+        <form method="post" action={`${base}/${team.id}/imagen/quitar`} class="inline">
+          <button class="btn sm" type="submit">
+            Quitar imagen
+          </button>
+        </form>
+      ) : null}
+    </div>
+  );
+};
+
+export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: boolean; imagesEnabled?: boolean }> = ({
   tournament,
   teams,
   hasFixture,
+  imagesEnabled = false,
 }) => {
   const base = `/admin/t/${tournament.id}/equipos`;
   const taken: Record<string, string> = {};
@@ -85,6 +108,7 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
                   </td>
                   <td data-label="Emblema">
                     <HeroSlot formId={formId} team={team} />
+                    <CustomImage team={team} base={base} enabled={imagesEnabled} />
                   </td>
                   <td data-label="Nombre">
                     <input name="name" form={formId} value={team.name} required maxlength={40} aria-label="Nombre" />
@@ -136,6 +160,9 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
       <p class="muted" style="margin:0;font-size:12px">
         El héroe es el emblema del equipo en la web pública: aparece en tarjetas de partido, tabla y playoffs. Cada
         héroe solo puede usarlo un equipo.
+        {imagesEnabled
+          ? ' Si el equipo sube su propia imagen, reemplaza al héroe en toda la web; al quitarla vuelve el héroe.'
+          : ' Las imágenes personalizadas no están disponibles en este servidor (falta configurar el almacenamiento).'}
       </p>
       <dialog id="heroModal" class="hero-modal">
         <div class="hm-head">
