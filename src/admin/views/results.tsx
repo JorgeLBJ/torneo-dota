@@ -1,5 +1,6 @@
 import type { Child, FC } from 'hono/jsx';
 import type { Game, Match, Team, Tournament } from '../../db/repository.js';
+import type { LiveMark } from '../../domain/live.js';
 import { resolveSeries, seriesLengthFor, type SeriesLength, type SeriesState } from '../../domain/series.js';
 import type { StandingRow } from '../../domain/standings.js';
 import { formatDate, formatLocalDateTime } from '../../format/datetime.js';
@@ -26,6 +27,11 @@ export interface ResultCardProps {
   length?: SeriesLength;
   hidden?: Record<string, string>;
   editHref?: string;
+  /** The stored match this card is about (null for a playoff match that does not exist yet). */
+  matchId?: number | null;
+  /** The tournament's live game, and the current time to say for how long. */
+  live?: LiveMark | null;
+  now?: Date;
 }
 
 const dotaLink = (id: number) => `https://www.opendota.com/matches/${id}`;
@@ -155,8 +161,30 @@ const seriesLine = (state: SeriesState, team1: Team, team2: Team): string => {
   return state.wins[0] + state.wins[1] === 0 ? `Al mejor de ${state.length} · gana quien llegue a ${state.needed}` : `Serie ${score} · en juego`;
 };
 
-export const ResultCard: FC<ResultCardProps> = ({ action, header, team1, team2, prefix, match, games = [], length = 1, hidden, editHref }) => {
+const minutesSince = (iso: string, now: Date): number => Math.max(0, Math.floor((now.getTime() - Date.parse(iso)) / 60000));
+
+/** "▶ Marcar en vivo" / "■ Quitar en vivo" for one game. A separate form: the game form is not nested. */
+const LiveForm: FC<{ action: string; number: number; isLive: boolean; hidden?: Record<string, string> }> = ({ action, number, isLive, hidden }) => (
+  <form class="live-form" method="post" action={`${action}/juego/${number}/en-vivo`}>
+    {Object.entries(hidden ?? {}).map(([name, value]) => (
+      <input type="hidden" name={name} value={value} />
+    ))}
+    <input type="hidden" name="action" value={isLive ? 'clear' : 'mark'} />
+    {isLive ? (
+      <button class="btn sm stop" type="submit">
+        ■ Quitar en vivo
+      </button>
+    ) : (
+      <button class="btn sm live" type="submit">
+        ▶ Marcar en vivo
+      </button>
+    )}
+  </form>
+);
+
+export const ResultCard: FC<ResultCardProps> = ({ action, header, team1, team2, prefix, match, games = [], length = 1, hidden, editHref, matchId = null, live = null, now = new Date() }) => {
   const saved = match?.winnerId != null;
+  const isLive = live !== null && matchId !== null && live.matchId === matchId;
   if (!team1 || !team2) {
     return (
       <div class="rc open">
@@ -167,6 +195,10 @@ export const ResultCard: FC<ResultCardProps> = ({ action, header, team1, team2, 
         <p class="muted" style="margin:0">
           Este partido todavía no tiene los dos equipos definidos.
         </p>
+        <button class="btn sm live" type="button" disabled>
+          ▶ Marcar en vivo
+        </button>
+        <span class="hint">Se habilita cuando están los dos equipos.</span>
         {editHref ? (
           <a class="btn sm" href={editHref} style="justify-self:start">
             Definir equipos
@@ -180,10 +212,12 @@ export const ResultCard: FC<ResultCardProps> = ({ action, header, team1, team2, 
   const state = resolveSeries(team1.id, team2.id, length, games);
   const byNumber = new Map(games.map((g) => [g.gameNumber, g]));
   return (
-    <div class={`rc series ${saved ? 'saved' : 'open'}`}>
+    <div class={`rc series ${saved ? 'saved' : 'open'}${isLive ? ' on' : ''}`}>
       <div class="rc-top">
         <span>{header}</span>
-        {saved ? (
+        {isLive ? (
+          <span class="badge live">● EN VIVO · {minutesSince(live!.startedAt, now)} min</span>
+        ) : saved ? (
           <span class="pill ok">Guardado</span>
         ) : games.length > 0 ? (
           <span class="pill next">En juego</span>
@@ -195,7 +229,13 @@ export const ResultCard: FC<ResultCardProps> = ({ action, header, team1, team2, 
       {Array.from({ length }, (_, i) => i + 1).map((number) => {
         const game = byNumber.get(number);
         if (game || number === state.nextGame) {
-          return <GameForm action={action} number={number} multi={multi} team1={team1} team2={team2} prefix={prefix} game={game} hidden={hidden} />;
+          const thisLive = isLive && live!.gameNumber === number;
+          return (
+            <>
+              {thisLive || (!game && number === state.nextGame) ? <LiveForm action={action} number={number} isLive={thisLive} hidden={hidden} /> : null}
+              <GameForm action={action} number={number} multi={multi} team1={team1} team2={team2} prefix={prefix} game={game} hidden={hidden} />
+            </>
+          );
         }
         return (
           <div class="game off">
@@ -204,6 +244,11 @@ export const ResultCard: FC<ResultCardProps> = ({ action, header, team1, team2, 
           </div>
         );
       })}
+      {state.nextGame !== null || isLive ? (
+        <span class="hint">
+          {isLive ? 'Al guardar el resultado de este juego, el «en vivo» se apaga solo.' : 'Marcar otro partido reemplaza al actual.'}
+        </span>
+      ) : null}
     </div>
   );
 };
@@ -261,9 +306,10 @@ export interface ResultsViewProps {
   filter: string;
   standings: StandingRow[];
   gamesByMatch: Map<number, Game[]>;
+  now: Date;
 }
 
-export const ResultsView: FC<ResultsViewProps> = ({ tournament, cards, dates, hasUndated, filter, standings, gamesByMatch }) => (
+export const ResultsView: FC<ResultsViewProps> = ({ tournament, cards, dates, hasUndated, filter, standings, gamesByMatch, now }) => (
   <>
     <PageHead
       title="Resultados"
@@ -310,6 +356,9 @@ export const ResultsView: FC<ResultsViewProps> = ({ tournament, cards, dates, ha
           team1={team1}
           team2={team2}
           match={match}
+          matchId={match.id}
+          live={tournament.live}
+          now={now}
           games={gamesByMatch.get(match.id) ?? []}
           length={seriesLengthFor(tournament, match.phase, match.isTiebreak)}
           hidden={{ fecha: filter }}

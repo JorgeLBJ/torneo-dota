@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { seriesLengthFor } from '../../domain/series.js';
-import { assignSemifinalTeams, deletePlayoffGame, phaseSlots, recordPlayoffResult, resetPlayoffs } from '../../services/playoffs.js';
+import { clearLive } from '../../services/live.js';
+import { assignSemifinalTeams, deletePlayoffGame, markPlayoffLive, phaseSlots, recordPlayoffResult, resetPlayoffs } from '../../services/playoffs.js';
 import { parseGameNumber, readGameForm } from '../game-form.js';
 import { loadState } from '../../services/state.js';
 import type { AdminEnv, Deps } from '../context.js';
@@ -22,6 +23,7 @@ export function playoffRoutes(deps: Deps) {
       <PlayoffsView
         tournament={tournament}
         state={loadState(repo, tournament)}
+        now={deps.now()}
         slots={{
           semifinal: phaseSlots(repo, tournament.id, 'semifinal'),
           final: phaseSlots(repo, tournament.id, 'final'),
@@ -102,6 +104,32 @@ export function playoffRoutes(deps: Deps) {
     setFlash(c, 'ok', multi ? `Juego ${gameNumber} guardado.` : 'Resultado guardado.');
     return c.redirect(back, 303);
   };
+
+  /** Marks (or unmarks) a game of a semifinal/final as the one being played right now. */
+  app.post('/playoffs/:phase/:number/juego/:n/en-vivo', async (c) => {
+    const tournament = c.get('tournament');
+    const phase = c.req.param('phase');
+    const number = Number(c.req.param('number'));
+    const valid = (phase === 'semifinal' && (number === 1 || number === 2)) || (phase === 'final' && number === 1);
+    if (!valid) return c.text('Partido de playoffs no encontrado.', 404);
+    const back = `/admin/t/${tournament.id}/playoffs`;
+    const body = await readBody(c);
+    const gameNumber = parseGameNumber(c.req.param('n'));
+    if (gameNumber === null) {
+      setFlash(c, 'error', 'Ese juego no existe.');
+      return c.redirect(back, 303);
+    }
+    if (str(body, 'action') === 'clear') {
+      clearLive(repo, tournament);
+      setFlash(c, 'ok', 'Partida en vivo quitada.');
+    } else {
+      const marked = markPlayoffLive(repo, tournament, loadState(repo, tournament), phase as 'semifinal' | 'final', number, gameNumber, deps.now());
+      if (!marked.ok) setFlash(c, 'error', marked.error);
+      else setFlash(c, 'ok', 'Partida marcada en vivo.');
+    }
+    deps.events.tournamentChanged(tournament.id);
+    return c.redirect(back, 303);
+  });
 
   app.post('/playoffs/:phase/:number/juego/:n', (c) => playoffGame(c, c.req.param('n')));
   app.post('/playoffs/:phase/:number', (c) => playoffGame(c, undefined));

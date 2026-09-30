@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup partida en vivo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800;900&family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+  :root { --bg:#07080a; --panel:#0f1114; --panel-2:#15181c; --line:rgba(255,255,255,.08); --line-2:rgba(200,170,110,.28);
+    --fg:#e8e4dc; --muted:#8c8a86; --gold:#c8aa6e; --gold-hi:#f0dcaa; --radiant:#6dbf4b; --dire:#d2452f; --live:#e5402b;
+    --fd:"Cinzel",serif; --fl:"Barlow Condensed",sans-serif; --fb:"Barlow",system-ui,sans-serif; color-scheme:dark; }
+  * { box-sizing:border-box } body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 var(--fb) }
+  .wrap { max-width:1180px; margin:0 auto; padding:28px 16px 60px; display:grid; gap:44px }
+  .tag { font:600 12px var(--fl); letter-spacing:.2em; text-transform:uppercase; color:var(--muted) }
+  h1 { margin:0; font:800 24px var(--fd); letter-spacing:.06em; text-transform:uppercase }
+  .sec-title { display:flex; gap:14px; align-items:baseline; flex-wrap:wrap; border-bottom:1px solid var(--line); padding-bottom:10px; margin-bottom:16px }
+  .note { font:500 13px var(--fl); letter-spacing:.04em; color:var(--muted); margin:10px 0 0 }
+
+  /* ---------- Live strip ---------- */
+  .live-strip { position:relative; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:18px; padding:16px 22px;
+    background:radial-gradient(70% 140% at 50% 0%, rgba(229,64,43,.16), transparent 70%), linear-gradient(180deg,var(--panel-2),var(--panel));
+    border:1px solid rgba(229,64,43,.45); box-shadow:0 0 0 1px rgba(229,64,43,.08), 0 10px 40px rgba(229,64,43,.08) }
+  .live-strip::before, .live-strip::after { content:""; position:absolute; top:0; bottom:0; width:3px }
+  .live-strip::before { left:0; background:var(--radiant) } .live-strip::after { right:0; background:var(--dire) }
+  .side { display:flex; align-items:center; gap:14px } .side.b { flex-direction:row-reverse; text-align:right }
+  .side .emb { width:112px; aspect-ratio:16/9; border:1px solid var(--line); overflow:hidden } .side .emb img { width:100%; height:100%; object-fit:cover; display:block }
+  .side strong { display:block; font:800 20px var(--fd); text-transform:uppercase; letter-spacing:.03em }
+  .side small { font:500 12px var(--fl); letter-spacing:.1em; color:var(--muted); text-transform:uppercase }
+  .center { display:grid; justify-items:center; gap:6px; text-align:center }
+  .pill { display:inline-flex; align-items:center; gap:8px; padding:4px 12px; background:var(--live); color:#fff; font:700 12px var(--fl); letter-spacing:.24em; text-transform:uppercase }
+  .dot { width:8px; height:8px; border-radius:50%; background:#fff; animation:pulse 1.4s infinite }
+  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.25 } }
+  .phase { font:600 13px var(--fl); letter-spacing:.18em; color:var(--gold); text-transform:uppercase }
+  .series { font:900 34px var(--fd); display:flex; gap:10px; align-items:baseline } .series i { font-style:normal; color:var(--muted); font-size:20px }
+  .elapsed { font:500 12px var(--fl); letter-spacing:.14em; color:var(--muted); text-transform:uppercase }
+  .games { display:flex; flex-wrap:wrap; gap:6px; justify-content:center } .games span { font:600 11px var(--fl); letter-spacing:.1em; padding:2px 8px; border:1px solid var(--line); color:var(--muted) }
+  .games .w1 { border-color:rgba(109,191,75,.5); color:var(--radiant) } .games .w2 { border-color:rgba(210,69,47,.5); color:var(--dire) } .games .now { border-color:var(--live); color:#fff; background:rgba(229,64,43,.18) }
+
+  /* ---------- Fake player ---------- */
+  .player { margin-top:12px; aspect-ratio:16/9; border:1px solid var(--line); background:#000 center/cover; position:relative; display:grid; place-items:center; overflow:hidden }
+  .player::after { content:""; position:absolute; inset:0; background:linear-gradient(180deg,transparent 60%,rgba(0,0,0,.7)) }
+  .play { position:relative; z-index:1; width:78px; height:78px; border-radius:50%; background:rgba(0,0,0,.55); border:2px solid rgba(255,255,255,.8); display:grid; place-items:center; color:#fff; font-size:30px }
+  .player .ch { position:absolute; z-index:1; left:14px; bottom:12px; font:600 13px var(--fl); letter-spacing:.14em; color:#ddd; text-transform:uppercase }
+  .player .ch b { color:#a970ff }
+  .idle { margin-top:12px; padding:14px 18px; border:1px dashed var(--line); color:var(--muted); font:500 13px var(--fl); letter-spacing:.1em; text-transform:uppercase; text-align:center }
+
+  /* ---------- Cards ---------- */
+  .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(330px,100%),1fr)); gap:14px }
+  .match { position:relative; display:grid; grid-template-columns:1fr auto 1fr; background:linear-gradient(180deg,var(--panel-2),var(--panel)); border:1px solid var(--line) }
+  .match::before,.match::after { content:""; position:absolute; top:0; bottom:0; width:3px } .match::before { left:0; background:var(--radiant) } .match::after { right:0; background:var(--dire) }
+  .match.live { border-color:rgba(229,64,43,.6); animation:glow 2.4s ease-in-out infinite }
+  @keyframes glow { 0%,100% { box-shadow:0 0 0 0 rgba(229,64,43,0) } 50% { box-shadow:0 0 0 3px rgba(229,64,43,.22), 0 0 30px rgba(229,64,43,.18) } }
+  .match .ptr { margin:12px; aspect-ratio:16/9; border:1px solid var(--line); overflow:hidden } .match .ptr img { width:100%; height:100%; object-fit:cover; display:block }
+  .match .mid { align-self:center; display:grid; justify-items:center; gap:4px; padding:0 4px }
+  .match .res { font:800 26px var(--fd) } .match .mid small { font:600 11px var(--fl); letter-spacing:.16em; color:var(--muted); text-transform:uppercase }
+  .match .nm { padding:0 12px 12px; font:700 14px var(--fd); text-transform:uppercase } .match .nm.b { text-align:right }
+  .match .pill { position:absolute; top:-11px; left:50%; transform:translateX(-50%); font-size:10px; padding:2px 10px; white-space:nowrap }
+
+  /* ---------- Admin ---------- */
+  .admin { font-family:"Figtree",system-ui,sans-serif; background:#0c0e18; border:1px dashed #272c45; padding:18px; border-radius:14px; display:grid; gap:14px; grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr)) }
+  .rc { background:#141726; border:1px solid #272c45; border-radius:14px; padding:14px; display:grid; gap:12px; color:#eceef7 }
+  .rc.on { border-color:#e5402b; box-shadow:0 0 0 1px rgba(229,64,43,.35) }
+  .rc-top { display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#8d93b0 }
+  .badge { font-size:11px; font-weight:700; letter-spacing:.06em; padding:3px 9px; border-radius:99px; border:1px solid #e6b65f; color:#e6b65f }
+  .badge.live { border-color:#e5402b; background:#e5402b; color:#fff }
+  .teams { display:grid; gap:8px } .team { display:flex; align-items:center; gap:10px; height:40px; padding:0 12px; border:1px solid #272c45; border-radius:10px }
+  .team i { font-style:normal; width:22px; height:22px; border-radius:6px; display:grid; place-items:center; font-size:12px; font-weight:800; background:#1f2440 }
+  .row { display:flex; gap:8px; justify-content:space-between; align-items:center; flex-wrap:wrap }
+  .btn { height:38px; padding:0 16px; border-radius:99px; border:1px solid #272c45; background:transparent; color:#eceef7; font:600 13px "Figtree",sans-serif; cursor:pointer }
+  .btn.live { border-color:#e5402b; color:#ff8a78 } .btn.stop { background:#e5402b; border-color:#e5402b; color:#fff } .btn.pri { background:#e6b65f; border-color:#e6b65f; color:#1a1405 }
+  .hint { font-size:12px; color:#8d93b0 }
+
+  @media (max-width:760px) {
+    .live-strip { grid-template-columns:1fr 1fr; padding:14px } .center { grid-column:1/-1; order:-1 }
+    .side, .side.b { flex-direction:column; text-align:center; gap:8px } .side .emb { width:96px } .side strong { font-size:16px }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <section>
+    <div class="sec-title"><h1>1 · Pestaña «En vivo»</h1><span class="tag">Franja sobre el stream mientras se juega</span></div>
+    <div class="live-strip">
+      <div class="side"><div class="emb"><img id="a1" alt=""></div><div><strong>Bastardigans</strong><small>2.º de grupos</small></div></div>
+      <div class="center">
+        <span class="pill"><span class="dot"></span>En juego</span>
+        <span class="phase">Semifinal 2 · Juego 3 de 3</span>
+        <div class="series"><span>1</span><i>–</i><span>1</span></div>
+        <div class="games"><span class="w1">J1 · Bastardigans</span><span class="w2">J2 · Chacales</span><span class="now">J3 · ahora</span></div>
+        <span class="elapsed">Empezó hace <b id="el">23 min</b></span>
+      </div>
+      <div class="side b"><div class="emb"><img id="b1" alt=""></div><div><strong>Chacales</strong><small>3.º de grupos</small></div></div>
+    </div>
+    <div class="player" id="player"><div class="play">▶</div><div class="ch">Transmitiendo en <b>Twitch</b> · nbh_ind</div></div>
+    <p class="note">Sin partida marcada, la franja no aparece y el stream se ve como hoy. En el celular, la franja se apila: el cartel arriba y los dos equipos debajo.</p>
+  </section>
+
+  <section>
+    <div class="sec-title"><h1>2 · Partidos y Playoffs</h1><span class="tag">La tarjeta en juego se resalta</span></div>
+    <div class="cards">
+      <article class="match live">
+        <span class="pill"><span class="dot"></span>En juego · J3</span>
+        <div class="ptr"><img id="a2" alt=""></div>
+        <div class="mid"><div class="res">1 – 1</div><small>Semifinal 2</small></div>
+        <div class="ptr"><img id="b2" alt=""></div>
+        <div class="nm">Bastardigans</div><div></div><div class="nm b">Chacales</div>
+      </article>
+      <article class="match">
+        <div class="ptr"><img id="c2" alt=""></div>
+        <div class="mid"><div class="res" style="color:var(--gold-hi)">2 – 1</div><small>Semifinal 1</small></div>
+        <div class="ptr"><img id="d2" alt="" style="filter:grayscale(1) brightness(.55)"></div>
+        <div class="nm">Team Fe</div><div></div><div class="nm b" style="color:var(--muted)">Punisher</div>
+      </article>
+    </div>
+    <p class="note">Además, arriba de la página (en todas las pestañas) aparece un aviso corto: «🔴 En juego: Bastardigans vs Chacales · Ver en vivo», que lleva a la pestaña En vivo.</p>
+  </section>
+
+  <section>
+    <div class="sec-title"><h1>3 · Admin</h1><span class="tag">Un botón por juego · solo uno en vivo a la vez</span></div>
+    <div class="admin">
+      <div class="rc on">
+        <div class="rc-top"><span>Semifinal 2 · Juego 3</span><span class="badge live">● EN VIVO · 23 min</span></div>
+        <div class="teams"><div class="team"><i>B</i>Bastardigans</div><div class="team"><i>C</i>Chacales</div></div>
+        <div class="row"><button class="btn stop">■ Quitar en vivo</button><button class="btn pri">Guardar resultado</button></div>
+        <span class="hint">Al guardar el resultado de este juego, el «en vivo» se apaga solo.</span>
+      </div>
+      <div class="rc">
+        <div class="rc-top"><span>Gran final · Juego 1</span><span class="badge">PENDIENTE</span></div>
+        <div class="teams"><div class="team"><i>T</i>Team Fe</div><div class="team" style="color:#8d93b0"><i>?</i>Ganador SF2</div></div>
+        <div class="row"><button class="btn live" disabled style="opacity:.45">▶ Marcar en vivo</button><button class="btn pri" disabled style="opacity:.45">Guardar</button></div>
+        <span class="hint">Se habilita cuando están los dos equipos. Marcar otro partido reemplaza al actual.</span>
+      </div>
+    </div>
+  </section>
+</div>
+<script>
+  const H = s => `file:///F:/PROYECTOS_NODE/torneo-dota/public/heroes/${s}.png`;
+  for (const [id, s] of [['a1','phantom_assassin'],['b1','lina'],['a2','phantom_assassin'],['b2','lina'],['c2','juggernaut'],['d2','pudge']]) document.getElementById(id).src = H(s);
+  document.getElementById('player').style.backgroundImage = `url(file:///F:/PROYECTOS_NODE/torneo-dota/public/img/hero-bg.jpg)`;
+  let m = 23; setInterval(() => { m++; document.getElementById('el').textContent = m + ' min'; }, 60000);
+</script>
+</body>
+</html>

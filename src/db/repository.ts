@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import { isHeroSlug } from '../data/heroes.js';
+import { liveEligibility, type LiveMark } from '../domain/live.js';
 import { resolveSeries, seriesLengthFor, type GameScore, type SeriesLength } from '../domain/series.js';
 import { isValidTimeZone, utcToZoned, zonedToUtc } from '../format/timezone.js';
 
@@ -29,10 +30,12 @@ export interface Tournament {
   /** A Kick/Twitch/YouTube page URL as the admin entered it (validated); the embed is derived from it. */
   streamUrl: string | null;
   isActive: boolean;
+  /** The game being played right now, marked by the admin; null when nothing is live. */
+  live: LiveMark | null;
   createdAt: string;
 }
 
-export type TournamentPatch = Partial<Omit<Tournament, 'id' | 'createdAt' | 'isActive'>>;
+export type TournamentPatch = Partial<Omit<Tournament, 'id' | 'createdAt' | 'isActive' | 'live'>>;
 
 export interface ScheduleDay {
   /** YYYY-MM-DD */
@@ -162,6 +165,7 @@ export const TIEBREAKER_KEYS = ['kd', 'kills', 'h2h', 'extra'] as const;
 
 const TOURNAMENT_COLS = `id, name, slug, qualifiers, game, points_win AS pointsWin, points_loss AS pointsLoss,
   tiebreakers, group_legs AS groupLegs, group_games AS groupGames, semifinal_games AS semifinalGames, final_games AS finalGames,
+  live_match_id AS liveMatchId, live_game_number AS liveGameNumber, live_started_at AS liveStartedAt,
   rules_text AS rulesText, timezone, stream_url AS streamUrl, is_active AS isActive, created_at AS createdAt`;
 const TEAM_COLS = 'id, tournament_id AS tournamentId, code, name, captain, hero, image_key AS imageKey';
 const MATCH_COLS = `m.id, m.tournament_id AS tournamentId, m.phase, m.round, m.match_number AS matchNumber, m.is_tiebreak AS isTiebreak,
@@ -172,7 +176,13 @@ const MATCH_FROM = 'FROM matches m JOIN tournaments t ON t.id = m.tournament_id'
 const ADMIN_COLS = 'id, username, password_hash AS passwordHash, created_at AS createdAt';
 const SESSION_COLS = 'id, admin_id AS adminId, expires_at AS expiresAt';
 
-type TournamentRow = Omit<Tournament, 'tiebreakers' | 'isActive'> & { tiebreakers: string; isActive: number };
+type TournamentRow = Omit<Tournament, 'tiebreakers' | 'isActive' | 'live'> & {
+  tiebreakers: string;
+  isActive: number;
+  liveMatchId: number | null;
+  liveGameNumber: number | null;
+  liveStartedAt: string | null;
+};
 type MatchRow = Omit<Match, 'scheduledDate' | 'startTime' | 'endTime' | 'isTiebreak'> & { timezone: string; isTiebreak: number };
 
 function toMatch({ timezone, ...row }: MatchRow): Match {
@@ -183,9 +193,10 @@ function toMatch({ timezone, ...row }: MatchRow): Match {
 
 type ScheduleDayRow = Omit<ScheduleDay, 'startTimes'> & { startTimes: string };
 
-function toTournament(row: TournamentRow): Tournament {
+function toTournament({ liveMatchId, liveGameNumber, liveStartedAt, ...row }: TournamentRow): Tournament {
   const known = row.tiebreakers.split(',').filter((k): k is TiebreakerKey => (TIEBREAKER_KEYS as readonly string[]).includes(k));
-  return { ...row, tiebreakers: [...new Set(known)], isActive: row.isActive === 1 };
+  const live = liveMatchId !== null && liveGameNumber !== null && liveStartedAt !== null ? { matchId: liveMatchId, gameNumber: liveGameNumber, startedAt: liveStartedAt } : null;
+  return { ...row, tiebreakers: [...new Set(known)], isActive: row.isActive === 1, live };
 }
 
 export function createRepository(db: Database.Database) {
@@ -200,6 +211,7 @@ export function createRepository(db: Database.Database) {
          group_legs = @groupLegs, group_games = @groupGames, semifinal_games = @semifinalGames, final_games = @finalGames,
          rules_text = @rulesText, timezone = @timezone, stream_url = @streamUrl WHERE id = @id`,
     ),
+    setLive: db.prepare('UPDATE tournaments SET live_match_id = @matchId, live_game_number = @gameNumber, live_started_at = @startedAt WHERE id = @id'),
     activeTournament: db.prepare(`SELECT ${TOURNAMENT_COLS} FROM tournaments WHERE is_active = 1`),
     clearActive: db.prepare('UPDATE tournaments SET is_active = 0 WHERE is_active = 1'),
     markActive: db.prepare('UPDATE tournaments SET is_active = 1 WHERE id = ?'),
@@ -394,6 +406,36 @@ export function createRepository(db: Database.Database) {
     if (winnerId !== match.team1Id && winnerId !== match.team2Id) throw new Error('The winner must be one of the match teams');
   };
 
+  /**
+   * Turns the live mark off when it stopped being true: its match is gone, or its game is no longer the next
+   * unplayed game of an undecided series (it got a result, the series was decided or reset, the length changed).
+   * Called in the same transaction as every change that can cause it.
+   */
+  const reconcileLive = (tournamentId: number): void => {
+    const tournament = tournamentById(tournamentId);
+    const live = tournament?.live;
+    if (!tournament || !live) return;
+    const match = matchById(live.matchId);
+    const invalid =
+      !match ||
+      liveEligibility(match.team1Id, match.team2Id, seriesLengthFor(tournament, match.phase, match.isTiebreak), gamesOf(match.id), live.gameNumber) !== null;
+    if (invalid) q.setLive.run({ id: tournamentId, matchId: null, gameNumber: null, startedAt: null });
+  };
+
+  const reconcileLiveOf = (matchId: number): void => {
+    const match = matchById(matchId);
+    if (match) reconcileLive(match.tournamentId);
+  };
+
+  /** A different pairing in the live match is a different match: the mark goes. The same pairing keeps it. */
+  const dropLiveIfPairingChanged = (before: Match, team1Id: number | null, team2Id: number | null): void => {
+    const live = tournamentById(before.tournamentId)?.live;
+    if (live?.matchId === before.id && (before.team1Id !== team1Id || before.team2Id !== team2Id)) {
+      q.setLive.run({ id: before.tournamentId, matchId: null, gameNumber: null, startedAt: null });
+    }
+    reconcileLive(before.tournamentId);
+  };
+
   const insertMatchesTx = db.transaction((matches: NewMatch[]) => {
     for (const m of matches) q.insertMatch.run(withDefaults(m));
   });
@@ -464,6 +506,7 @@ export function createRepository(db: Database.Database) {
         // A different series length changes who wins the matches that already have games.
         if (before.groupGames !== next.groupGames || before.semifinalGames !== next.semifinalGames || before.finalGames !== next.finalGames) {
           for (const matchId of q.matchIdsOfTournament.all(id) as number[]) refreshAggregate(matchId);
+          reconcileLive(id);
         }
         return requireRow(tournamentById(id), 'Tournament');
       });
@@ -547,8 +590,11 @@ export function createRepository(db: Database.Database) {
     },
     updateMatch(id: number, edit: MatchEdit): Match {
       const current = requireRow(matchById(id), 'Match');
-      q.updateMatch.run({ ...edit, ...instants(current.tournamentId, edit), id });
-      return requireRow(matchById(id), 'Match');
+      return inTransaction(() => {
+        q.updateMatch.run({ ...edit, ...instants(current.tournamentId, edit), id });
+        dropLiveIfPairingChanged(current, edit.team1Id, edit.team2Id);
+        return requireRow(matchById(id), 'Match');
+      });
     },
     updateMatchSchedule(id: number, schedule: Schedule): Match {
       const current = requireRow(matchById(id), 'Match');
@@ -556,8 +602,12 @@ export function createRepository(db: Database.Database) {
       return requireRow(matchById(id), 'Match');
     },
     updateMatchTeams(id: number, team1Id: number | null, team2Id: number | null): Match {
-      q.updateMatchTeams.run({ team1Id, team2Id, id });
-      return requireRow(matchById(id), 'Match');
+      const current = requireRow(matchById(id), 'Match');
+      return inTransaction(() => {
+        q.updateMatchTeams.run({ team1Id, team2Id, id });
+        dropLiveIfPairingChanged(current, team1Id, team2Id);
+        return requireRow(matchById(id), 'Match');
+      });
     },
     /** Decides a match with one game: replaces every game of the match by game 1 (the legacy "single result"). */
     recordResult(id: number, result: MatchResult): Match {
@@ -566,6 +616,7 @@ export function createRepository(db: Database.Database) {
         q.deleteGames.run(id);
         q.upsertGame.run(gameParams(id, { gameNumber: 1, ...result }));
         refreshAggregate(id);
+        reconcileLiveOf(id);
         return requireRow(matchById(id), 'Match');
       });
     },
@@ -574,8 +625,15 @@ export function createRepository(db: Database.Database) {
       return inTransaction(() => {
         q.deleteGames.run(id);
         refreshAggregate(id);
+        reconcileLiveOf(id);
         return requireRow(matchById(id), 'Match');
       });
+    },
+
+    // The game being played right now. The application decides what may be marked (see domain/live.ts); the
+    // repository only stores it, and turns it off by itself whenever a change makes it untrue.
+    setLive(tournamentId: number, live: LiveMark | null): void {
+      q.setLive.run({ id: tournamentId, matchId: live?.matchId ?? null, gameNumber: live?.gameNumber ?? null, startedAt: live?.startedAt ?? null });
     },
 
     // Games (the series of a match). The match's winner and kills/deaths are re-derived in the same transaction.
@@ -587,6 +645,7 @@ export function createRepository(db: Database.Database) {
         assertWinner(matchId, game.winnerId);
         q.upsertGame.run(gameParams(matchId, game));
         refreshAggregate(matchId);
+        reconcileLiveOf(matchId);
         return requireRow(matchById(matchId), 'Match');
       });
     },
@@ -594,6 +653,7 @@ export function createRepository(db: Database.Database) {
       return inTransaction(() => {
         q.deleteGame.run(matchId, gameNumber);
         refreshAggregate(matchId);
+        reconcileLiveOf(matchId);
         return requireRow(matchById(matchId), 'Match');
       });
     },

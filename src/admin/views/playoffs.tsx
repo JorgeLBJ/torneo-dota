@@ -10,9 +10,10 @@ interface PlayoffsViewProps {
   state: TournamentState;
   /** Calendar slots used for the header when a playoff match is not stored yet. */
   slots: { semifinal: Schedule[]; final: Schedule[] };
+  now: Date;
 }
 
-export const PlayoffsView: FC<PlayoffsViewProps> = ({ tournament, state, slots }) => {
+export const PlayoffsView: FC<PlayoffsViewProps> = ({ tournament, state, slots, now }) => {
   const { bracket, teamsById, teams } = state;
   const base = `/admin/t/${tournament.id}/playoffs`;
   // Semifinal teams saved on the matches themselves (a manual pick), as opposed to teams derived from the table.
@@ -37,6 +38,9 @@ export const PlayoffsView: FC<PlayoffsViewProps> = ({ tournament, state, slots }
       team2={team(slot.team2Id)}
       prefix={seedPrefix}
       match={stored(slot)}
+      matchId={slot.matchId}
+      live={tournament.live}
+      now={now}
       games={state.gamesByMatch.get(slot.matchId ?? -1) ?? []}
       length={phase === 'final' ? tournament.finalGames : tournament.semifinalGames}
     />

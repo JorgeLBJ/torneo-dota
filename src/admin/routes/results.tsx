@@ -3,6 +3,7 @@ import type { Match } from '../../db/repository.js';
 import { loadState } from '../../services/state.js';
 import { seriesLengthFor } from '../../domain/series.js';
 import { deleteGameResult, saveGameResult } from '../../services/games.js';
+import { clearLive, markLive } from '../../services/live.js';
 import { parseGameNumber, readGameForm } from '../game-form.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { isDate, readBody, str } from '../form.js';
@@ -49,6 +50,7 @@ export function resultRoutes(deps: Deps) {
         filter={filter}
         standings={state.standings}
         gamesByMatch={state.gamesByMatch}
+        now={deps.now()}
       />,
     );
   });
@@ -88,6 +90,32 @@ export function resultRoutes(deps: Deps) {
     setFlash(c, 'ok', multi ? `Juego ${gameNumber} del partido ${match.matchNumber} guardado.` : `Resultado del partido ${match.matchNumber} guardado.`);
     return c.redirect(back, 303);
   };
+
+  /** Marks (or unmarks) a game of a group match as the one being played right now. */
+  app.post('/resultados/:mid/juego/:n/en-vivo', async (c) => {
+    const tournament = c.get('tournament');
+    const id = Number(c.req.param('mid'));
+    const match: Match | undefined = Number.isInteger(id) ? repo.getMatch(id) : undefined;
+    if (!match || match.tournamentId !== tournament.id || match.phase !== 'group') return c.text('Partido no encontrado.', 404);
+    const body = await readBody(c);
+    const filter = parseFilter(str(body, 'fecha'));
+    const back = `/admin/t/${tournament.id}/resultados${filter ? `?fecha=${filter}` : ''}`;
+    const gameNumber = parseGameNumber(c.req.param('n'));
+    if (gameNumber === null) {
+      setFlash(c, 'error', 'Ese juego no existe.');
+      return c.redirect(back, 303);
+    }
+    if (str(body, 'action') === 'clear') {
+      clearLive(repo, tournament);
+      setFlash(c, 'ok', 'Partida en vivo quitada.');
+    } else {
+      const marked = markLive(repo, tournament, match, gameNumber, deps.now());
+      if (!marked.ok) setFlash(c, 'error', marked.error);
+      else setFlash(c, 'ok', `Partido ${match.matchNumber} marcado en vivo.`);
+    }
+    deps.events.tournamentChanged(tournament.id);
+    return c.redirect(back, 303);
+  });
 
   app.post('/resultados/:mid/juego/:n', (c) => saveGame(c, c.req.param('n')));
   app.post('/resultados/:mid', (c) => saveGame(c, undefined));

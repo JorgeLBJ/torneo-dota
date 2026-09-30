@@ -2,6 +2,7 @@ import { fail, ok, type Checked } from '../checked.js';
 import type { Match, Phase, Repository, Schedule, Tournament } from '../db/repository.js';
 import { addMinutes } from '../domain/fixture.js';
 import { deleteGameResult, saveGameResult, type ImportChoice } from './games.js';
+import { markLive } from './live.js';
 import { validateResult, type RawResult } from './results.js';
 import type { TournamentState } from './state.js';
 
@@ -106,6 +107,31 @@ export function recordPlayoffResult(
   if (!saved.ok) return saved;
   if (phase === 'semifinal' && saved.value.winnerId !== previousWinner) resetFinal(repo, matches);
   return saved;
+}
+
+/**
+ * Marks a game of a semifinal/final as live. The teams come from the derived bracket and are stored on the match
+ * (like a result would), so the match exists before anything is played.
+ */
+export function markPlayoffLive(
+  repo: Repository,
+  tournament: Tournament,
+  state: TournamentState,
+  phase: PlayoffPhase,
+  number: number,
+  gameNumber: number,
+  now: Date,
+): Checked<void> {
+  const slot = phase === 'final' ? (number === 1 ? state.bracket.final : undefined) : state.bracket.semifinals[number - 1];
+  if (!slot) return fail('Partido de playoffs no encontrado.');
+  if (slot.team1Id === null || slot.team2Id === null) return fail('El partido todavía no tiene los dos equipos definidos.');
+  const matches = ensurePlayoffMatches(repo, tournament);
+  let match = findMatch(matches, phase, number)!;
+  if (match.team1Id !== slot.team1Id || match.team2Id !== slot.team2Id) {
+    repo.clearResult(match.id);
+    match = repo.updateMatchTeams(match.id, slot.team1Id, slot.team2Id);
+  }
+  return markLive(repo, tournament, match, gameNumber, now);
 }
 
 /** Removes one game of a playoff series (the last one loaded). */
