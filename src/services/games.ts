@@ -1,6 +1,6 @@
 import { fail, ok, type Checked } from '../checked.js';
 import type { Game, Match, Repository, Tournament } from '../db/repository.js';
-import { gameFromSnapshot, lookupDotaMatch } from '../dota/import.js';
+import { gameFromSnapshot, lookupDotaMatch, radiantTeamFor } from '../dota/import.js';
 import type { DotaMatchSource } from '../dota/source.js';
 import { seriesLengthFor, validateSeries, type GameScore } from '../domain/series.js';
 import { validateResult, type RawResult } from './results.js';
@@ -90,8 +90,8 @@ export function deleteGameResult(repo: Repository, tournament: Tournament, match
 export interface ImportFields {
   /** The Match ID as typed ('' when the game is manual). */
   dotaMatchId: string;
-  /** The team id chosen as Radiant. */
-  radiant: string;
+  /** The team id the admin says won the Dota match (the Radiant side is derived from it). */
+  winner: string;
   /** The form carries the import the game already has. */
   keep: boolean;
 }
@@ -113,12 +113,13 @@ export async function prepareGameImport(
   const result = validateResult(teams, raw);
   if (!result.ok) return result;
   const [team1, team2] = teams as [number, number];
-  const radiant = /^\d+$/.test(fields.radiant) ? Number(fields.radiant) : null;
-  if (radiant === null || (radiant !== team1 && radiant !== team2)) {
-    return fail('Indica qué equipo jugó de Radiant (pulsa «Buscar» y elige).');
+  const winner = /^\d+$/.test(fields.winner) ? Number(fields.winner) : null;
+  if (winner === null || (winner !== team1 && winner !== team2)) {
+    return fail('Indica quién ganó la partida (pulsa «Buscar» y elige).');
   }
   const found = await lookupDotaMatch(source, fields.dotaMatchId);
   if (!found.ok) return found;
+  const radiant = radiantTeamFor(found.value, winner, team1, team2);
   const expected = gameFromSnapshot(found.value, radiant, team1, team2);
   const given = result.value;
   const same =

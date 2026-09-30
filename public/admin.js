@@ -1152,8 +1152,8 @@
   forms.forEach(function (form) {
     var idInput = form.querySelector('[name="dota_match_id"]');
     var statusEl = form.querySelector('[data-dota-status]');
-    var radiantBox = form.querySelector('[data-dota-radiant]');
-    var radiantSelect = form.querySelector('[name="dota_radiant"]');
+    var whoBox = form.querySelector('[data-dota-who]');
+    var whoSelect = form.querySelector('[name="dota_winner"]');
     var search = form.querySelector('[data-dota-search]');
     var fill = form.querySelector('[data-dota-fill]');
     if (!idInput || !search || !fill) return;
@@ -1179,10 +1179,10 @@
         busy(search, false);
         if (res.ok && res.body.ok) {
           say('✓ ' + res.body.summary, 'ok');
-          radiantBox.hidden = false;
+          whoBox.hidden = false;
         } else {
           say(res.body.error || 'No se pudo consultar la partida.', 'error');
-          radiantBox.hidden = true;
+          whoBox.hidden = true;
         }
       }).catch(function () {
         busy(search, false);
@@ -1196,11 +1196,11 @@
     }
 
     function doFill() {
-      if (!radiantSelect.value) { say('Elige qué equipo jugó de Radiant.', 'error'); return; }
+      if (!whoSelect.value) { say('Elige quién ganó la partida.', 'error'); return; }
       busy(fill, true, 'Cargando…');
       post('/dota/autocompletar', {
         dota_match_id: idInput.value.trim(),
-        radiant: radiantSelect.value,
+        winner: whoSelect.value,
         team1_id: form.getAttribute('data-team1'),
         team2_id: form.getAttribute('data-team2'),
       }).then(function (res) {
@@ -1228,7 +1228,7 @@
     // A different id is a different match: look it up again before using it.
     idInput.addEventListener('input', function () {
       if (idInput.value.trim() !== original) {
-        radiantBox.hidden = true;
+        whoBox.hidden = true;
         say('', 'muted');
       }
     });

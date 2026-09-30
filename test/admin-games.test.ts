@@ -15,18 +15,20 @@ let a: Team;
 let b: Team;
 let asked: number[];
 let failWith: DotaLookupError | null;
+let direWins = false;
 
 const source: DotaMatchSource = {
   fetch: async (id) => {
     asked.push(id);
     if (failWith) throw failWith;
-    return { ...snapshot, matchId: id };
+    return { ...snapshot, matchId: id, radiantWin: !direWins };
   },
 };
 
 beforeEach(async () => {
   asked = [];
   failWith = null;
+  direWins = false;
   t = await makeApp({ dotaSource: source });
   cookie = await t.login();
   tournament = t.repo.createTournament({ name: 'Copa', slug: 'copa' });
@@ -172,7 +174,7 @@ describe('Dota lookups for the forms', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       ok: true,
-      summary: 'Partida encontrada · 66:06 · Radiant ganó 42 – 41',
+      summary: 'Partida encontrada · 66:06 · 42 – 41',
       matchId: 9023462170,
       radiantWin: true,
       radiantScore: 42,
@@ -201,11 +203,11 @@ describe('Dota lookups for the forms', () => {
     expect(last).toBe(429);
   });
 
-  it('autocompletar computes winner, kills and deaths for the team that played Radiant', async () => {
-    const res = await postJson('/dota/autocompletar', { dota_match_id: '9023462170', radiant: String(b.id), team1_id: String(a.id), team2_id: String(b.id) });
+  it('autocompletar computes kills and deaths from who won the Dota match', async () => {
+    const res = await postJson('/dota/autocompletar', { dota_match_id: '9023462170', winner: String(b.id), team1_id: String(a.id), team2_id: String(b.id) });
     expect(await res.json()).toEqual({
       ok: true,
-      summary: 'Partida encontrada · 66:06 · Radiant ganó 42 – 41',
+      summary: 'Partida encontrada · 66:06 · 42 – 41',
       winnerId: b.id,
       team1Kills: 41,
       team1Deaths: deaths('dire'),
@@ -214,12 +216,12 @@ describe('Dota lookups for the forms', () => {
     });
   });
 
-  it('autocompletar refuses teams of another tournament or a Radiant that is neither team', async () => {
+  it('autocompletar refuses teams of another tournament or a winner that is neither team', async () => {
     const other = t.repo.createTournament({ name: 'Otra', slug: 'otra' });
     const foreign = t.repo.createTeam(other.id, { code: 'ZZ', name: 'Foreign' });
     const teams = { team1_id: String(a.id), team2_id: String(foreign.id) };
-    expect((await postJson('/dota/autocompletar', { dota_match_id: '1', radiant: String(a.id), ...teams })).status).toBe(400);
-    const res = await postJson('/dota/autocompletar', { dota_match_id: '1', radiant: '999999', team1_id: String(a.id), team2_id: String(b.id) });
+    expect((await postJson('/dota/autocompletar', { dota_match_id: '1', winner: String(a.id), ...teams })).status).toBe(400);
+    const res = await postJson('/dota/autocompletar', { dota_match_id: '1', winner: '999999', team1_id: String(a.id), team2_id: String(b.id) });
     expect(res.status).toBe(400);
     expect(asked).toEqual([]);
   });
@@ -233,7 +235,7 @@ describe('saving a game with its Dota import', () => {
     t2_kills: '41',
     t2_deaths: String(deaths('dire')),
     dota_match_id: '9023462170',
-    dota_radiant: String(a.id),
+    dota_winner: String(a.id),
     ...over,
   });
 
@@ -246,6 +248,15 @@ describe('saving a game with its Dota import', () => {
     expect(game.importedAt).not.toBeNull();
   });
 
+  it('when Dire won, the team chosen as the winner was Dire: the other one is stored as Radiant', async () => {
+    direWins = true;
+    const m = groupMatch();
+    // team A won as Dire: A scored the Dire 41 and died as often as the Dire players did
+    const form = importForm({ t1_kills: '41', t1_deaths: String(deaths('dire')), t2_kills: '42', t2_deaths: String(deaths('radiant')) });
+    await t.post(`${base()}/resultados/${m.id}/juego/1`, form, cookie);
+    expect(t.repo.listGames(m.id)[0]).toMatchObject({ winnerId: a.id, radiantTeamId: b.id, dotaMatchId: 9023462170 });
+  });
+
   it('numbers that differ from the Dota match are refused, nothing is saved', async () => {
     const m = groupMatch();
     const res = await t.post(`${base()}/resultados/${m.id}/juego/1`, importForm({ t1_kills: '99' }), cookie);
@@ -253,10 +264,10 @@ describe('saving a game with its Dota import', () => {
     expect(t.repo.listGames(m.id)).toEqual([]);
   });
 
-  it('a Match ID without the Radiant team is refused', async () => {
+  it('a Match ID without saying who won is refused', async () => {
     const m = groupMatch();
-    const res = await t.post(`${base()}/resultados/${m.id}/juego/1`, importForm({ dota_radiant: '' }), cookie);
-    expect(await flashText(t, res, cookie)).toContain('Indica qué equipo jugó de Radiant (pulsa «Buscar» y elige).');
+    const res = await t.post(`${base()}/resultados/${m.id}/juego/1`, importForm({ dota_winner: '' }), cookie);
+    expect(await flashText(t, res, cookie)).toContain('Indica quién ganó la partida (pulsa «Buscar» y elige).');
   });
 
   it('a lookup that fails at save time is reported and nothing is saved', async () => {
@@ -297,7 +308,7 @@ describe('saving a game with its Dota import', () => {
     await t.post(`${base()}/resultados/${m.id}/juego/1`, importForm(), cookie);
     const before = t.repo.listGames(m.id)[0]!;
     asked.length = 0;
-    // the form of an imported game posts its Match ID and the Radiant select as they were
+    // the form of an imported game posts its Match ID and the winner select as they were
     const res = await t.post(`${base()}/resultados/${m.id}/juego/1`, importForm({ dota_keep: '1' }), cookie);
     expect(res.status).toBe(303);
     const after = t.repo.listGames(m.id)[0]!;
@@ -315,17 +326,17 @@ describe('saving a game with its Dota import', () => {
     expect(t.repo.listGames(m.id)[1]!.dotaSnapshot).not.toBeNull();
   });
 
-  it('an untouched Match ID with a different Radiant team is a re-import: it must match the new side', async () => {
+  it('an untouched Match ID with a different winner is a re-import: it must match the new numbers', async () => {
     const m = groupMatch();
     await t.post(`${base()}/resultados/${m.id}/juego/1`, importForm(), cookie);
-    // same numbers, but the admin now says team B was Radiant: the numbers no longer fit, so it is refused
-    const refused = await t.post(`${base()}/resultados/${m.id}/juego/1`, importForm({ dota_keep: '1', dota_radiant: String(b.id) }), cookie);
+    // same numbers, but the admin now says team B won: the numbers no longer fit, so it is refused
+    const refused = await t.post(`${base()}/resultados/${m.id}/juego/1`, importForm({ dota_keep: '1', dota_winner: String(b.id) }), cookie);
     expect(await flashText(t, refused, cookie)).toContain('Los datos no coinciden con la partida de Dota');
     expect(t.repo.listGames(m.id)[0]).toMatchObject({ radiantTeamId: a.id });
-    // with the numbers autocompleted for B as Radiant, the import is replaced
+    // with the numbers autocompleted for B as the winner, the import is replaced
     const swapped = importForm({
       dota_keep: '1',
-      dota_radiant: String(b.id),
+      dota_winner: String(b.id),
       winner: String(b.id),
       t1_kills: '41',
       t1_deaths: String(deaths('dire')),

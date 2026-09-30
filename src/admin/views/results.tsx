@@ -117,15 +117,15 @@ const GameForm: FC<GameFormProps> = ({ action, number, multi, team1, team2, pref
               </>
             ) : null}
           </p>
-          <div class="dota-radiant" data-dota-radiant hidden={!imported}>
+          <div class="dota-who" data-dota-who hidden={!imported}>
             <label class="f">
-              ¿Qué equipo jugó de Radiant?
-              <Select name="dota_radiant">
+              ¿Quién ganó esta partida?
+              <Select name="dota_winner">
                 <option value="">Elegir…</option>
-                <option value={String(team1.id)} selected={game?.radiantTeamId === team1.id}>
+                <option value={String(team1.id)} selected={imported && game?.winnerId === team1.id}>
                   {team1.name}
                 </option>
-                <option value={String(team2.id)} selected={game?.radiantTeamId === team2.id}>
+                <option value={String(team2.id)} selected={imported && game?.winnerId === team2.id}>
                   {team2.name}
                 </option>
               </Select>

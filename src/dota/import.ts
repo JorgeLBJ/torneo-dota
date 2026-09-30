@@ -12,11 +12,16 @@ export function formatDuration(totalSeconds: number): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
-/** "Partida encontrada · 66:06 · Radiant ganó 42 – 41" */
+/** "Partida encontrada · 66:06 · 42 – 41": the winning score first, no mention of sides (the admin says who won). */
 export function snapshotSummary(snapshot: DotaSnapshot): string {
-  const winner = snapshot.radiantWin ? 'Radiant' : 'Dire';
   const scores = snapshot.radiantWin ? `${snapshot.radiantScore} – ${snapshot.direScore}` : `${snapshot.direScore} – ${snapshot.radiantScore}`;
-  return `Partida encontrada · ${formatDuration(snapshot.durationSec)} · ${winner} ganó ${scores}`;
+  return `Partida encontrada · ${formatDuration(snapshot.durationSec)} · ${scores}`;
+}
+
+/** The team that played Radiant, from who won: the winner if Radiant won, the other team if Dire won. */
+export function radiantTeamFor(snapshot: DotaSnapshot, winnerId: number, team1Id: number, team2Id: number): number {
+  const loserId = winnerId === team1Id ? team2Id : team1Id;
+  return snapshot.radiantWin ? winnerId : loserId;
 }
 
 /**

@@ -385,8 +385,8 @@ tr.row-msg .flash{margin:0}
 .dota-status.ok{color:var(--win)}
 .dota-status.error{color:var(--loss)}
 .dota-status a{color:var(--gold)}
-.dota-radiant{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
-.dota-radiant .f{flex:1;min-width:150px}
+.dota-who{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
+.dota-who .f{flex:1;min-width:150px}
 .rc.series{align-content:start}
 
 /* Live game marks */

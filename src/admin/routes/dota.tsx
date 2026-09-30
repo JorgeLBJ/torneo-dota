@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { gameFromSnapshot, lookupDotaMatch, snapshotSummary } from '../../dota/import.js';
+import { gameFromSnapshot, lookupDotaMatch, radiantTeamFor, snapshotSummary } from '../../dota/import.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { readBody, str } from '../form.js';
 
@@ -40,16 +40,17 @@ export function dotaRoutes(deps: Deps) {
     };
     const team1 = id('team1_id');
     const team2 = id('team2_id');
-    const radiant = id('radiant');
+    const winner = id('winner');
     const own = new Set(repo.listTeams(tournament.id).map((team) => team.id));
     if (team1 === null || team2 === null || team1 === team2 || !own.has(team1) || !own.has(team2)) {
       return c.json({ error: 'El partido todavía no tiene los dos equipos definidos.' }, 400);
     }
-    if (radiant !== team1 && radiant !== team2) {
-      return c.json({ error: 'Indica qué equipo jugó de Radiant (pulsa «Buscar» y elige).' }, 400);
+    if (winner !== team1 && winner !== team2) {
+      return c.json({ error: 'Indica quién ganó la partida (pulsa «Buscar» y elige).' }, 400);
     }
     const found = await lookupDotaMatch(deps.dota, str(body, 'dota_match_id'));
     if (!found.ok) return c.json({ error: found.error }, 400);
+    const radiant = radiantTeamFor(found.value, winner, team1, team2);
     return c.json({ ok: true, summary: snapshotSummary(found.value), ...gameFromSnapshot(found.value, radiant, team1, team2) });
   });
 

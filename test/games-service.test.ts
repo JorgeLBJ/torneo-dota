@@ -3,6 +3,7 @@ import type Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openDatabase } from '../src/db/open.js';
 import { createRepository, type Match, type Repository, type Team, type Tournament } from '../src/db/repository.js';
+import { gameFromSnapshot } from '../src/dota/import.js';
 import { mapOpenDotaMatch } from '../src/dota/opendota.js';
 import { DotaLookupError, type DotaMatchSource } from '../src/dota/source.js';
 import { deleteGameResult, prepareGameImport, saveGameResult } from '../src/services/games.js';
@@ -220,40 +221,55 @@ describe('prepareGameImport', () => {
   const teamsOf = (): [number, number] => [1, 2];
 
   it('no Match ID: a manual game, or keep the import the game already has', async () => {
-    expect(await prepareGameImport(source(), teamsOf(), imported(), { dotaMatchId: '', radiant: '', keep: false })).toEqual({ ok: true, value: undefined });
-    expect(await prepareGameImport(source(), teamsOf(), imported(), { dotaMatchId: '', radiant: '', keep: true })).toEqual({ ok: true, value: 'keep' });
+    expect(await prepareGameImport(source(), teamsOf(), imported(), { dotaMatchId: '', winner: '', keep: false })).toEqual({ ok: true, value: undefined });
+    expect(await prepareGameImport(source(), teamsOf(), imported(), { dotaMatchId: '', winner: '', keep: true })).toEqual({ ok: true, value: 'keep' });
   });
 
-  it('a Match ID with the Radiant team and matching numbers becomes an import with the compact snapshot', async () => {
-    const result = await prepareGameImport(source(), teamsOf(), imported(), { dotaMatchId: '9023462170', radiant: '1', keep: false });
+  it('a Match ID with who won and matching numbers becomes an import with the compact snapshot', async () => {
+    const result = await prepareGameImport(source(), teamsOf(), imported(), { dotaMatchId: '9023462170', winner: '1', keep: false });
     expect(result).toMatchObject({ ok: true, value: { radiantTeamId: 1, dotaMatchId: 9023462170 } });
     if (!result.ok || result.value === undefined || result.value === 'keep') throw new Error('expected an import');
     expect(JSON.parse(result.value.snapshot)).toMatchObject({ matchId: 9023462170, radiantScore: 42 });
   });
 
   it('refuses numbers that do not match the Dota match (the detail would contradict the score)', async () => {
-    const result = await prepareGameImport(source(), teamsOf(), imported({ t1Kills: '50' }), { dotaMatchId: '9023462170', radiant: '1', keep: false });
+    const result = await prepareGameImport(source(), teamsOf(), imported({ t1Kills: '50' }), { dotaMatchId: '9023462170', winner: '1', keep: false });
     expect(result).toEqual({ ok: false, error: 'Los datos no coinciden con la partida de Dota: pulsa «Autocompletar» de nuevo o quita el Match ID.' });
-    const wrongWinner = await prepareGameImport(source(), teamsOf(), imported({ winner: '2' }), { dotaMatchId: '9023462170', radiant: '1', keep: false });
+    const wrongWinner = await prepareGameImport(source(), teamsOf(), imported({ winner: '2' }), { dotaMatchId: '9023462170', winner: '1', keep: false });
     expect(wrongWinner).toMatchObject({ ok: false });
   });
 
-  it('needs the Radiant team, which must be one of the two', async () => {
-    const message = 'Indica qué equipo jugó de Radiant (pulsa «Buscar» y elige).';
-    expect(await prepareGameImport(source(), teamsOf(), imported(), { dotaMatchId: '9023462170', radiant: '', keep: false })).toEqual({ ok: false, error: message });
-    expect(await prepareGameImport(source(), teamsOf(), imported(), { dotaMatchId: '9023462170', radiant: '9', keep: false })).toEqual({ ok: false, error: message });
+  it('needs who won, which must be one of the two teams', async () => {
+    const message = 'Indica quién ganó la partida (pulsa «Buscar» y elige).';
+    expect(await prepareGameImport(source(), teamsOf(), imported(), { dotaMatchId: '9023462170', winner: '', keep: false })).toEqual({ ok: false, error: message });
+    expect(await prepareGameImport(source(), teamsOf(), imported(), { dotaMatchId: '9023462170', winner: '9', keep: false })).toEqual({ ok: false, error: message });
+  });
+
+  it('the Radiant side is derived from who won: the winner was Radiant when Radiant won, the other team when Dire won', async () => {
+    // Radiant won (the real match): choosing team 2 as the winner means team 2 was Radiant
+    const asTeam2 = gameFromSnapshot(snapshot, 2, 1, 2);
+    const raw2 = { winner: String(asTeam2.winnerId), t1Kills: String(asTeam2.team1Kills), t1Deaths: String(asTeam2.team1Deaths), t2Kills: String(asTeam2.team2Kills), t2Deaths: String(asTeam2.team2Deaths) };
+    const radiantWon = await prepareGameImport(source(), teamsOf(), raw2, { dotaMatchId: '9023462170', winner: '2', keep: false });
+    expect(radiantWon).toMatchObject({ ok: true, value: { radiantTeamId: 2 } });
+    // Dire won: choosing team 1 as the winner means team 2 was Radiant
+    const direWon: DotaMatchSource = { fetch: async () => ({ ...snapshot, radiantWin: false }) };
+    const asTeam2Radiant = gameFromSnapshot({ ...snapshot, radiantWin: false }, 2, 1, 2);
+    expect(asTeam2Radiant.winnerId).toBe(1);
+    const raw1 = { winner: '1', t1Kills: String(asTeam2Radiant.team1Kills), t1Deaths: String(asTeam2Radiant.team1Deaths), t2Kills: String(asTeam2Radiant.team2Kills), t2Deaths: String(asTeam2Radiant.team2Deaths) };
+    expect(await prepareGameImport(direWon, teamsOf(), raw1, { dotaMatchId: '9023462170', winner: '1', keep: false })).toMatchObject({ ok: true, value: { radiantTeamId: 2 } });
+    expect(await prepareGameImport(direWon, teamsOf(), { ...raw1, winner: '2' }, { dotaMatchId: '9023462170', winner: '2', keep: false })).toMatchObject({ ok: false });
   });
 
   it('a bad id or a failed lookup is a readable error', async () => {
-    expect(await prepareGameImport(source(), teamsOf(), imported(), { dotaMatchId: 'abc', radiant: '1', keep: false })).toMatchObject({ ok: false });
+    expect(await prepareGameImport(source(), teamsOf(), imported(), { dotaMatchId: 'abc', winner: '1', keep: false })).toMatchObject({ ok: false });
     const notFound = new DotaLookupError('not_found', 'Partida no encontrada. Revisa el Match ID.');
-    expect(await prepareGameImport(source(notFound), teamsOf(), imported(), { dotaMatchId: '9023462170', radiant: '1', keep: false })).toEqual({
+    expect(await prepareGameImport(source(notFound), teamsOf(), imported(), { dotaMatchId: '9023462170', winner: '1', keep: false })).toEqual({
       ok: false,
       error: 'Partida no encontrada. Revisa el Match ID.',
     });
   });
 
   it('keep needs the normal result validation to pass first (a teamless match cannot import)', async () => {
-    expect(await prepareGameImport(source(), [1, null], imported(), { dotaMatchId: '9023462170', radiant: '1', keep: false })).toMatchObject({ ok: false });
+    expect(await prepareGameImport(source(), [1, null], imported(), { dotaMatchId: '9023462170', winner: '1', keep: false })).toMatchObject({ ok: false });
   });
 });
