@@ -1,7 +1,11 @@
 import type { FC, PropsWithChildren } from 'hono/jsx';
 import { raw } from 'hono/html';
+import { useContext } from 'hono/jsx';
 import type { Team } from '../db/repository.js';
 import { assetUrl } from '../assets.js';
+import type { EmblemSources } from '../domain/emblem.js';
+import { EmblemPicture, EmblemSourcesContext, hasPicture } from '../emblem-view.js';
+import { emblemSourcesFor } from '../emblem-sources.js';
 import type { RulebookBlock } from '../markdown.js';
 import type {
   BracketMatchView,
@@ -104,15 +108,17 @@ export const PublicDocument: FC<PropsWithChildren<{ meta: PageMeta; links?: Page
   </>
 );
 
-/** Hero portrait of a team, or its code on a neutral tile when no hero was picked. */
+/** The emblem of a team (its own image, else its hero portrait), or its code on a neutral tile when no hero was picked. */
 const Portrait: FC<{ team: Team | null; cls?: string }> = ({ team, cls = '' }) =>
-  team?.hero ? (
-    <img class={cls} src={`/assets/heroes/${team.hero}.png`} alt="" loading="lazy" />
+  team && hasPicture(team, useContext(EmblemSourcesContext)) ? (
+    <EmblemPicture team={team} cls={cls} />
   ) : (
     <span class={`ph ${cls}`} style={team ? `--tc:${PALETTE[team.id % PALETTE.length]}` : undefined}>
       {team ? team.code : '?'}
     </span>
   );
+
+const defaultSources = emblemSourcesFor(null);
 
 const teamName = (team: Team | null) => team?.name ?? 'Por definir';
 
@@ -558,8 +564,8 @@ const RulesPanel: FC<{ model: PublicModel }> = ({ model }) => (
 // ---------- Page ----------
 
 /** Everything inside #app; also served on its own as the live-update fragment. */
-export const PublicContent: FC<{ model: PublicModel }> = ({ model }) => (
-  <>
+export const PublicContent: FC<{ model: PublicModel; sources?: EmblemSources }> = ({ model, sources }) => (
+  <EmblemSourcesContext.Provider value={sources ?? defaultSources}>
     <span hidden data-server-now={model.serverNow}></span>
     <Hero model={model} />
     <div class="tabs-bar">
@@ -589,7 +595,7 @@ export const PublicContent: FC<{ model: PublicModel }> = ({ model }) => (
         <RulesPanel model={model} />
       </section>
     </main>
-  </>
+  </EmblemSourcesContext.Provider>
 );
 
 export const ComingSoonContent: FC = () => (

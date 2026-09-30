@@ -13,8 +13,9 @@ Aplicación web ligera y multitorneo para ligas de Dota 2. Genera un fixture de 
 - **Pestaña de transmisión**: un enlace de Kick, Twitch o YouTube por torneo, incrustado en la página pública.
 - **Varios torneos**: uno está *activo* y se muestra en `/`; además, cada torneo tiene su propia URL para el archivo histórico.
 - **Vista previa al compartir**: cada enlace público muestra en WhatsApp, Telegram o Discord una imagen y un texto que cambian según el estado del torneo (grupos, en vivo, semifinales, campeón). La imagen se regenera con `npm run render:og`.
+- **Imagen propia del equipo**: además de elegir un héroe, cada equipo puede subir una imagen. El panel la recorta a 16:9 (Cropper.js incluido en el proyecto, sin CDN), el servidor la valida y la convierte a WebP optimizado (512×288 y 1024×576), y se guarda en Cloudflare R2 (o en una carpeta local en desarrollo). El emblema es un héroe o la imagen propia, nunca los dos. Los cambios de la pantalla Equipos se preparan en las filas y se guardan todos juntos con «Guardar cambios», así que un héroe puede pasar de un equipo a otro en un solo guardado.
 - **Zonas horarias**: las horas de los partidos se guardan en UTC; cada visitante ve su hora local.
-- **Panel de administración** (acceso con contraseña, varios administradores, todos con el mismo rol): torneos, reglas, equipos con emblema de héroe (127 héroes, retratos alojados en el propio proyecto), fixture, resultados, playoffs y usuarios.
+- **Panel de administración** (acceso con contraseña, varios administradores, todos con el mismo rol): torneos, reglas, equipos con emblema de héroe (127 héroes, retratos alojados en el propio proyecto) o con su propia imagen, fixture, resultados, playoffs y usuarios.
 
 ## Capturas de pantalla
 
@@ -30,6 +31,7 @@ Aplicación web ligera y multitorneo para ligas de Dota 2. Genera un fixture de 
 
 ```bash
 npm ci
+cp .env.example .env   # opcional: ajustes locales (puerto, contraseña, R2); ver más abajo
 npm run dev
 ```
 
@@ -50,6 +52,7 @@ Luego abre:
 - El código de configuración generado es aleatorio (192 bits), se imprime **una sola vez** en la salida del servidor y cambia en cada arranque. Para usar uno propio, define `ADMIN_SETUP_TOKEN`.
 - `/admin/setup` solo existe mientras no haya administradores; después responde 404. Los intentos tienen límite de frecuencia, igual que el inicio de sesión.
 - Después, gestiona los usuarios en el panel (**Usuarios**). Cada administrador puede cambiar su propia contraseña desde la barra lateral (**Cambiar contraseña**), lo que además cierra sus otras sesiones.
+- **Archivo `.env` (opcional, solo desarrollo).** `npm run dev`, `npm run seed:oct2026` y `npm run render:og` leen `./.env` si existe (con `--env-file-if-exists` de Node, sin dependencias nuevas). Está en `.gitignore`; parte de `.env.example`, que lista `PORT`, `DATABASE_PATH`, `ADMIN_PASSWORD` y las variables `R2_*`. `npm start` y Docker **no** lo leen. Si defines solo algunas de las cinco `R2_*`, el servidor no arranca y te dice cuáles faltan.
 - La base de datos SQLite se crea en `./data/torneos.db` en el primer arranque y se migra automáticamente.
 - Datos de demostración opcionales: `npm run seed:oct2026` crea *Torneo All vs All · Oct 2026* (7 equipos, 21 partidos) y lo deja activo. Se puede ejecutar dos veces sin problema (no hace nada si el torneo ya existe).
 
@@ -75,6 +78,9 @@ El servidor lee estas variables de entorno:
 | `COOKIE_SECURE` | desactivado | `1` o `true`: marca la cookie de sesión como `Secure`. Actívalo cuando se sirva por HTTPS |
 | `TRUST_PROXY` | desactivado | `1` o `true`: confía en `X-Forwarded-For` / `X-Forwarded-Host` de un proxy inverso (ver más abajo) |
 | `PUBLIC_BASE_URL` | vacío | URL pública de la app (por ejemplo `https://torneo-dota.jpsolutions.app`, sin barra final) para las URL absolutas de la vista previa al compartir. Vacío: se usa el origen de la solicitud (respetando `TRUST_PROXY`) |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_BASE_URL` | vacías | Almacenamiento de las imágenes de equipos en Cloudflare R2 (bucket público). Son **todo o nada**: si defines solo algunas, el servidor no arranca y lista las que faltan. Cómo crearlas: `deploy/README.md` |
+| `IMAGE_STORE` | vacío | `local` guarda las imágenes en una carpeta y las sirve la app en `/uploads`. Sin R2 es el comportamiento en desarrollo; en producción, sin R2 y sin `local`, las imágenes personalizadas se desactivan |
+| `IMAGES_DIR` | `./data/uploads` (`/data/uploads` en Docker) | Carpeta del almacenamiento local |
 | `STREAM_PARENT_HOSTS` | vacío | Hosts, separados por comas, autorizados a incrustar el reproductor de Twitch. Vacío significa el host de la solicitud más `sites.google.com` |
 
 `TRUST_PROXY` supone **exactamente un** proxy de confianza delante (por ejemplo, Caddy en el mismo servidor). El limitador de intentos de inicio de sesión usa entonces la entrada más a la derecha de `X-Forwarded-For`, la que agregó el proxy.
@@ -159,7 +165,9 @@ src/
   auth/               contraseñas, sesiones, limitador de inicio de sesión
   format/             formato de fechas y aritmética de zonas horarias
   data/               lista de héroes
-migrations/           archivos SQL solo hacia adelante: 001_init.sql ... 004_stream.sql
+  storage/            puerto ImageStore y adaptadores (Cloudflare R2 con SigV4, carpeta local)
+  images/             validación y conversión de imágenes con sharp
+migrations/           archivos SQL solo hacia adelante: 001_init.sql ... 006_team_images.sql
 deploy/               despliegue con Docker: compose, .env de ejemplo, bloque de Caddy y guía
 Dockerfile            imagen de producción (varias etapas, compila a dist/)
 public/               archivos estáticos: CSS, JS del cliente, retratos de héroes, imágenes
@@ -175,7 +183,7 @@ docs/screenshots/     imágenes usadas en este README
 
 | Comando | Qué hace |
 | --- | --- |
-| `npm run dev` | Inicia con observación de archivos (`tsx watch`) |
+| `npm run dev` | Inicia con observación de archivos (`tsx watch`) y carga `./.env` si existe |
 | `npm run build` | Compila TypeScript a `dist/` (`tsc -p tsconfig.build.json`) |
 | `npm start` | Inicia la versión compilada (`node dist/server.js`); ejecuta antes `npm run build` |
 | `npm test` | Ejecuta todas las pruebas una vez (`vitest run`) |

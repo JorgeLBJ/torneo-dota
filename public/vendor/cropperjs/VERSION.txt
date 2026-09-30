@@ -1,0 +1,1 @@
+cropperjs 1.6.2 (https://github.com/fengyuan-chen/cropperjs), MIT. Files copied unmodified from the npm package dist/.

@@ -23,7 +23,8 @@ RUN npm run build
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production \
     PORT=3000 \
-    DATABASE_PATH=/data/torneos.db
+    DATABASE_PATH=/data/torneos.db \
+    IMAGES_DIR=/data/uploads
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist

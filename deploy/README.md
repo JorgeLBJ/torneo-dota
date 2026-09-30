@@ -69,6 +69,31 @@ Guía para publicar **torneo-dota** en un VPS que ya tiene Caddy en Docker. La i
 
 7. **Abre <https://torneo-dota.jpsolutions.app/admin>**, crea el administrador con el código del paso 4 y configura el torneo.
 
+## Imágenes de los equipos (Cloudflare R2)
+
+Cada equipo puede subir su propia imagen, que reemplaza a su héroe en toda la web. Las imágenes viven en un bucket de Cloudflare R2 (no en el VPS). **Sin esta configuración, en producción las imágenes personalizadas quedan desactivadas** (el panel lo avisa y los héroes siguen funcionando).
+
+1. **Crea el bucket.** En el panel de Cloudflare: *R2 Object Storage > Create bucket*. Nombre sugerido: `torneo-dota`.
+2. **Activa el acceso público de lectura**, con una de estas dos opciones:
+   - *Dominio de desarrollo r2.dev*: en el bucket, *Settings > Public access > R2.dev subdomain > Allow Access*. Te da una URL `https://pub-xxxxxxxx.r2.dev`. Es lo más rápido, pero Cloudflare lo limita en tráfico y no es para producción con mucho público.
+   - *Dominio propio* (recomendado): *Settings > Custom Domains > Connect Domain*, por ejemplo `img.jpsolutions.app` (la zona debe estar en Cloudflare).
+3. **Crea un token de API** solo para este bucket: *R2 Object Storage > Manage API tokens > Create API token*, permiso **Object Read & Write**, y en *Specify bucket(s)* elige únicamente `torneo-dota`. Copia el *Access Key ID* y el *Secret Access Key* (el secreto se muestra una sola vez). El *Account ID* aparece en la misma página de R2.
+4. **Rellena `.env`** (las cinco variables son obligatorias juntas; si falta alguna, el servidor no arranca y dice cuáles):
+
+   ```bash
+   R2_ACCOUNT_ID=<tu account id>
+   R2_ACCESS_KEY_ID=<access key id>
+   R2_SECRET_ACCESS_KEY=<secret access key>
+   R2_BUCKET=torneo-dota
+   R2_PUBLIC_BASE_URL=https://img.jpsolutions.app   # o https://pub-xxxxxxxx.r2.dev, sin barra final
+   ```
+
+5. **Reinicia** con `docker compose up -d`. El registro debe decir `Team images: Cloudflare R2 bucket "torneo-dota"`.
+
+- El servidor convierte cada imagen a WebP (512×288 y 1024×576), les pone `Cache-Control: public, max-age=31536000, immutable` y usa una clave nueva en cada cambio, así que reemplazar una imagen nunca deja copias viejas en caché. Al reemplazar o quitar la imagen, o al eliminar el equipo, se borran los archivos anteriores.
+- El token solo puede leer y escribir en ese bucket. Para rotarlo, crea uno nuevo, cambia `R2_ACCESS_KEY_ID` y `R2_SECRET_ACCESS_KEY` y reinicia.
+- **Alternativa sin R2:** `IMAGE_STORE=local` guarda las imágenes en el volumen (`/data/uploads`) y las sirve la propia app. Quedan incluidas en la copia de seguridad del volumen, pero sin CDN.
+
 ## Actualizar
 
 ```bash

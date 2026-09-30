@@ -13,6 +13,7 @@ import { createRepository } from './db/repository.js';
 import { createEvents } from './events.js';
 import { FAVICON_SVG } from './favicon.js';
 import { publicApp } from './public/routes.js';
+import { LocalImageStore } from './storage/local.js';
 
 export type { AppConfig } from './config.js';
 
@@ -23,19 +24,27 @@ export interface CreateAppOptions {
 
 /** Largest accepted request body; every form in the app is far smaller. */
 export const MAX_BODY_BYTES = 64 * 1024;
+/** One save of the Equipos screen: several 5 MB pictures plus the multipart envelope. */
+export const MAX_UPLOAD_BYTES = 30 * 1024 * 1024;
+const IMAGE_UPLOAD_PATH = /^\/admin\/t\/\d+\/equipos\/lote$/; // the Equipos batch save, which may carry cropped images
 
 export function createApp({ db, config }: CreateAppOptions) {
   const repo = createRepository(db);
   const events = createEvents();
   const limiter = new LoginRateLimiter();
   const accountLimiter = new LoginRateLimiter();
+  const uploadLimiter = new LoginRateLimiter({ maxFailures: 30, windowMs: 60_000 });
+  const images = config.imageStore ?? null;
   const now = clockOf(config);
   const app = new Hono();
 
-  app.use(
-    '*',
-    bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (c) => c.text('La solicitud es demasiado grande.', 413) }),
-  );
+  const smallBodies = bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (c) => c.text('La solicitud es demasiado grande.', 413) });
+  const imageBodies = bodyLimit({
+    maxSize: MAX_UPLOAD_BYTES,
+    onError: (c) => c.json({ error: 'Los cambios son demasiado grandes (máximo 30 MB en total, 5 MB por imagen).' }, 413),
+  });
+  // Only the image upload route may carry a large body; everything else keeps the small cap.
+  app.use('*', (c, next) => (IMAGE_UPLOAD_PATH.test(c.req.path) ? imageBodies(c, next) : smallBodies(c, next)));
 
   // Static files (CSS, JS, self-hosted hero portraits) are served from ./public under /assets.
   // Only URLs carrying the file's current fingerprint (see assetUrl) are immutable; portraits and the
@@ -62,10 +71,18 @@ export function createApp({ db, config }: CreateAppOptions) {
   });
   // Crawlers: public pages are open, the backoffice is not (see public/robots.txt).
   app.get('/robots.txt', (c) => c.body(readFileSync(`${PUBLIC_DIR}/robots.txt`, 'utf8'), 200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' }));
+  // With the local adapter the app serves the files itself; R2 serves its own.
+  if (images instanceof LocalImageStore) {
+    app.get('/uploads/*', async (c) => {
+      const bytes = await images.read(c.req.path.slice('/uploads/'.length));
+      if (!bytes) return c.text('No encontrado.', 404);
+      return c.body(new Uint8Array(bytes), 200, { 'Content-Type': 'image/webp', 'Cache-Control': 'public, max-age=31536000, immutable' });
+    });
+  }
   app.get('/favicon.svg', (c) => c.body(FAVICON_SVG, 200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' }));
   app.get('/favicon.ico', (c) => c.body(null, 204));
-  app.route('/admin', adminApp({ repo, events, config, limiter, accountLimiter, now }));
-  app.route('/', publicApp({ repo, events, config, now }));
+  app.route('/admin', adminApp({ repo, events, config, limiter, accountLimiter, now, images, uploadLimiter }));
+  app.route('/', publicApp({ repo, events, config, now, images }));
 
   return { app, repo, events };
 }

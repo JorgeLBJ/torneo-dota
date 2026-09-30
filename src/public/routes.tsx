@@ -6,6 +6,8 @@ import type { AppConfig } from '../config.js';
 import type { Repository, Tournament } from '../db/repository.js';
 import { parentHostsFor } from '../domain/stream.js';
 import { assetUrl } from '../assets.js';
+import { emblemSourcesFor } from '../emblem-sources.js';
+import type { ImageStore } from '../storage/image-store.js';
 import { clientKey, publicOrigin, requestHost } from '../security.js';
 import { NO_TOURNAMENT_SHARE, buildShare, type Share } from './share.js';
 import type { Events } from '../events.js';
@@ -25,6 +27,7 @@ export interface PublicDeps {
   events: Events;
   config: Pick<AppConfig, 'heartbeatMs' | 'publicBaseUrl' | 'sseLimits' | 'streamParentHosts' | 'trustProxy'>;
   now: Clock;
+  images?: ImageStore | null;
 }
 
 const NOT_FOUND_SHARE: Share = {
@@ -47,7 +50,8 @@ const linksFor = (tournament: Tournament): PageLinks => ({
 });
 const ROOT_LINKS: PageLinks = { events: '/events', partial: '/partial' };
 
-export function publicApp({ repo, events, config, now }: PublicDeps) {
+export function publicApp({ repo, events, config, now, images = null }: PublicDeps) {
+  const sources = emblemSourcesFor(images);
   const app = new Hono();
 
   const content = (tournament: Tournament, parentHosts: readonly string[]) => {
@@ -55,7 +59,7 @@ export function publicApp({ repo, events, config, now }: PublicDeps) {
       now: now(),
       parentHosts,
     });
-    return { model, node: <PublicContent model={model} /> };
+    return { model, node: <PublicContent model={model} sources={sources} /> };
   };
 
   /** Twitch embeds must name every page that frames the player: this host and, by default, Google Sites. */

@@ -13,6 +13,8 @@ export interface AppConfig {
   setupToken?: string;
   /** Public origin for absolute share URLs (PUBLIC_BASE_URL), e.g. https://torneo-dota.jpsolutions.app. Unset: the request origin. */
   publicBaseUrl?: string;
+  /** Where custom team images live. Null/absent: custom images are switched off. */
+  imageStore?: import('./storage/image-store.js').ImageStore | null;
   /** Clock override for tests. */
   now?: () => Date;
 }

@@ -46,6 +46,8 @@ export interface Team {
   captain: string | null;
   /** Hero slug, unique within the tournament. */
   hero: string | null;
+  /** Key of the team's own uploaded image (1x WebP) in the image store; replaces the hero everywhere when set. */
+  imageKey: string | null;
 }
 
 export interface Match {
@@ -122,7 +124,7 @@ export const TIEBREAKER_KEYS = ['kd', 'kills', 'h2h', 'extra'] as const;
 
 const TOURNAMENT_COLS = `id, name, slug, qualifiers, game, points_win AS pointsWin, points_loss AS pointsLoss,
   tiebreakers, group_legs AS groupLegs, rules_text AS rulesText, timezone, stream_url AS streamUrl, is_active AS isActive, created_at AS createdAt`;
-const TEAM_COLS = 'id, tournament_id AS tournamentId, code, name, captain, hero';
+const TEAM_COLS = 'id, tournament_id AS tournamentId, code, name, captain, hero, image_key AS imageKey';
 const MATCH_COLS = `m.id, m.tournament_id AS tournamentId, m.phase, m.round, m.match_number AS matchNumber, m.is_tiebreak AS isTiebreak,
   m.starts_at AS startsAt, m.ends_at AS endsAt, t.timezone AS timezone,
   m.team1_id AS team1Id, m.team2_id AS team2Id, m.winner_id AS winnerId,
@@ -179,7 +181,7 @@ export function createRepository(db: Database.Database) {
     teamById: db.prepare(`SELECT ${TEAM_COLS} FROM teams WHERE id = ?`),
     listTeams: db.prepare(`SELECT ${TEAM_COLS} FROM teams WHERE tournament_id = ? ORDER BY code`),
     updateTeam: db.prepare(
-      'UPDATE teams SET code = @code, name = @name, captain = @captain, hero = @hero WHERE id = @id',
+      'UPDATE teams SET code = @code, name = @name, captain = @captain, hero = @hero, image_key = @imageKey WHERE id = @id',
     ),
     deleteTeam: db.prepare('DELETE FROM teams WHERE id = ?'),
     teamHasMatches: db
@@ -272,6 +274,30 @@ export function createRepository(db: Database.Database) {
     isTiebreak: m.isTiebreak ? 1 : 0,
     ...instants(m.tournamentId, m),
   });
+
+  /**
+   * Saves several teams at once in ONE transaction: fields, hero and (when `key` is given; null clears it) image key.
+   * The previous keys are read inside it, so concurrent saves each see a distinct previous key and never share an
+   * object. Codes and heroes are freed first, so teams can swap them without tripping the unique indexes; the caller
+   * has already validated the final state.
+   */
+  const saveTeamsBatchTx = db.transaction(
+    (tournamentId: number, updates: TeamUpdate[]): { ok: true; teams: Team[]; previous: Record<number, string | null> } | { ok: false; missingId: number } => {
+      const previous: Record<number, string | null> = {};
+      for (const update of updates) {
+        const current = teamById(update.id);
+        if (!current || current.tournamentId !== tournamentId) return { ok: false, missingId: update.id };
+        previous[update.id] = current.imageKey;
+      }
+      const free = db.prepare("UPDATE teams SET code = '~' || id, hero = NULL WHERE id = ?");
+      for (const update of updates) free.run(update.id);
+      for (const update of updates) {
+        const current = requireRow(teamById(update.id), 'Team');
+        q.updateTeam.run({ ...current, ...update.fields, imageKey: update.key === undefined ? previous[update.id] : update.key, id: update.id });
+      }
+      return { ok: true, teams: updates.map((update) => requireRow(teamById(update.id), 'Team')), previous };
+    },
+  );
 
   const insertMatchesTx = db.transaction((matches: NewMatch[]) => {
     for (const m of matches) q.insertMatch.run(withDefaults(m));
@@ -373,11 +399,16 @@ export function createRepository(db: Database.Database) {
     },
     getTeam: teamById,
     listTeams: (tournamentId: number) => q.listTeams.all(tournamentId) as Team[],
-    updateTeam(id: number, patch: Partial<Pick<Team, 'code' | 'name' | 'captain' | 'hero'>>): Team {
+    updateTeam(id: number, patch: Partial<Pick<Team, 'code' | 'name' | 'captain' | 'hero' | 'imageKey'>>): Team {
       requireHero(patch.hero);
       const current = requireRow(teamById(id), 'Team');
       q.updateTeam.run({ ...current, ...patch, id });
       return requireRow(teamById(id), 'Team');
+    },
+    /** Atomically saves many teams (see saveTeamsBatchTx); returns the image keys it replaced. */
+    saveTeamsBatch(tournamentId: number, updates: TeamUpdate[]) {
+      for (const update of updates) requireHero(update.fields.hero);
+      return saveTeamsBatchTx(tournamentId, updates);
     },
     deleteTeam(id: number): void {
       q.deleteTeam.run(id);
@@ -472,6 +503,13 @@ export function createRepository(db: Database.Database) {
       q.deleteExpiredSessions.run(now);
     },
   };
+}
+
+export interface TeamUpdate {
+  id: number;
+  fields: Pick<Team, 'code' | 'name' | 'captain' | 'hero'>;
+  /** Undefined: keep the stored image key. String: the new key. Null: no image. */
+  key?: string | null;
 }
 
 export type Repository = ReturnType<typeof createRepository>;

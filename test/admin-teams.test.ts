@@ -14,6 +14,13 @@ beforeEach(async () => {
 });
 afterEach(() => t.db.close());
 
+/** The screen's global save: rows as the page sends them (JSON answer). */
+const saveRows = (rows: Record<string, unknown>[]) => {
+  const form = new FormData();
+  form.append('rows', JSON.stringify(rows));
+  return t.app.request(`${url}/lote`, { method: 'POST', body: form, headers: { origin: 'http://localhost', cookie, accept: 'application/json' } });
+};
+
 describe('teams screen', () => {
   it('lists teams with their hero portrait and name', async () => {
     t.repo.createTeam(tournament.id, { code: 'A', name: 'Alpha', captain: 'Kelvin', hero: 'axe' });
@@ -24,18 +31,19 @@ describe('teams screen', () => {
     expect(html).toContain('value="Kelvin"');
     expect(html).toContain('/assets/heroes/axe.png');
     expect(html).toContain('Axe');
-    expect(html).toContain('Sin héroe');
+    expect(html).toContain('Sin emblema');
+    expect(html).not.toContain('Sin héroe');
     expect(html).toContain('Buscar héroe');
     expect(html).toContain('Fuerza');
   });
 
-  it('exposes taken heroes to the picker as JSON', async () => {
+  it('gives the picker the hero list; which heroes are taken is computed live from the rows on the page', async () => {
     t.repo.createTeam(tournament.id, { code: 'A', name: 'Alpha', hero: 'axe' });
     const html = await (await t.get(url, cookie)).text();
     const json = /<script type="application\/json" id="heroes-data">(.*?)<\/script>/s.exec(html)?.[1];
-    const data = JSON.parse(json!) as { heroes: unknown[]; taken: Record<string, string> };
+    const data = JSON.parse(json!) as { heroes: unknown[]; taken?: unknown };
     expect(data.heroes).toHaveLength(127);
-    expect(data.taken).toEqual({ axe: 'A' });
+    expect(data.taken).toBeUndefined();
   });
 
   it('adds a team with normalized code and hero', async () => {
@@ -73,23 +81,24 @@ describe('teams screen', () => {
 
   it('updates a team and lets it keep its own hero', async () => {
     const team = t.repo.createTeam(tournament.id, { code: 'A', name: 'Alpha', hero: 'axe' });
-    const res = await t.post(`${url}/${team.id}`, { code: 'A', name: 'Alpha 2', captain: 'Z', hero: 'axe' }, cookie);
-    expect(res.status).toBe(303);
+    const res = await saveRows([{ id: team.id, code: 'A', name: 'Alpha 2', captain: 'Z', hero: 'axe', emblem: 'hero' }]);
+    expect(res.status).toBe(200);
     expect(t.repo.getTeam(team.id)).toMatchObject({ name: 'Alpha 2', captain: 'Z', hero: 'axe' });
   });
 
   it('rejects taking another team hero on update', async () => {
     t.repo.createTeam(tournament.id, { code: 'A', name: 'Alpha', hero: 'axe' });
     const b = t.repo.createTeam(tournament.id, { code: 'B', name: 'Bravo' });
-    const res = await t.post(`${url}/${b.id}`, { code: 'B', name: 'Bravo', hero: 'axe' }, cookie);
-    expect(await flashText(t, res, cookie)).toContain('ya lo usa el equipo A');
+    const res = await saveRows([{ id: b.id, code: 'B', name: 'Bravo', captain: '', hero: 'axe', emblem: 'hero' }]);
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(await res.json())).toContain('ya lo usa el equipo A');
     expect(t.repo.getTeam(b.id)!.hero).toBeNull();
   });
 
   it('does not touch teams of another tournament', async () => {
     const other = t.repo.createTournament({ name: 'Otro', slug: 'otro' });
     const foreign = t.repo.createTeam(other.id, { code: 'A', name: 'Foreign' });
-    expect((await t.post(`${url}/${foreign.id}`, { code: 'A', name: 'Hacked' }, cookie)).status).toBe(404);
+    expect((await saveRows([{ id: foreign.id, code: 'A', name: 'Hacked', captain: '', hero: null, emblem: 'keep' }])).status).toBe(400);
     expect((await t.post(`${url}/${foreign.id}/eliminar`, {}, cookie)).status).toBe(404);
     expect(t.repo.getTeam(foreign.id)!.name).toBe('Foreign');
   });
@@ -122,13 +131,16 @@ describe('teams screen', () => {
     expect(fired).toBe(1);
   });
 
-  it('keeps the hero thumbnail, its name and the other controls on one row', async () => {
+  it('has one compact emblem cell per row: thumbnail, source label and a single Cambiar menu', async () => {
     t.repo.createTeam(tournament.id, { code: 'A', name: 'Alpha', hero: 'axe' });
     const html = await (await t.get(url, cookie)).text();
-    expect(html).toContain('class="hero-cell"');
     expect(html).toContain('class="code-input"');
-    // Both the existing row and the "new team" row use the same compact slot.
-    expect(html.match(/class="hero-slot/g)).toHaveLength(2);
-    expect(html).toContain('+ Héroe');
+    // Both the existing row and the "new team" row use the same cell.
+    expect(html.match(/class="emblem-cell"/g)).toHaveLength(2);
+    expect(html.match(/class="emblem-thumb"/g)).toHaveLength(2);
+    expect(html.match(/<summary class="btn sm">\s*Cambiar/g)).toHaveLength(2);
+    expect(html).toContain('data-label="Emblema"');
+    expect(html).not.toContain('Emblema (héroe)');
+    expect(html).not.toContain('+ Héroe');
   });
 });

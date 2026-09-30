@@ -6,6 +6,7 @@ import { ensureInitialAdmin } from './auth/bootstrap.js';
 import { resolveSetupToken } from './auth/setup-token.js';
 import { configFromEnv } from './config.js';
 import { openDatabase } from './db/open.js';
+import { imageStoreFromEnv } from './storage/from-env.js';
 import { createShutdown } from './shutdown.js';
 
 const port = Number(process.env.PORT ?? 3000);
@@ -15,7 +16,9 @@ try {
   mkdirSync(dirname(databasePath), { recursive: true });
   const db = openDatabase(databasePath);
   const setup = resolveSetupToken(process.env.ADMIN_SETUP_TOKEN);
-  const { app, repo } = createApp({ db, config: { ...configFromEnv(), setupToken: setup.token } });
+  const images = imageStoreFromEnv();
+  console.log(images.message);
+  const { app, repo } = createApp({ db, config: { ...configFromEnv(), setupToken: setup.token, imageStore: images.store } });
   if ((await ensureInitialAdmin(repo, process.env.ADMIN_PASSWORD)) === 'setup-required') {
     // The generated code is printed once, here; an operator-chosen code is never echoed.
     console.log(
