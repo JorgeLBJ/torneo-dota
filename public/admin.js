@@ -22,10 +22,7 @@
 
   var data = JSON.parse(dataEl.textContent);
   var heroes = data.heroes;
-  var taken = data.taken;
-  // Shared with the team rows, which keep it current as rows are saved.
   window.teamRows = window.teamRows || {};
-  window.teamRows.taken = taken;
   var grid = document.getElementById('heroGrid');
   var search = document.getElementById('heroSearch');
   var label = document.getElementById('heroTeam');
@@ -35,16 +32,18 @@
   function render() {
     var query = search.value.trim().toLowerCase();
     var own = current.input.value;
+    // Taken = in use by ANOTHER row as the page will be after saving (a hero a row is moving away from is free).
+    var taken = window.teamRows.takenBy(current.cell);
     grid.textContent = '';
     heroes.forEach(function (hero) {
       if (attr !== 'any' && hero.attr !== attr) return;
       if (query && hero.name.toLowerCase().indexOf(query) === -1) return;
-      var isTaken = Object.prototype.hasOwnProperty.call(taken, hero.slug) && hero.slug !== own;
+      var isTaken = Object.prototype.hasOwnProperty.call(taken, hero.slug);
       var button = document.createElement('button');
       button.type = 'button';
       button.className = 'hero' + (hero.slug === own ? ' sel' : '') + (isTaken ? ' taken' : '');
       button.disabled = isTaken;
-      button.title = isTaken ? 'Ya lo usa el equipo ' + taken[hero.slug] : hero.name;
+      button.title = isTaken ? 'Ya lo usa ' + taken[hero.slug] : hero.name;
       var img = document.createElement('img');
       img.loading = 'lazy';
       img.alt = '';
@@ -117,19 +116,22 @@
   });
 })();
 
-// Team rows (Equipos): every emblem change (hero, uploaded image, removal) is STAGED in its row and only saved with
-// that row's "Guardar", which sends ONE request for that row and then redraws just that row. Other rows keep
-// whatever was typed in them. Without JavaScript the plain form post still saves the row's text fields and hero.
+// Team rows (Equipos): every change (fields, hero, uploaded image, removal) is STAGED in its row. Nothing is saved
+// until "Guardar cambios", which sends ONE batch for all changed rows; the server validates the final state of the
+// whole tournament, so heroes and codes can move between teams in the same save. Each team has a hero OR its own
+// image, never both. The new-team row is a separate plain form ("+ Agregar equipo"): it creates a team and reloads.
 (function () {
   var cells = Array.prototype.slice.call(document.querySelectorAll('[data-emblem-cell]'));
   if (!cells.length) return;
 
   var HEROES = '/assets/heroes/';
   var states = [];
+  var bar = document.querySelector('[data-save-bar]');
   var replaceDialog = document.getElementById('replaceImageDialog');
+  var discardDialog = document.getElementById('discardAllDialog');
   var replacing = null;
+  var saving = false;
   var api = window.teamRows || {};
-  api.taken = api.taken || null;
   window.teamRows = api;
 
   function formIdOf(cell) {
@@ -138,7 +140,7 @@
 
   function fieldsOf(state) {
     return Array.prototype.slice.call(document.querySelectorAll('[form="' + state.formId + '"]'))
-      .filter(function (el) { return el !== state.clearInput; });
+      .filter(function (el) { return el !== state.heroInput; });
   }
 
   function savedFrom(cell, heroInput) {
@@ -159,7 +161,6 @@
       formId: formIdOf(cell),
       row: cell.closest('[data-team-row]'),
       heroInput: heroInput,
-      clearInput: cell.querySelector('[data-clear-image]'),
       thumb: cell.querySelector('[data-emblem-thumb]'),
       label: cell.querySelector('[data-emblem-label]'),
       marker: cell.querySelector('[data-unsaved]'),
@@ -170,11 +171,11 @@
       removeImage: false,
       hero: heroInput.defaultValue,
       heroName: cell.getAttribute('data-hero-name') || '',
-      saving: false,
     };
     cell.teamRowState = state;
     states.push(state);
   });
+  var rowStates = states.filter(function (state) { return state.row; });
 
   function dropBlob(state) {
     if (state.blobUrl) URL.revokeObjectURL(state.blobUrl);
@@ -182,12 +183,16 @@
     state.blobUrl = null;
   }
 
+  /** The hero the team will have once saved: none while a custom image is staged (the emblem is exclusive). */
+  function finalHero(state) {
+    return state.blob ? '' : state.hero;
+  }
+
   function isDirty(state) {
     if (state.blob || state.removeImage) return true;
-    // A hidden input's value IS its default value (the two are the same attribute), so the staged hero is compared
-    // with the saved one directly instead of through the input.
+    // A hidden input's value IS its default value (the same attribute), so the staged hero is compared directly.
     if (state.hero !== state.saved.hero) return true;
-    return fieldsOf(state).some(function (el) { return el !== state.heroInput && el.value !== el.defaultValue; });
+    return fieldsOf(state).some(function (el) { return el.value !== el.defaultValue; });
   }
 
   function message(state, text, kind) {
@@ -211,20 +216,57 @@
     p.setAttribute('role', kind === 'error' ? 'alert' : 'status');
     p.textContent = text;
     cell.appendChild(p);
-    if (next.timer) clearTimeout(next.timer);
-    if (kind === 'ok') next.timer = setTimeout(function () { if (next.parentNode) next.remove(); }, 6000);
+  }
+
+  // ---------- The action bar ----------
+
+  var barText = bar && bar.querySelector('[data-save-text]');
+  var barMessage = bar && bar.querySelector('[data-save-message]');
+  var saveButton = bar && bar.querySelector('[data-save-all]');
+  var saveCount = bar && bar.querySelector('[data-save-count]');
+  var discardButton = bar && bar.querySelector('[data-discard-all]');
+  var barTimer = null;
+
+  function dirtyStates() {
+    return rowStates.filter(isDirty);
+  }
+
+  function refreshBar() {
+    if (!bar) return;
+    var count = dirtyStates().length;
+    saveCount.textContent = String(count);
+    barText.textContent = count === 1 ? '1 equipo con cambios sin guardar' : count + ' equipos con cambios sin guardar';
+    // The bar also shows the result of a save for a few seconds.
+    bar.hidden = count === 0 && !barMessage.textContent;
+    barText.hidden = count === 0;
+    saveButton.hidden = count === 0;
+    discardButton.hidden = count === 0;
+  }
+
+  function barNote(text, kind) {
+    if (!bar) return;
+    clearTimeout(barTimer);
+    barMessage.textContent = text || '';
+    barMessage.className = 'save-message' + (text ? ' ' + kind : '');
+    barMessage.hidden = !text;
+    refreshBar();
+    if (text && kind === 'ok') {
+      barTimer = setTimeout(function () { barNote('', ''); }, 6000);
+    }
   }
 
   function refreshDirty(state) {
-    var dirty = isDirty(state);
     if (state.row) {
+      var dirty = isDirty(state);
       state.marker.hidden = !dirty;
       state.row.classList.toggle('dirty', dirty);
       var undo = state.row.querySelector('[data-undo]');
       if (undo) undo.hidden = !dirty;
     }
-    return dirty;
+    refreshBar();
   }
+
+  // ---------- Drawing a row ----------
 
   /** Draws the row's emblem from its state: staged image, saved image, hero, or the code tile. */
   function render(state) {
@@ -278,7 +320,6 @@
     state.label.parentNode.title = text;
     state.cell.setAttribute('data-has-image', kind ? '1' : '0');
     state.heroInput.value = state.hero;
-    state.clearInput.value = state.removeImage && !state.blob ? '1' : '';
     if (state.removeItem) state.removeItem.hidden = !kind;
     refreshDirty(state);
   }
@@ -303,6 +344,20 @@
     if (file) file.setAttribute('aria-label', 'Imagen del equipo ' + name);
   }
 
+  /**
+   * Heroes in use right now by the OTHER rows, as the page will be after saving: a hero another row is moving away
+   * from (or replacing by an image) is free; one it is about to take is taken. Value: the team's name.
+   */
+  api.takenBy = function (cell) {
+    var taken = {};
+    rowStates.forEach(function (state) {
+      if (state.cell === cell) return;
+      var hero = finalHero(state);
+      if (hero) taken[hero] = api.nameOf(state.cell);
+    });
+    return taken;
+  };
+
   // ---------- Staging ----------
 
   api.stageImage = function (cell, blob) {
@@ -315,10 +370,11 @@
     render(state);
   };
 
+  /** "Quitar imagen": drops a staged image (back to what the row had) or removes the saved one. */
   api.stageRemoval = function (cell) {
     var state = stateOf(cell);
-    dropBlob(state);
-    state.removeImage = state.saved.hasImage;
+    if (state.blob) dropBlob(state);
+    else state.removeImage = state.saved.hasImage;
     message(state, '');
     render(state);
   };
@@ -366,15 +422,10 @@
     render(state);
   }
 
-  // ---------- Saving one row ----------
+  // ---------- Saving everything at once ----------
 
-  /** Redraws the row from the server's JSON; nothing else on the page is touched. */
+  /** Redraws one row from the server's JSON. */
   function applySaved(state, team) {
-    var taken = api.taken;
-    if (taken) {
-      Object.keys(taken).forEach(function (slug) { if (taken[slug] === state.saved.code) delete taken[slug]; });
-      if (team.hero) taken[team.hero] = team.code;
-    }
     var values = { code: team.code, name: team.name, captain: team.captain || '' };
     fieldsOf(state).forEach(function (el) {
       if (Object.prototype.hasOwnProperty.call(values, el.name)) el.value = values[el.name];
@@ -394,61 +445,117 @@
     };
     state.cell.setAttribute('data-code', team.code);
     state.cell.setAttribute('data-team-name', team.name);
-    state.cell.querySelectorAll('[data-team-label]').forEach(function (el) { el.setAttribute('data-team-label', team.name); });
     state.heroInput.value = state.hero;
-    render(state);
+    state.heroInput.defaultValue = state.hero;
     fieldsOf(state).forEach(function (el) { el.defaultValue = el.value; });
-    refreshDirty(state);
+    message(state, '');
+    render(state);
   }
 
-  function save(state, form) {
-    if (state.saving) return;
-    state.saving = true;
-    var button = form.querySelector('button[type="submit"]');
-    var label = button.textContent;
-    button.disabled = true;
-    button.textContent = 'Guardando…';
-    message(state, '');
-    var data = new FormData(form);
-    if (state.blob) data.set('image', state.blob, state.blob.type === 'image/png' ? 'equipo.png' : 'equipo.webp');
-    var done = function () {
-      state.saving = false;
-      button.disabled = false;
-      button.textContent = label;
+  function rowPayload(state) {
+    var value = function (name) {
+      var el = document.querySelector('[form="' + state.formId + '"][name="' + name + '"]');
+      return el ? el.value : '';
     };
-    fetch(form.action, { method: 'POST', body: data, credentials: 'same-origin', headers: { Accept: 'application/json' } })
+    var emblem = 'keep';
+    if (state.blob) emblem = 'image';
+    else if (state.removeImage || state.hero !== state.saved.hero) emblem = state.hero ? 'hero' : 'none';
+    var payload = {
+      id: Number(state.row.getAttribute('data-team-id')),
+      code: value('code'),
+      name: value('name'),
+      captain: value('captain'),
+      hero: emblem === 'hero' ? state.hero : null,
+      emblem: emblem,
+    };
+    if (emblem === 'image') payload.imageField = 'image_' + payload.id;
+    return payload;
+  }
+
+  function setSaving(on) {
+    saving = on;
+    saveButton.disabled = on;
+    discardButton.disabled = on;
+    saveButton.querySelector('[data-save-label]').textContent = on ? 'Guardando…' : 'Guardar cambios';
+  }
+
+  function saveAll() {
+    if (saving) return;
+    var dirty = dirtyStates();
+    if (!dirty.length) return;
+    rowStates.forEach(function (state) { message(state, ''); });
+    barNote('', '');
+    setSaving(true);
+    var data = new FormData();
+    data.set('rows', JSON.stringify(dirty.map(rowPayload)));
+    dirty.forEach(function (state) {
+      if (state.blob) {
+        var id = state.row.getAttribute('data-team-id');
+        data.set('image_' + id, state.blob, state.blob.type === 'image/png' ? 'equipo.png' : 'equipo.webp');
+      }
+    });
+    fetch(bar.getAttribute('data-batch-url'), { method: 'POST', body: data, credentials: 'same-origin', headers: { Accept: 'application/json' } })
       .then(function (res) {
         return res.json().catch(function () { return {}; }).then(function (body) {
-          done();
-          if (res.ok && body.team) {
-            applySaved(state, body.team);
-            message(state, body.message || 'Equipo guardado.', 'ok');
+          setSaving(false);
+          if (res.ok && body.teams) {
+            body.teams.forEach(function (team) {
+              var row = document.querySelector('[data-team-row][data-team-id="' + team.id + '"]');
+              if (row) applySaved(stateOf(row.querySelector('[data-emblem-cell]')), team);
+            });
+            barNote(body.message || 'Cambios guardados.', 'ok');
+          } else if (body.errors) {
+            var first = null;
+            Object.keys(body.errors).forEach(function (id) {
+              var row = document.querySelector('[data-team-row][data-team-id="' + id + '"]');
+              if (!row) return;
+              message(stateOf(row.querySelector('[data-emblem-cell]')), body.errors[id], 'error');
+              if (!first) first = row;
+            });
+            barNote('No se guardó nada: corrige las filas marcadas y vuelve a guardar. Tus cambios siguen aquí.', 'error');
+            if (first && first.scrollIntoView) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
           } else if (res.status === 401 || res.status === 403 || res.redirected) {
-            message(state, 'La sesión caducó. Recarga la página e inicia sesión de nuevo; tus cambios siguen aquí hasta entonces.', 'error');
+            barNote('La sesión caducó. Recarga la página e inicia sesión de nuevo; tus cambios siguen aquí hasta entonces.', 'error');
           } else {
-            message(state, body.error || 'No se pudo guardar el equipo. Inténtalo de nuevo.', 'error');
+            barNote(body.error || 'No se pudieron guardar los cambios. Inténtalo de nuevo.', 'error');
           }
         });
       })
       .catch(function () {
-        done();
-        message(state, 'No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.', 'error');
+        setSaving(false);
+        barNote('No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.', 'error');
       });
+  }
+
+  function discardAll() {
+    rowStates.forEach(function (state) { if (isDirty(state)) undo(state); });
+    barNote('', '');
+  }
+
+  if (saveButton) saveButton.addEventListener('click', saveAll);
+  if (discardButton) {
+    discardButton.addEventListener('click', function () {
+      if (discardDialog && typeof discardDialog.showModal === 'function') discardDialog.showModal();
+      else discardAll();
+    });
+  }
+  if (discardDialog) {
+    var confirmDiscard = discardDialog.querySelector('[data-discard-confirm]');
+    if (confirmDiscard) {
+      confirmDiscard.addEventListener('click', function () {
+        discardAll();
+        discardDialog.close();
+      });
+    }
   }
 
   states.forEach(function (state) {
     render(state);
     if (!state.row) return;
-    var form = document.getElementById(state.formId);
-    if (form && window.fetch && window.FormData) {
-      form.addEventListener('submit', function (event) {
-        event.preventDefault();
-        save(state, form);
-      });
-    }
     var undoButton = state.row.querySelector('[data-undo]');
     if (undoButton) undoButton.addEventListener('click', function () { undo(state); });
   });
+  refreshBar();
 
   // Typing in any field of a row marks that row as unsaved.
   document.addEventListener('input', function (event) {
@@ -462,11 +569,11 @@
     });
   });
 
-  // Leaving with unsaved edits asks first; a row's own plain (no-JavaScript) submit is the one exception.
+  // Leaving with unsaved edits asks first. Only "+ Agregar equipo" with nothing else pending goes through silently.
   var leaving = false;
   document.addEventListener('submit', function (event) {
     var form = event.target;
-    if (form && form.matches && form.matches('[data-team-form], #team-new')) {
+    if (form && form.matches && form.matches('#team-new') && !dirtyStates().length) {
       leaving = true;
       setTimeout(function () { leaving = false; }, 0);
     }

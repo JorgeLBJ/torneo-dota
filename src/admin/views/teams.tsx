@@ -50,7 +50,6 @@ const EmblemCell: FC<{ formId: string; team?: Team; imagesEnabled: boolean }> = 
       data-team-name={team?.name}
     >
       <input type="hidden" name="hero" form={formId} value={team?.hero ?? ''} data-hero-input />
-      <input type="hidden" name="clear_image" form={formId} value="" data-clear-image />
       <button
         type="button"
         class="emblem-thumb"
@@ -123,7 +122,7 @@ const EmblemDialogs: FC = () => (
     <dialog id="removeImageDialog" class="confirm-modal" aria-labelledby="removeImageTitle">
       <h2 id="removeImageTitle">¿Quitar la imagen?</h2>
       <p>
-        <span data-remove-team></span> volverá a usar su héroe (o su código si no tiene). Se aplicará cuando guardes la fila.
+        <span data-remove-team></span> dejará de usar esta imagen y volverá a su héroe anterior o a su código. Se aplicará cuando guardes los cambios.
       </p>
       <div class="actions">
         <button class="btn" type="button" autofocus data-dialog-cancel>
@@ -134,9 +133,21 @@ const EmblemDialogs: FC = () => (
         </button>
       </div>
     </dialog>
+    <dialog id="discardAllDialog" class="confirm-modal" aria-labelledby="discardAllTitle">
+      <h2 id="discardAllTitle">¿Descartar todos los cambios?</h2>
+      <p>Se perderá lo que hayas escrito, elegido o recortado en las filas sin guardar.</p>
+      <div class="actions">
+        <button class="btn" type="button" autofocus data-dialog-cancel>
+          Cancelar
+        </button>
+        <button class="btn danger" type="button" data-discard-confirm>
+          Descartar todo
+        </button>
+      </div>
+    </dialog>
     <dialog id="replaceImageDialog" class="confirm-modal" aria-labelledby="replaceImageTitle">
       <h2 id="replaceImageTitle">¿Reemplazar la imagen propia por el héroe?</h2>
-      <p>La imagen se quitará cuando guardes la fila; el héroe la sustituye en toda la web.</p>
+      <p>La imagen se quitará cuando guardes los cambios; el héroe la sustituye en toda la web.</p>
       <div class="actions">
         <button class="btn" type="button" autofocus data-dialog-cancel>
           Cancelar
@@ -233,8 +244,6 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
   imagesEnabled = false,
 }) => {
   const base = `/admin/t/${tournament.id}/equipos`;
-  const taken: Record<string, string> = {};
-  for (const team of teams) if (team.hero) taken[team.hero] = team.code;
   return (
     <>
       <PageHead
@@ -245,6 +254,23 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
             : 'Agrega los equipos y luego genera el fixture.'
         }
       />
+      <div class="save-bar" data-save-bar data-batch-url={`${base}/lote`} hidden role="region" aria-label="Cambios sin guardar">
+        <span class="save-text" data-save-text></span>
+        <p class="save-message" data-save-message hidden role="status"></p>
+        <div class="actions">
+          <button class="btn" type="button" data-discard-all>
+            Descartar todo
+          </button>
+          <button class="btn pri" type="button" data-save-all>
+            <span>
+              <span data-save-label>Guardar cambios</span> (<span data-save-count>0</span>)
+            </span>
+          </button>
+        </div>
+      </div>
+      <noscript>
+        <p class="flash warn">Para guardar cambios en los equipos hace falta JavaScript.</p>
+      </noscript>
       <div class="card scroll-x">
         <table class="cards teams">
           <thead>
@@ -283,11 +309,6 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
                   </td>
                   <td>
                     <div class="actions">
-                      <form id={formId} method="post" action={`${base}/${team.id}`} class="inline" data-team-form>
-                        <button class="btn sm" type="submit">
-                          Guardar
-                        </button>
-                      </form>
                       <button class="btn sm" type="button" data-undo hidden>
                         Deshacer cambios
                       </button>
@@ -326,10 +347,11 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
         </table>
       </div>
       <p class="muted" style="margin:0;font-size:12px">
-        El héroe es el emblema del equipo en la web pública: aparece en tarjetas de partido, tabla y playoffs. Cada
-        héroe solo puede usarlo un equipo.
+        El emblema del equipo aparece en la web pública (tarjetas de partido, tabla y playoffs) y es un héroe o su propia
+        imagen, nunca los dos. Cada héroe solo puede usarlo un equipo. Los cambios se guardan todos juntos con «Guardar
+        cambios», así que puedes pasar un héroe de un equipo a otro en un solo guardado.
         {imagesEnabled
-          ? ' Si el equipo sube su propia imagen, reemplaza al héroe en toda la web; al quitarla vuelve el héroe.'
+          ? ''
           : ' Las imágenes personalizadas no están disponibles en este servidor (falta configurar el almacenamiento).'}
       </p>
       <EmblemViewer />
@@ -359,7 +381,7 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
       <script
         type="application/json"
         id="heroes-data"
-        dangerouslySetInnerHTML={{ __html: inlineJson({ heroes: HEROES, taken }) }}
+        dangerouslySetInnerHTML={{ __html: inlineJson({ heroes: HEROES }) }}
       />
     </>
   );

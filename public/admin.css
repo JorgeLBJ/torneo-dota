@@ -339,3 +339,17 @@ tr.row-msg .flash{margin:0}
   table.cards tr.dirty{border-color:rgba(230,182,95,.45);background:rgba(230,182,95,.06)}
   table.cards tr.dirty>td{background:none}
 }
+
+/* Global save bar of the Equipos screen */
+.save-bar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px 16px;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;border-radius:12px;border:1px solid rgba(230,182,95,.45);background:var(--panel);box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.save-text{font-weight:600;color:var(--gold)}
+.save-message{margin:0;font-size:13px}
+.save-message.ok{color:var(--win)}
+.save-message.error{color:var(--loss)}
+.save-bar .actions{margin-left:auto}
+@media (max-width:760px){
+  .save-bar{position:fixed;top:auto;left:8px;right:8px;bottom:8px;margin:0;z-index:40}
+  .save-bar .actions{width:100%;margin:0}
+  .save-bar .actions .btn{flex:1}
+  main{padding-bottom:110px}
+}

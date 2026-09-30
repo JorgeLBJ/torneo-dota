@@ -37,13 +37,13 @@ describe('teams screen', () => {
     expect(html).toContain('Fuerza');
   });
 
-  it('exposes taken heroes to the picker as JSON', async () => {
+  it('gives the picker the hero list; which heroes are taken is computed live from the rows on the page', async () => {
     t.repo.createTeam(tournament.id, { code: 'A', name: 'Alpha', hero: 'axe' });
     const html = await (await t.get(url, cookie)).text();
     const json = /<script type="application\/json" id="heroes-data">(.*?)<\/script>/s.exec(html)?.[1];
-    const data = JSON.parse(json!) as { heroes: unknown[]; taken: Record<string, string> };
+    const data = JSON.parse(json!) as { heroes: unknown[]; taken?: unknown };
     expect(data.heroes).toHaveLength(127);
-    expect(data.taken).toEqual({ axe: 'A' });
+    expect(data.taken).toBeUndefined();
   });
 
   it('adds a team with normalized code and hero', async () => {

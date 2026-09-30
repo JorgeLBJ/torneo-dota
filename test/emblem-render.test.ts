@@ -141,7 +141,11 @@ describe('crop dialog', () => {
     const body = await (await t.get(base, cookie)).text();
     expect(body).toContain('Subir imagen');
     expect(body).toContain('data-image-pick');
-    expect(body).toContain('data-team-form');
+    expect(body).toContain('data-save-bar');
+    expect(body).toContain('Guardar cambios');
+    expect(body).toContain('Descartar todo');
+    expect(body).toContain(`data-batch-url="${base}/lote"`);
+    expect(body).not.toContain('data-team-form');
     expect(body).toContain('Deshacer cambios');
     expect(body).toContain('Sin guardar');
     expect(body).toContain('id="imageModal"');
@@ -205,10 +209,33 @@ describe('what counts as an unsaved change in a row', () => {
 
   it('a staged hero marks the row dirty without going through the hidden input (its value is its default)', () => {
     expect(script).toMatch(/if \(state\.hero !== state\.saved\.hero\) return true;/);
-    expect(script).toMatch(/el !== state\.heroInput && el\.value !== el\.defaultValue/);
+    expect(script).toMatch(/filter\(function \(el\) \{ return el !== state\.heroInput; \}\)/);
   });
 
   it('every staged change is part of the check: image, removal, hero and the text fields', () => {
     expect(script).toMatch(/if \(state\.blob \|\| state\.removeImage\) return true;/);
+  });
+});
+
+describe('one global save', () => {
+  const script = readFileSync(new URL('../public/admin.js', import.meta.url), 'utf8');
+
+  it('rows have no Guardar of their own: one bar saves every changed row, each row keeps Deshacer and Eliminar', async () => {
+    const body = await (await t.get(`/admin/t/${tournament.id}/equipos`, cookie)).text();
+    expect(body.match(/data-save-all/g)).toHaveLength(1);
+    expect(body.match(/data-undo/g)).toHaveLength(3);
+    expect(body).not.toMatch(/<button[^>]*type="submit"[^>]*>\s*Guardar\s*<\/button>/);
+    expect(body.match(/\/eliminar/g)).toHaveLength(3);
+  });
+
+  it('the page sends rows and images as one batch', () => {
+    expect(script).toContain("data.set('rows', JSON.stringify(dirty.map(rowPayload)))");
+    expect(script).toContain("emblem = state.hero ? 'hero' : 'none'");
+    expect(script).toContain("payload.imageField = 'image_' + payload.id");
+  });
+
+  it('a hero is taken by another row only as the page will be after saving (a staged image frees it)', () => {
+    expect(script).toMatch(/function finalHero\(state\) \{\s*return state\.blob \? '' : state\.hero;/);
+    expect(script).toMatch(/var hero = finalHero\(state\);\s*if \(hero\) taken\[hero\] = api\.nameOf\(state\.cell\);/);
   });
 });
