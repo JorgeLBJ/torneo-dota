@@ -276,14 +276,64 @@ describe('saving a game with its Dota import', () => {
     expect(t.repo.listGames(m.id)[0]!.dotaSnapshot).not.toBeNull();
   });
 
-  it('clearing the Match ID, or changing the numbers by hand, drops the import', async () => {
+  it('clearing the Match ID is the one way to drop an import (and it is explicit)', async () => {
     const m = groupMatch();
     await t.post(`${base()}/resultados/${m.id}/juego/1`, importForm(), cookie);
     await t.post(`${base()}/resultados/${m.id}/juego/1`, importForm({ dota_keep: '1', dota_match_id: '' }), cookie);
     expect(t.repo.listGames(m.id)[0]).toMatchObject({ dotaMatchId: null, dotaSnapshot: null });
+  });
+
+  it('changing the numbers of an imported game by hand is refused, not a silent drop of the import', async () => {
+    const m = groupMatch();
     await t.post(`${base()}/resultados/${m.id}/juego/1`, importForm(), cookie);
-    await t.post(`${base()}/resultados/${m.id}/juego/1`, importForm({ dota_keep: '1', t1_kills: '43' }), cookie);
-    expect(t.repo.listGames(m.id)[0]).toMatchObject({ dotaMatchId: null, dotaSnapshot: null, team1Kills: 43 });
+    const res = await t.post(`${base()}/resultados/${m.id}/juego/1`, importForm({ dota_keep: '1', t1_kills: '43' }), cookie);
+    expect(await flashText(t, res, cookie)).toContain('importado de Dota');
+    expect(t.repo.listGames(m.id)[0]).toMatchObject({ dotaMatchId: 9023462170, team1Kills: 42 });
+    expect(t.repo.listGames(m.id)[0]!.dotaSnapshot).not.toBeNull();
+  });
+
+  it('re-saving an untouched imported game keeps the whole import: snapshot, Match ID and Radiant side', async () => {
+    const m = groupMatch();
+    await t.post(`${base()}/resultados/${m.id}/juego/1`, importForm(), cookie);
+    const before = t.repo.listGames(m.id)[0]!;
+    asked.length = 0;
+    // the form of an imported game posts its Match ID and the Radiant select as they were
+    const res = await t.post(`${base()}/resultados/${m.id}/juego/1`, importForm({ dota_keep: '1' }), cookie);
+    expect(res.status).toBe(303);
+    const after = t.repo.listGames(m.id)[0]!;
+    expect(after).toMatchObject({ dotaMatchId: 9023462170, radiantTeamId: a.id, dotaSnapshot: before.dotaSnapshot });
+    expect(asked).toEqual([]);
+  });
+
+  it('the same holds for a game in a series', async () => {
+    setFormat({ groupGames: 3 });
+    const m = groupMatch();
+    await t.post(`${base()}/resultados/${m.id}/juego/1`, result(a), cookie);
+    await t.post(`${base()}/resultados/${m.id}/juego/2`, importForm({ winner: String(a.id) }), cookie);
+    await t.post(`${base()}/resultados/${m.id}/juego/2`, importForm({ dota_keep: '1' }), cookie);
+    expect(t.repo.listGames(m.id)[1]).toMatchObject({ dotaMatchId: 9023462170, radiantTeamId: a.id });
+    expect(t.repo.listGames(m.id)[1]!.dotaSnapshot).not.toBeNull();
+  });
+
+  it('an untouched Match ID with a different Radiant team is a re-import: it must match the new side', async () => {
+    const m = groupMatch();
+    await t.post(`${base()}/resultados/${m.id}/juego/1`, importForm(), cookie);
+    // same numbers, but the admin now says team B was Radiant: the numbers no longer fit, so it is refused
+    const refused = await t.post(`${base()}/resultados/${m.id}/juego/1`, importForm({ dota_keep: '1', dota_radiant: String(b.id) }), cookie);
+    expect(await flashText(t, refused, cookie)).toContain('Los datos no coinciden con la partida de Dota');
+    expect(t.repo.listGames(m.id)[0]).toMatchObject({ radiantTeamId: a.id });
+    // with the numbers autocompleted for B as Radiant, the import is replaced
+    const swapped = importForm({
+      dota_keep: '1',
+      dota_radiant: String(b.id),
+      winner: String(b.id),
+      t1_kills: '41',
+      t1_deaths: String(deaths('dire')),
+      t2_kills: '42',
+      t2_deaths: String(deaths('radiant')),
+    });
+    await t.post(`${base()}/resultados/${m.id}/juego/1`, swapped, cookie);
+    expect(t.repo.listGames(m.id)[0]).toMatchObject({ radiantTeamId: b.id, winnerId: b.id, dotaMatchId: 9023462170 });
   });
 
   it('the form of an imported game shows the Match ID, the OpenDota link and keeps the import on save', async () => {

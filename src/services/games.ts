@@ -18,6 +18,8 @@ export type ImportChoice = GameImport | 'keep' | undefined;
 
 const toScore = (game: Game): GameScore => game;
 
+const EDITED_IMPORT = 'Este juego está importado de Dota y cambiaste los números: pulsa «Autocompletar» de nuevo o quita el Match ID para cargarlo a mano.';
+
 /**
  * Saves one game of a match's series after checking it with the existing result rules and the series rules
  * (game numbers in order, none after the decider). The match's winner, kills and deaths follow from its games.
@@ -52,7 +54,9 @@ export function saveGameResult(
       current.team1Deaths === result.team1Deaths &&
       current.team2Kills === result.team2Kills &&
       current.team2Deaths === result.team2Deaths;
-    if (unchanged && current.dotaMatchId !== null && current.dotaSnapshot !== null && current.radiantTeamId !== null) {
+    if (current?.dotaMatchId != null && current.dotaSnapshot !== null && current.radiantTeamId !== null) {
+      // The game keeps its import, or the save is refused: dropping it silently would lose the detail without a word.
+      if (!unchanged) return fail(EDITED_IMPORT);
       dota = { radiantTeamId: current.radiantTeamId, dotaMatchId: current.dotaMatchId, snapshot: current.dotaSnapshot };
     }
   } else if (imported) {

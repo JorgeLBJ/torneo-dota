@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { getHero, heroByDotaId } from '../src/data/heroes.js';
 import { CachedDotaSource, DotaLookupError } from '../src/dota/source.js';
 import { OpenDotaSource, mapOpenDotaMatch, parseDotaMatchId } from '../src/dota/opendota.js';
@@ -113,6 +113,63 @@ describe('mapOpenDotaMatch edge cases', () => {
     expect(() => mapOpenDotaMatch({ ...fixture, players: (fixture.players as unknown[]).slice(0, 8) })).toThrow(DotaLookupError);
     expect(() => mapOpenDotaMatch({ error: 'nope' })).toThrow(DotaLookupError);
     expect(() => mapOpenDotaMatch(null)).toThrow(DotaLookupError);
+  });
+});
+
+describe('mapOpenDotaMatch: who won', () => {
+  it('a match without a boolean radiant_win is incomplete, never a Dire win by default', () => {
+    for (const radiant_win of [undefined, null, 'true', 1, 0]) {
+      const match = { ...fixture, radiant_win };
+      expect(() => mapOpenDotaMatch(match)).toThrow(DotaLookupError);
+      try {
+        mapOpenDotaMatch(match);
+      } catch (error) {
+        expect((error as DotaLookupError).code).toBe('incomplete');
+        expect((error as Error).message).toContain('no tiene sus 10 jugadores todavía');
+      }
+    }
+  });
+
+  it('both real outcomes are still read', () => {
+    expect(mapOpenDotaMatch({ ...fixture, radiant_win: true }).radiantWin).toBe(true);
+    expect(mapOpenDotaMatch({ ...fixture, radiant_win: false }).radiantWin).toBe(false);
+  });
+});
+
+describe('OpenDotaSource: the default fetch and failed responses', () => {
+  it('uses the global fetch without a receiver, so it never throws "Illegal invocation"', async () => {
+    const seenThis: unknown[] = [];
+    vi.stubGlobal('fetch', function (this: unknown) {
+      seenThis.push(this);
+      if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+      return Promise.resolve(new Response(JSON.stringify(fixture), { status: 200 }));
+    });
+    try {
+      const snapshot = await new OpenDotaSource().fetch(9023462170);
+      expect(snapshot.matchId).toBe(9023462170);
+      expect(seenThis.every((t) => t === undefined || t === globalThis)).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('cancels the body of a 5xx answer before retrying, so the connection is released', async () => {
+    let cancelled = 0;
+    const failing = () => new Response(new ReadableStream({ start() {}, cancel() { cancelled++; } }), { status: 502 });
+    const answers = [failing(), new Response(JSON.stringify(fixture), { status: 200 })];
+    const fetchImpl = (async () => answers.shift()!) as unknown as typeof fetch;
+    const snapshot = await new OpenDotaSource({ fetchImpl, retryDelayMs: 0 }).fetch(1);
+    expect(snapshot.matchId).toBe(9023462170);
+    expect(cancelled).toBe(1);
+  });
+
+  it('also cancels the body of the answer it gives up on', async () => {
+    let cancelled = 0;
+    const failing = () => new Response(new ReadableStream({ start() {}, cancel() { cancelled++; } }), { status: 503 });
+    const answers = [failing(), failing()];
+    const fetchImpl = (async () => answers.shift()!) as unknown as typeof fetch;
+    await expect(new OpenDotaSource({ fetchImpl, retryDelayMs: 0 }).fetch(1)).rejects.toMatchObject({ code: 'unavailable' });
+    expect(cancelled).toBe(2);
   });
 });
 

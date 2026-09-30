@@ -35,10 +35,17 @@ export async function readGameForm(
     t2Deaths: str(body, 't2_deaths'),
   };
   const typedId = str(body, 'dota_match_id');
-  const untouched = str(body, 'dota_keep') === '1' && existing?.dotaMatchId != null && String(existing.dotaMatchId) === typedId;
+  const typedRadiant = str(body, 'dota_radiant');
+  // Untouched: same Match ID and the same Radiant team (or none chosen). A different Radiant team is a new import
+  // and has to produce the submitted numbers, so it goes through the full check instead of being ignored.
+  const untouched =
+    str(body, 'dota_keep') === '1' &&
+    existing?.dotaMatchId != null &&
+    String(existing.dotaMatchId) === typedId &&
+    (typedRadiant === '' || typedRadiant === String(existing.radiantTeamId));
   const imported = await prepareGameImport(source, teams, raw, {
     dotaMatchId: untouched ? '' : typedId,
-    radiant: str(body, 'dota_radiant'),
+    radiant: typedRadiant,
     keep: untouched,
   });
   if (!imported.ok) return fail(imported.error);

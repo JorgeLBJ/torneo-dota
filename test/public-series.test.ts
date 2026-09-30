@@ -232,3 +232,17 @@ describe('public page markup', () => {
     expect(html).toContain(`data-detail-url="/t/copa/partido/${sf1.id}/detalle"`);
   });
 });
+
+describe('match detail script: out-of-order answers', () => {
+  const script = readFileSync(new URL('../public/match-detail.js', import.meta.url), 'utf8');
+
+  it('numbers every request and only lets the latest draw (checked in the browser with delayed answers)', () => {
+    expect(script).toContain('var mine = ++latest;');
+    expect(script).toMatch(/if \(mine !== latest\) return;\s*render\(data\);/);
+    expect(script).toContain('if (keepOpen || mine !== latest) return;');
+  });
+
+  it('closing the dialog invalidates what is still on its way', () => {
+    expect(script).toMatch(/dialog\.addEventListener\('close', function \(\) \{\s*latest\+\+;/);
+  });
+});

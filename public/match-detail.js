@@ -7,6 +7,9 @@
 
   var HEROES = '/assets/heroes/';
   var current = { url: null, game: null, data: null };
+  // Every request gets a number; only the latest one may draw. A slow answer for an older match or a dialog that
+  // was closed meanwhile is dropped, so a fast switch never shows the previous match.
+  var latest = 0;
 
   function el(tag, cls, text) {
     var node = document.createElement(tag);
@@ -220,17 +223,19 @@
   }
 
   function load(url, keepOpen) {
+    var mine = ++latest;
     return fetch(url, { cache: 'no-store', headers: { Accept: 'application/json' } })
       .then(function (res) {
         if (!res.ok) throw new Error('missing');
         return res.json();
       })
       .then(function (data) {
+        if (mine !== latest) return;
         render(data);
         if (!keepOpen && !dialog.open) dialog.showModal();
       })
       .catch(function () {
-        if (keepOpen) return;
+        if (keepOpen || mine !== latest) return;
         content.textContent = '';
         content.appendChild(el('p', 'd-empty', 'No se pudo cargar el detalle de la partida. Inténtalo de nuevo.'));
         if (!dialog.open) dialog.showModal();
@@ -249,6 +254,7 @@
   // A click on the backdrop lands on the dialog element itself.
   dialog.addEventListener('click', function (event) { if (event.target === dialog) dialog.close(); });
   dialog.addEventListener('close', function () {
+    latest++; // nothing still on its way may draw into (or reopen) a closed dialog
     var url = current.url;
     current.url = null;
     var opener = url && document.querySelector('[data-detail-url="' + url + '"]');

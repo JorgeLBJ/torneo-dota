@@ -73,6 +73,8 @@ export function mapOpenDotaMatch(raw: unknown): DotaSnapshot {
   const radiant = players.filter(isRadiant);
   const dire = players.filter((p) => !isRadiant(p));
   if (players.length !== 10 || radiant.length !== 5 || dire.length !== 5) throw lookupError('incomplete');
+  // Without a real outcome the match is not finished or not processed: never guess Dire.
+  if (typeof match.radiant_win !== 'boolean') throw lookupError('incomplete');
 
   const picksBans = Array.isArray(match.picks_bans) ? (match.picks_bans as Record<string, unknown>[]) : [];
   const bans = picksBans
@@ -84,7 +86,7 @@ export function mapOpenDotaMatch(raw: unknown): DotaSnapshot {
   return {
     matchId: num(match.match_id),
     durationSec: num(match.duration),
-    radiantWin: match.radiant_win === true,
+    radiantWin: match.radiant_win,
     radiantScore: num(match.radiant_score),
     direScore: num(match.dire_score),
     firstBloodSec: firstBloodTime(match),
@@ -92,6 +94,15 @@ export function mapOpenDotaMatch(raw: unknown): DotaSnapshot {
     players: [...radiant.map((p) => mapPlayer(p, 'radiant')), ...dire.map((p) => mapPlayer(p, 'dire'))],
     bans,
   };
+}
+
+/** Frees the connection of a response whose body is not going to be read. */
+async function release(response: Response): Promise<void> {
+  try {
+    await response.body?.cancel();
+  } catch {
+    // Nothing left to free.
+  }
 }
 
 export interface OpenDotaOptions {
@@ -107,7 +118,8 @@ export class OpenDotaSource implements DotaMatchSource {
   private readonly retryDelayMs: number;
 
   constructor(options: OpenDotaOptions = {}) {
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    // A plain call, not a method of this object: the native fetch throws "Illegal invocation" with another receiver.
+    this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
     this.timeoutMs = options.timeoutMs ?? 8000;
     this.retryDelayMs = options.retryDelayMs ?? 400;
   }
@@ -115,12 +127,16 @@ export class OpenDotaSource implements DotaMatchSource {
   async fetch(matchId: number): Promise<DotaSnapshot> {
     let response = await this.request(matchId);
     if (response.status >= 500) {
+      await release(response); // an unread body would hold the connection
       if (this.retryDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.retryDelayMs));
       response = await this.request(matchId);
     }
     if (response.status === 404) throw lookupError('not_found');
     if (response.status === 429) throw lookupError('rate_limited');
-    if (!response.ok) throw lookupError('unavailable');
+    if (!response.ok) {
+      await release(response);
+      throw lookupError('unavailable');
+    }
     let body: unknown;
     try {
       body = await response.json();
