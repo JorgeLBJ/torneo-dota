@@ -18,7 +18,7 @@ describe('admin stylesheet', () => {
     expect(rule('select,input')).toContain('height:var(--control-h)');
     expect(rule('.btn')).toContain('height:var(--control-h)');
     expect(rule('.btn.sm')).toContain('height:var(--control-h-sm)');
-    expect(rule('.hero-slot')).toContain('height:var(--control-h)');
+    expect(rule('.emblem-thumb')).toContain('height:var(--control-h)');
   });
 
   it('lets the main area use the full width', () => {

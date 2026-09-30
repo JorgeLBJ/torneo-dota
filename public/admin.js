@@ -57,26 +57,54 @@
     });
   }
 
-  function choose(hero) {
-    current.input.value = hero.slug;
-    current.button.textContent = '';
+  var replaceDialog = document.getElementById('replaceImageDialog');
+  var replacing = null;
+
+  function apply(target, hero) {
+    target.input.value = hero.slug;
+    var thumb = target.cell.querySelector('[data-emblem-thumb]');
+    thumb.textContent = '';
     var img = document.createElement('img');
     img.alt = '';
     img.src = '/assets/heroes/' + hero.slug + '.png';
-    current.button.appendChild(img);
-    current.button.classList.add('filled');
-    if (current.nameEl) current.nameEl.textContent = hero.name;
+    thumb.appendChild(img);
+    var label = target.cell.querySelector('[data-emblem-label]');
+    label.textContent = hero.name;
+    label.title = hero.name;
+  }
+
+  function choose(hero) {
+    var target = current;
     modal.close();
+    // A custom image outranks the hero everywhere, so picking a hero means giving the image up.
+    if (target.cell.getAttribute('data-has-image') === '1' && replaceDialog && typeof replaceDialog.showModal === 'function') {
+      replacing = { target: target, hero: hero };
+      replaceDialog.showModal();
+      return;
+    }
+    apply(target, hero);
+  }
+
+  if (replaceDialog) {
+    var confirm = replaceDialog.querySelector('[data-replace-confirm]');
+    if (confirm) confirm.addEventListener('click', function () {
+      if (replacing) {
+        var cell = replacing.target.cell;
+        apply(replacing.target, replacing.hero);
+        cell.querySelector('[data-clear-image]').value = '1';
+        cell.setAttribute('data-has-image', '0');
+        var remove = cell.querySelector('form[data-remove-image]');
+        if (remove) remove.hidden = true;
+      }
+      replacing = null;
+      replaceDialog.close();
+    });
   }
 
   document.querySelectorAll('[data-hero-pick]').forEach(function (button) {
     button.addEventListener('click', function () {
-      var cell = button.parentElement;
-      current = {
-        button: button,
-        input: cell.querySelector('[data-hero-input]'),
-        nameEl: cell.querySelector('[data-hero-name]'),
-      };
+      var cell = button.closest('[data-emblem-cell]');
+      current = { cell: cell, input: cell.querySelector('[data-hero-input]') };
       label.textContent = button.getAttribute('data-team-label') || '';
       search.value = '';
       render();
@@ -298,5 +326,80 @@
     }).catch(function () {
       failed('No se pudo subir la imagen. Revisa tu conexión e inténtalo de nuevo.');
     });
+  });
+})();
+
+// Emblem menu ("Cambiar"): a popover menu, removal and hero-over-image confirmations.
+(function () {
+  var menus = Array.prototype.slice.call(document.querySelectorAll('[data-emblem-menu]'));
+  if (!menus.length) return;
+
+  function closeMenus(except) {
+    menus.forEach(function (menu) { if (menu !== except) menu.open = false; });
+  }
+  window.closeEmblemMenus = closeMenus;
+
+  // The table sits in a scrolling card, so the popover is positioned against the viewport.
+  function place(menu) {
+    var pop = menu.querySelector('.emblem-pop');
+    var anchor = menu.querySelector('summary').getBoundingClientRect();
+    pop.style.top = '0px';
+    pop.style.left = '0px';
+    var box = pop.getBoundingClientRect();
+    var left = Math.max(8, Math.min(anchor.left, window.innerWidth - box.width - 8));
+    var top = anchor.bottom + 4;
+    if (top + box.height > window.innerHeight - 8) top = Math.max(8, anchor.top - box.height - 4);
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+  }
+
+  menus.forEach(function (menu) {
+    menu.addEventListener('toggle', function () {
+      if (!menu.open) return;
+      closeMenus(menu);
+      place(menu);
+      var first = menu.querySelector('.emblem-pop button');
+      if (first) first.focus();
+    });
+    // Choosing anything closes the menu.
+    menu.querySelector('.emblem-pop').addEventListener('click', function (event) {
+      if (event.target.closest('button')) menu.open = false;
+    });
+    menu.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && menu.open) {
+        menu.open = false;
+        menu.querySelector('summary').focus();
+      }
+    });
+  });
+  document.addEventListener('click', function (event) {
+    if (!event.target.closest('[data-emblem-menu]')) closeMenus();
+  });
+  window.addEventListener('resize', function () { closeMenus(); });
+  window.addEventListener('scroll', function () { closeMenus(); }, true);
+
+  // Removal asks first; without JavaScript the form simply submits.
+  var removeDialog = document.getElementById('removeImageDialog');
+  if (removeDialog && typeof removeDialog.showModal === 'function') {
+    var pending = null;
+    document.querySelectorAll('form[data-remove-image]').forEach(function (form) {
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        pending = form;
+        removeDialog.querySelector('[data-remove-team]').textContent = form.getAttribute('data-team-label') || 'El equipo';
+        removeDialog.showModal();
+      });
+    });
+    removeDialog.querySelector('[data-remove-confirm]').addEventListener('click', function () {
+      if (pending) HTMLFormElement.prototype.submit.call(pending);
+    });
+  }
+
+  document.querySelectorAll('dialog').forEach(function (dialog) {
+    var cancel = dialog.querySelector('[data-dialog-cancel]');
+    if (cancel) cancel.addEventListener('click', function () { dialog.close(); });
+    if (dialog.id === 'removeImageDialog' || dialog.id === 'replaceImageDialog') {
+      dialog.addEventListener('click', function (event) { if (event.target === dialog) dialog.close(); });
+    }
   });
 })();

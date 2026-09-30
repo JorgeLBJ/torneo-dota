@@ -10,7 +10,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 var(--fb)}
 button,input,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 /* One focus style everywhere: the outline. Bordered controls hide their own border so the ring is never doubled. */
-input:focus-visible,select:focus-visible,textarea:focus-visible,.btn:focus-visible,.hero-slot:focus-visible,.pick:focus-visible,label.pick:has(input:focus-visible),.chip:focus-visible{border-color:transparent}
+input:focus-visible,select:focus-visible,textarea:focus-visible,.btn:focus-visible,.emblem-menu summary:focus-visible,.pick:focus-visible,label.pick:has(input:focus-visible),.chip:focus-visible{border-color:transparent}
 
 /* Shell */
 .shell{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
@@ -84,10 +84,7 @@ td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
 .login{min-height:100vh;display:grid;place-items:center;padding:16px}
 .login .card{width:min(360px,100%);display:grid;gap:14px}
 
-/* Hero picker */
-.hero-slot{display:grid;place-items:center;flex:none;width:72px;height:var(--control-h);padding:0;border-radius:8px;overflow:hidden;cursor:pointer;background:var(--panel-2);border:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1}
-.hero-slot img{width:100%;height:100%;object-fit:cover;display:block}
-.hero-slot:hover{border-color:var(--gold)}
+/* Emblem cell: thumbnail + source + one menu, all on a control-height row */
 .hero-modal{width:min(900px,calc(100vw - 32px));max-height:85vh;padding:18px;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--fg)}
 .hero-modal::backdrop{background:rgba(0,0,0,.7)}
 .hm-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
@@ -178,14 +175,12 @@ table.cal select,table.cal input{min-width:0;text-overflow:ellipsis}
   table.cards td[data-label]::before{content:attr(data-label);display:block;margin-bottom:3px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
   table.cards td[colspan]{grid-column:1 / -1}
   table.cal tr,table.teams tr{grid-template-columns:1fr 1fr}
-  table.cal td:nth-child(3),table.cal td:nth-child(5),table.teams td:nth-child(n+3){grid-column:1 / -1}
+  table.cal td:nth-child(3),table.cal td:nth-child(5),table.teams td:nth-child(n+2){grid-column:1 / -1}
   .std .opt{display:none}
 }
 
 /* Controls keep their height and natural width inside grid and flex parents. */
 .stack>.btn,.stack>button{justify-self:start}
-.hero-cell{display:flex;align-items:center;gap:8px;min-width:0}
-.hero-cell .hero-name{min-width:0;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
 .pill:not(:first-child){margin-left:8px}
 aside .btn{width:100%}
 .code-input{width:90px;border-left:3px solid var(--tc,var(--gold))}
@@ -244,9 +239,6 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;overflow:hidde
 .tb-add{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .tb-add select{width:auto;min-width:220px;flex:1 1 220px;max-width:320px}
 .tb-list .pair{min-width:150px}
-.img-row{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
-.img-thumb{display:block;flex:none;width:72px;height:40px;border-radius:8px;overflow:hidden;border:1px solid var(--line);background:var(--panel-2)}
-.img-thumb img{width:100%;height:100%;object-fit:cover;display:block}
 
 /* ---------- Custom team image: crop dialog ---------- */
 .image-modal{width:min(820px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:18px;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--fg);box-shadow:0 20px 60px rgba(0,0,0,.6)}
@@ -276,4 +268,22 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;overflow:hidde
   .im-layout{grid-template-columns:1fr}
   .im-stage{height:min(46vh,320px)}
   .im-foot .btn{flex:1}
+}
+
+.emblem-cell{display:flex;align-items:center;gap:8px;min-width:0;height:var(--control-h)}
+.emblem-thumb{display:grid;place-items:center;flex:none;width:72px;height:var(--control-h);border-radius:8px;overflow:hidden;border:1px solid var(--line);background:var(--panel-2)}
+.emblem-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.emblem-code{font-weight:800;font-size:15px;line-height:1;color:var(--tc,var(--muted))}
+.emblem-label{min-width:0;flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--muted)}
+.emblem-menu{flex:none}
+.emblem-menu summary{list-style:none;cursor:pointer;user-select:none}
+.emblem-menu summary::-webkit-details-marker{display:none}
+.emblem-menu[open] summary{border-color:var(--gold);color:var(--gold)}
+.emblem-pop{position:fixed;z-index:30;display:grid;min-width:170px;padding:6px;gap:2px;border-radius:12px;border:1px solid var(--line);background:var(--panel);box-shadow:0 14px 40px rgba(0,0,0,.55)}
+.emblem-pop form{margin:0}
+.emblem-pop button{display:block;width:100%;height:var(--control-h-sm);padding:0 10px;border:0;border-radius:8px;background:none;color:var(--fg);text-align:left;font-size:13px;cursor:pointer}
+.emblem-pop button:hover,.emblem-pop button:focus-visible{background:var(--panel-2);color:var(--gold)}
+.emblem-pop button.danger:hover,.emblem-pop button.danger:focus-visible{color:var(--loss)}
+@media (max-width:760px){
+  .emblem-label{max-width:none}
 }

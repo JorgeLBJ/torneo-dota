@@ -18,52 +18,97 @@ const ATTRS: [string, string][] = [
 const inlineJson = (value: unknown): string =>
   JSON.stringify(value).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
 
-const HeroSlot: FC<{ formId: string; team?: Team }> = ({ formId, team }) => {
+/**
+ * The team's emblem in ONE compact row: thumbnail (custom image, else hero portrait, else code tile), the source of
+ * that emblem, and a single "Cambiar" menu. The hero picker, upload and removal all hang from the menu.
+ */
+const EmblemCell: FC<{ formId: string; base: string; team?: Team; imagesEnabled: boolean }> = ({ formId, base, team, imagesEnabled }) => {
   const hero = team?.hero ? getHero(team.hero) : undefined;
+  const custom = Boolean(team?.imageKey) && imagesEnabled;
+  const label = custom ? 'Imagen propia' : hero ? hero.name : 'Sin emblema';
   return (
-    <div class="hero-cell">
+    <div class="emblem-cell" data-emblem-cell data-has-image={custom ? '1' : '0'}>
       <input type="hidden" name="hero" form={formId} value={team?.hero ?? ''} data-hero-input />
-      <button
-        type="button"
-        class={`hero-slot${hero ? ' filled' : ''}`}
-        data-hero-pick={formId}
-        data-team-id={team ? String(team.id) : ''}
-        data-team-label={team ? team.name : 'el nuevo equipo'}
-        title="Elegir héroe"
-      >
-        {hero ? <img src={heroImage(hero.slug)} alt="" /> : <span>+ Héroe</span>}
-      </button>
-      <span class="muted hero-name" data-hero-name>
-        {hero ? hero.name : 'Sin héroe'}
+      <input type="hidden" name="clear_image" form={formId} value="" data-clear-image />
+      <span class="emblem-thumb" data-emblem-thumb>
+        {team && custom ? (
+          <EmblemPicture team={team} eager />
+        ) : hero ? (
+          <img src={heroImage(hero.slug)} alt="" />
+        ) : (
+          <span class="emblem-code" style={team ? `--tc:${teamColor(team.id)}` : undefined}>
+            {team ? team.code : '?'}
+          </span>
+        )}
       </span>
+      <span class="emblem-label" data-emblem-label title={label}>
+        {label}
+      </span>
+      <details class="emblem-menu" data-emblem-menu>
+        <summary class="btn sm">
+          Cambiar <span aria-hidden="true">▾</span>
+        </summary>
+        <div class="emblem-pop" role="group" aria-label="Cambiar emblema">
+          <button
+            type="button"
+            data-hero-pick={formId}
+            data-team-id={team ? String(team.id) : ''}
+            data-team-label={team ? team.name : 'el nuevo equipo'}
+          >
+            Elegir héroe
+          </button>
+          {team && imagesEnabled ? (
+            <>
+              <input type="file" accept="image/jpeg,image/png,image/webp" hidden data-image-file aria-label={`Imagen del equipo ${team.code}`} />
+              <button type="button" data-image-pick data-upload-url={`${base}/${team.id}/imagen`} data-team-label={team.name}>
+                Subir imagen
+              </button>
+            </>
+          ) : null}
+          {team && custom ? (
+            <form method="post" action={`${base}/${team.id}/imagen/quitar`} data-remove-image data-team-label={team.name}>
+              <button type="submit" class="danger">
+                Quitar imagen
+              </button>
+            </form>
+          ) : null}
+        </div>
+      </details>
     </div>
   );
 };
 
-/** The team's own picture, when it has one (shown next to the hero picker, which still chooses the fallback). */
-const CustomImage: FC<{ team: Team; base: string; enabled: boolean }> = ({ team, base, enabled }) => {
-  if (!enabled) return null;
-  return (
-    <div class="img-row">
-      <input type="file" accept="image/jpeg,image/png,image/webp" hidden data-image-file aria-label={`Imagen del equipo ${team.code}`} />
-      <button type="button" class="btn sm" data-image-pick data-upload-url={`${base}/${team.id}/imagen`} data-team-label={team.name}>
-        Subir imagen
-      </button>
-      {team.imageKey ? (
-        <span class="img-thumb">
-          <EmblemPicture team={team} eager />
-        </span>
-      ) : null}
-      {team.imageKey ? (
-        <form method="post" action={`${base}/${team.id}/imagen/quitar`} class="inline">
-          <button class="btn sm" type="submit">
-            Quitar imagen
-          </button>
-        </form>
-      ) : null}
-    </div>
-  );
-};
+/** Shared confirmations of the emblem menu (filled in by admin.js). */
+const EmblemDialogs: FC = () => (
+  <>
+    <dialog id="removeImageDialog" class="confirm-modal" aria-labelledby="removeImageTitle">
+      <h2 id="removeImageTitle">¿Quitar la imagen?</h2>
+      <p>
+        <span data-remove-team></span> volverá a usar su héroe (o su código si no tiene). Se borrarán los archivos de la imagen.
+      </p>
+      <div class="actions">
+        <button class="btn" type="button" autofocus data-dialog-cancel>
+          Cancelar
+        </button>
+        <button class="btn danger" type="button" data-remove-confirm>
+          Quitar imagen
+        </button>
+      </div>
+    </dialog>
+    <dialog id="replaceImageDialog" class="confirm-modal" aria-labelledby="replaceImageTitle">
+      <h2 id="replaceImageTitle">¿Reemplazar la imagen propia por el héroe?</h2>
+      <p>La imagen se eliminará cuando guardes el equipo; el héroe la sustituye en toda la web.</p>
+      <div class="actions">
+        <button class="btn" type="button" autofocus data-dialog-cancel>
+          Cancelar
+        </button>
+        <button class="btn pri" type="button" data-replace-confirm>
+          Reemplazar por el héroe
+        </button>
+      </div>
+    </dialog>
+  </>
+);
 
 /** Crop dialog: the admin frames the picture at 16:9 (the avatar slot) before it is uploaded. */
 const ImageModal: FC = () => (
@@ -147,7 +192,7 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
           <thead>
             <tr>
               <th>Código</th>
-              <th>Emblema (héroe)</th>
+              <th>Emblema</th>
               <th>Nombre</th>
               <th>Capitán</th>
               <th></th>
@@ -170,8 +215,7 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
                     />
                   </td>
                   <td data-label="Emblema">
-                    <HeroSlot formId={formId} team={team} />
-                    <CustomImage team={team} base={base} enabled={imagesEnabled} />
+                    <EmblemCell formId={formId} base={base} team={team} imagesEnabled={imagesEnabled} />
                   </td>
                   <td data-label="Nombre">
                     <input name="name" form={formId} value={team.name} required maxlength={40} aria-label="Nombre" />
@@ -201,7 +245,7 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
                 <input class="code-input" name="code" form="team-new" maxlength={4} placeholder="Ej. A" aria-label="Código del nuevo equipo" required />
               </td>
               <td data-label="Emblema">
-                <HeroSlot formId="team-new" />
+                <EmblemCell formId="team-new" base={base} imagesEnabled={imagesEnabled} />
               </td>
               <td data-label="Nombre">
                 <input name="name" form="team-new" maxlength={40} placeholder="Nombre del equipo" aria-label="Nombre del nuevo equipo" required />
@@ -228,6 +272,7 @@ export const TeamsView: FC<{ tournament: Tournament; teams: Team[]; hasFixture: 
           : ' Las imágenes personalizadas no están disponibles en este servidor (falta configurar el almacenamiento).'}
       </p>
       {imagesEnabled ? <ImageModal /> : null}
+      {imagesEnabled ? <EmblemDialogs /> : null}
       <dialog id="heroModal" class="hero-modal">
         <div class="hm-head">
           <h2 style="margin:0">

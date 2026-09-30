@@ -24,7 +24,8 @@ describe('teams screen', () => {
     expect(html).toContain('value="Kelvin"');
     expect(html).toContain('/assets/heroes/axe.png');
     expect(html).toContain('Axe');
-    expect(html).toContain('Sin héroe');
+    expect(html).toContain('Sin emblema');
+    expect(html).not.toContain('Sin héroe');
     expect(html).toContain('Buscar héroe');
     expect(html).toContain('Fuerza');
   });
@@ -122,13 +123,16 @@ describe('teams screen', () => {
     expect(fired).toBe(1);
   });
 
-  it('keeps the hero thumbnail, its name and the other controls on one row', async () => {
+  it('has one compact emblem cell per row: thumbnail, source label and a single Cambiar menu', async () => {
     t.repo.createTeam(tournament.id, { code: 'A', name: 'Alpha', hero: 'axe' });
     const html = await (await t.get(url, cookie)).text();
-    expect(html).toContain('class="hero-cell"');
     expect(html).toContain('class="code-input"');
-    // Both the existing row and the "new team" row use the same compact slot.
-    expect(html.match(/class="hero-slot/g)).toHaveLength(2);
-    expect(html).toContain('+ Héroe');
+    // Both the existing row and the "new team" row use the same cell.
+    expect(html.match(/class="emblem-cell"/g)).toHaveLength(2);
+    expect(html.match(/class="emblem-thumb"/g)).toHaveLength(2);
+    expect(html.match(/<summary class="btn sm">\s*Cambiar/g)).toHaveLength(2);
+    expect(html).toContain('data-label="Emblema"');
+    expect(html).not.toContain('Emblema (héroe)');
+    expect(html).not.toContain('+ Héroe');
   });
 });

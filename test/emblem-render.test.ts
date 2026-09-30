@@ -5,6 +5,7 @@ import { makeApp, type TestApp } from './helpers/app.js';
 import { MemoryImageStore } from './helpers/memory-store.js';
 
 let t: TestApp;
+let store: MemoryImageStore;
 let cookie: string;
 let tournament: Tournament;
 let alpha: Team;
@@ -13,7 +14,8 @@ let bravo: Team;
 const KEY = 'teams/1/1-aabbccddeeff.webp';
 
 beforeEach(async () => {
-  t = await makeApp({ imageStore: new MemoryImageStore() });
+  store = new MemoryImageStore();
+  t = await makeApp({ imageStore: store });
   cookie = await t.login();
   tournament = t.repo.createTournament({ name: 'Copa', slug: 'copa' });
   t.repo.setActiveTournament(tournament.id);
@@ -66,12 +68,30 @@ describe('admin teams page', () => {
   it('shows the current emblem, offers upload, and only offers removal when there is a custom image', async () => {
     const base = `/admin/t/${tournament.id}/equipos`;
     let body = await (await t.get(base, cookie)).text();
-    expect(body).not.toContain('Quitar imagen');
+    expect(body).not.toContain('/imagen/quitar');
     t.repo.updateTeam(alpha.id, { imageKey: KEY });
     body = await (await t.get(base, cookie)).text();
     expect(body).toContain(`https://images.example/${KEY}`);
     expect(body).toContain(`action="${base}/${alpha.id}/imagen/quitar"`);
-    expect(body).toContain('Quitar imagen');
+    expect(body).toContain('id="removeImageDialog"');
+  });
+
+  it('labels the emblem by its source and keeps a single menu: custom image, hero name, or none', async () => {
+    const base = `/admin/t/${tournament.id}/equipos`;
+    t.repo.updateTeam(alpha.id, { imageKey: KEY });
+    const body = await (await t.get(base, cookie)).text();
+    const cells = body.split('class="emblem-cell"').slice(1);
+    expect(cells[0]).toContain('Imagen propia');
+    expect(cells[0]).toContain('data-has-image="1"');
+    expect(cells[0]).toContain(`https://images.example/${KEY}`);
+    expect(cells[0]).toContain('Elegir héroe');
+    expect(cells[0]).toContain('Subir imagen');
+    expect(cells[0]).toContain('Quitar imagen');
+    expect(cells[1]).toContain('Lina');
+    expect(cells[1]).not.toContain('Quitar imagen');
+    expect(cells[1]).toContain('data-has-image="0"');
+    expect(cells[2]).toContain('Sin emblema');
+    expect(body).not.toContain('Sin héroe');
   });
 
   it('says so when custom images are unavailable', async () => {
@@ -111,5 +131,36 @@ describe('crop dialog', () => {
     const body = await (await off.get(`/admin/t/${tour.id}/equipos`, c)).text();
     expect(body).not.toContain('imageModal');
     off.db.close();
+  });
+});
+
+describe('choosing a hero over a custom image', () => {
+  const save = (fields: Record<string, string>) =>
+    t.post(`/admin/t/${tournament.id}/equipos/${alpha.id}`, { code: 'AA', name: 'Alpha', hero: 'axe', ...fields }, cookie);
+  const withStoredImage = async () => {
+    await store.put(KEY, new Uint8Array([1]), 'image/webp', 'x');
+    await store.put(KEY.replace('.webp', '@2x.webp'), new Uint8Array([2]), 'image/webp', 'x');
+    t.repo.updateTeam(alpha.id, { imageKey: KEY });
+  };
+
+  it('keeps the image when the form does not ask to clear it', async () => {
+    await withStoredImage();
+    await save({ hero: 'axe' });
+    expect(t.repo.getTeam(alpha.id)!.imageKey).toBe(KEY);
+    expect(store.keys()).toHaveLength(2);
+  });
+
+  it('removes the image and its files when the admin confirmed replacing it', async () => {
+    await withStoredImage();
+    await save({ hero: 'axe', clear_image: '1' });
+    expect(t.repo.getTeam(alpha.id)).toMatchObject({ imageKey: null, hero: 'axe' });
+    expect(store.keys()).toEqual([]);
+  });
+
+  it('removes nothing when the rest of the form is invalid', async () => {
+    await withStoredImage();
+    await save({ hero: 'not-a-hero', clear_image: '1' });
+    expect(t.repo.getTeam(alpha.id)!.imageKey).toBe(KEY);
+    expect(store.keys()).toHaveLength(2);
   });
 });

@@ -85,11 +85,14 @@ export function teamRoutes(deps: Deps) {
     const team = ownTeam(tournament.id, c.req.param('teamId'));
     if (!team) return c.text('Equipo no encontrado.', 404);
     const others = repo.listTeams(tournament.id).filter((t) => t.id !== team.id);
-    const parsed = parseTeam(await readBody(c), others);
+    const body = await readBody(c);
+    const parsed = parseTeam(body, others);
     if (!parsed.ok) {
       setFlash(c, 'error', parsed.error);
     } else {
       repo.updateTeam(team.id, parsed.value);
+      // The admin confirmed replacing the custom image by the chosen hero.
+      if (str(body, 'clear_image') === '1') await removeTeamImage(repo, deps.images, team);
       deps.events.tournamentChanged(tournament.id);
       setFlash(c, 'ok', `Equipo ${parsed.value.code} guardado.`);
     }
