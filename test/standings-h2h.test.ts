@@ -196,11 +196,21 @@ describe('qualification status', () => {
     expect(rows.map((r) => r.status)).toEqual(['tiebreak', 'tiebreak', 'tiebreak']);
   });
 
-  it('qualifies and eliminates cleanly when head-to-head breaks the tie', () => {
+  it('qualifies and eliminates cleanly when head-to-head breaks a tie at the cutoff', () => {
     number = 0;
-    // A and B are level on 1 point and K−D; A won the direct match; C lost to both... C has 0.
-    const rows = standings([A, B, C], [game(A, B, A, 10, 5, 5, 10), game(B, C, B, 15, 5, 5, 15), game(A, C, C, 5, 10, 10, 5)], ['kd', 'h2h']);
-    expect(rows.map((r) => r.code)).toHaveLength(3);
-    expect(rows.every((r) => r.status !== 'tiebreak' || r.unresolvedTie)).toBe(true);
+    // A and B finish on 2 wins each and B beat A; C and D finish on 1 win each and C beat D.
+    // Only one team qualifies, so the cutoff falls inside the A/B tie and head-to-head must decide it.
+    const matches = [
+      game(B, A, B),
+      game(A, C, A),
+      game(A, D, A),
+      game(B, C, B),
+      game(D, B, D),
+      game(C, D, C),
+    ];
+    const rows = standings([A, B, C, D], matches, ['h2h'], 1);
+    expect(order(rows)).toBe('BACD');
+    expect(rows.map((r) => r.status)).toEqual(['qualified', 'eliminated', 'eliminated', 'eliminated']);
+    expect(rows.some((r) => r.unresolvedTie)).toBe(false);
   });
 });
