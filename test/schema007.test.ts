@@ -38,7 +38,7 @@ describe('007_exclusive_emblem', () => {
     ]);
     // The freed hero can be taken by another team right away.
     db.exec("UPDATE teams SET hero = 'chaos_knight' WHERE code = 'D'");
-    expect(db.pragma('user_version', { simple: true })).toBe(7);
+    expect(db.pragma('user_version', { simple: true })).toBe(8);
     db.close();
   });
 });

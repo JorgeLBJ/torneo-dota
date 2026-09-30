@@ -42,6 +42,8 @@ beforeEach(() => {
   db = openDatabase(':memory:');
   repo = createRepository(db);
   tournament = repo.createTournament({ name: 'Copa Octubre', slug: 'copa' });
+  // These tests are about the bracket, not about series: playoffs are single games here.
+  tournament = repo.updateTournament(tournament.id, { semifinalGames: 1, finalGames: 1 });
   teams = ['Tigres', 'Lobos', 'Cuervos', 'Halcones'].map((name, i) => repo.createTeam(tournament.id, { code: `T${i + 1}`, name }));
   repo.replaceScheduleDays(tournament.id, [
     { date: '2026-10-03', phase: 'group', startTimes: ['14:00', '15:00', '16:00'], slotMinutes: 60 },

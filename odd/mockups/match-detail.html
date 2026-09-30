@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup detalle de partida</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800;900&family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+  :root { --bg:#07080a; --panel:#0f1114; --panel-2:#15181c; --line:rgba(255,255,255,.08); --line-2:rgba(200,170,110,.28);
+    --fg:#e8e4dc; --muted:#8c8a86; --gold:#c8aa6e; --gold-hi:#f0dcaa; --radiant:#6dbf4b; --dire:#d2452f;
+    --fd:"Cinzel",serif; --fl:"Barlow Condensed",sans-serif; --fb:"Barlow",system-ui,sans-serif; color-scheme:dark; }
+  * { box-sizing:border-box } body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 var(--fb) }
+  .wrap { max-width:1280px; margin:0 auto; padding:28px 16px 60px; display:grid; gap:40px }
+  .tag { font:600 12px var(--fl); letter-spacing:.2em; text-transform:uppercase; color:var(--muted) }
+  h1 { margin:0; font:800 26px var(--fd); letter-spacing:.06em; text-transform:uppercase }
+  .sec-title { display:flex; gap:14px; align-items:baseline; border-bottom:1px solid var(--line); padding-bottom:10px; margin-bottom:16px }
+
+  /* ---------- Public card with detail button ---------- */
+  .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:14px }
+  .match { position:relative; display:grid; grid-template-columns:1fr auto 1fr; grid-template-rows:auto auto auto; background:linear-gradient(180deg,var(--panel-2),var(--panel)); border:1px solid var(--line) }
+  .match::before,.match::after { content:""; position:absolute; top:0; bottom:0; width:3px }
+  .match::before { left:0; background:var(--radiant) } .match::after { right:0; background:var(--dire) }
+  .portrait { margin:12px; aspect-ratio:16/9; border:1px solid var(--line); overflow:hidden } .portrait img { width:100%; height:100%; object-fit:cover; display:block }
+  .portrait.win { border-color:var(--gold) } .portrait.lose img { filter:grayscale(1) brightness(.55) }
+  .mid { align-self:center; display:grid; justify-items:center; gap:4px; padding:0 6px }
+  .res { font:800 30px var(--fd) } .res .w { color:var(--gold-hi) } .res .l { color:var(--muted) }
+  .mid small { font:600 11px var(--fl); letter-spacing:.16em; color:var(--muted); text-transform:uppercase }
+  .name { padding:0 12px 10px; font:700 15px var(--fd); text-transform:uppercase } .name.b { text-align:right }
+  .name small { display:block; font:500 12px var(--fl); color:var(--muted); letter-spacing:.06em; text-transform:none }
+  .detail-btn { grid-column:1/-1; margin:0 12px 12px; padding:8px; border:1px solid var(--line-2); background:rgba(200,170,110,.06); color:var(--gold-hi); font:600 13px var(--fl); letter-spacing:.2em; text-transform:uppercase; cursor:pointer }
+  .detail-btn:hover { background:rgba(200,170,110,.14) }
+  .no-id { grid-column:1/-1; margin:0 12px 12px; text-align:center; font:500 12px var(--fl); color:#55534f; letter-spacing:.12em; text-transform:uppercase }
+
+  /* ---------- Detail modal ---------- */
+  dialog.detail { width:min(1100px,94vw); max-height:90vh; padding:0; border:1px solid var(--line-2); background:var(--bg); color:var(--fg) }
+  dialog.detail::backdrop { background:rgba(0,0,0,.75) }
+  .d-head { position:relative; padding:22px 24px 18px; background:radial-gradient(90% 120% at 50% 0%,rgba(200,170,110,.14),transparent 70%),var(--panel); border-bottom:1px solid var(--line-2) }
+  .d-close { position:absolute; top:12px; right:12px; width:32px; height:32px; border:1px solid var(--line); background:none; color:var(--fg); cursor:pointer; font-size:18px }
+  .scoreline { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:18px }
+  .team { display:flex; align-items:center; gap:14px } .team.b { flex-direction:row-reverse; text-align:right }
+  .team .emb { width:120px; aspect-ratio:16/9; border:1px solid var(--line) } .team .emb img { width:100%; height:100%; object-fit:cover; display:block }
+  .team strong { display:block; font:800 22px var(--fd); text-transform:uppercase } .team .side { font:700 12px var(--fl); letter-spacing:.3em; text-transform:uppercase }
+  .side.r { color:var(--radiant) } .side.d { color:var(--dire) }
+  .team .wtag { display:inline-block; margin-top:4px; padding:2px 8px; background:var(--gold); color:#1b1408; font:700 10px var(--fl); letter-spacing:.2em }
+  .bigscore { text-align:center } .bigscore .n { font:900 44px var(--fd); display:flex; gap:12px; align-items:baseline }
+  .bigscore .n .w { color:var(--gold-hi) } .bigscore .n .l { color:var(--muted) } .bigscore .n i { font-size:24px; color:var(--muted); font-style:normal }
+  .facts { display:flex; justify-content:center; gap:22px; margin-top:6px; font:600 12px var(--fl); letter-spacing:.14em; text-transform:uppercase; color:var(--muted) }
+  .facts b { color:var(--fg); font-weight:600 }
+  .d-body { padding:18px 24px 24px; overflow:auto; display:grid; gap:22px }
+  .tb { border:1px solid var(--line) } .tb-head { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#0b0c0f; border-bottom:1px solid var(--line) }
+  .tb-head b { font:700 16px var(--fd); letter-spacing:.06em; text-transform:uppercase } .tb.r .tb-head { box-shadow:inset 3px 0 0 var(--radiant) } .tb.d .tb-head { box-shadow:inset 3px 0 0 var(--dire) }
+  table { width:100%; border-collapse:collapse } th { font:600 11px var(--fl); letter-spacing:.16em; text-transform:uppercase; color:var(--muted); padding:8px 10px; text-align:center; border-bottom:1px solid var(--line) }
+  th.l,td.l { text-align:left } td { padding:8px 10px; text-align:center; border-bottom:1px solid var(--line); font:500 15px var(--fl); font-variant-numeric:tabular-nums }
+  tr:last-child td { border-bottom:0 } .pl { display:flex; align-items:center; gap:12px } .pl img { width:72px; height:40px; object-fit:cover; border:1px solid var(--line) }
+  .pl strong { display:block; font:600 15px var(--fb) } .pl small { font:500 12px var(--fl); color:var(--muted); letter-spacing:.06em } .anon { color:var(--muted); font-style:italic }
+  .kda b { color:var(--fg) } .kda .d { color:var(--dire) } .kda .a { color:var(--muted) } .gold { color:var(--gold-hi) }
+  .bans { display:flex; flex-wrap:wrap; gap:6px; align-items:center } .bans img { width:54px; height:30px; object-fit:cover; filter:grayscale(1) brightness(.6); border:1px solid var(--line) }
+  .d-foot { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; font:500 12px var(--fl); letter-spacing:.1em; color:var(--muted); text-transform:uppercase }
+  .d-foot a { color:var(--gold) }
+
+  /* ---------- Admin card ---------- */
+  .admin { font-family:"Figtree",system-ui,sans-serif; background:#0c0e18; border:1px dashed #272c45; padding:18px; border-radius:14px }
+  .rc { width:min(560px,100%); background:#141726; border:1px solid #272c45; border-radius:14px; padding:14px; display:grid; gap:12px; color:#eceef7 }
+  .rc-top { display:flex; justify-content:space-between; font-size:12px; color:#8d93b0 }
+  .import { display:grid; gap:8px; padding:12px; border-radius:10px; background:#1b1f33; border:1px solid #272c45 }
+  .import label { font-size:12px; color:#8d93b0 } .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center }
+  .row input,.row select { height:40px; border-radius:9px; border:1px solid #272c45; background:#141726; color:#eceef7; padding:0 12px; font:inherit }
+  .row input { flex:1; min-width:180px } .btn { height:40px; padding:0 16px; border-radius:99px; border:1px solid #272c45; background:transparent; color:#eceef7; font:600 13px inherit; cursor:pointer }
+  .btn.pri { background:#e6b65f; border-color:#e6b65f; color:#1a1405 } .ok { font-size:13px; color:#5fd3a2 }
+  .preview { font-size:13px; color:#c9cde0; display:grid; gap:4px } .preview b { color:#e6b65f }
+  .team-row { display:grid; grid-template-columns:1fr 64px 64px; gap:8px; align-items:center }
+  .pick { display:flex; align-items:center; gap:8px; height:40px; padding:0 10px; border-radius:10px; border:1px solid #272c45 } .pick.win { border-color:#5fd3a2; background:rgba(95,211,162,.1) }
+  .pick.win::after { content:"GANÓ"; margin-left:auto; font-size:10px; font-weight:800; letter-spacing:.1em; color:#5fd3a2 }
+  .num { height:40px; border-radius:9px; border:1px solid #5fd3a2; background:#141726; display:grid; place-items:center }
+  .auto { font-size:11px; color:#5fd3a2 }
+  .note { font:500 13px var(--fl); letter-spacing:.04em; color:var(--muted) }
+  @media (max-width:760px){ .scoreline{grid-template-columns:1fr} .team,.team.b{flex-direction:row;text-align:left} .team .emb{width:90px} .bigscore{order:-1} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <div class="sec-title"><h1>1 · Web pública</h1><span class="tag">Tarjeta de partido con "Ver detalle"</span></div>
+    <div class="cards">
+      <article class="match">
+        <div class="portrait win"><img id="empA1" alt=""></div>
+        <div class="mid"><div class="res"><span class="w">1</span> – <span class="l">0</span></div><small>Partido 1</small></div>
+        <div class="portrait lose"><img id="empB1" alt=""></div>
+        <div class="name">Team Fe<small id="kdA">K 42 · D 41</small></div><div></div>
+        <div class="name b">Bastardigans<small id="kdB">K 41 · D 42</small></div>
+        <button class="detail-btn" onclick="document.getElementById('dlg').showModal()">▸ Ver detalle de la partida</button>
+      </article>
+      <article class="match">
+        <div class="portrait"><img src="file:///F:/PROYECTOS_NODE/torneo-dota/public/heroes/lina.png" alt=""></div>
+        <div class="mid"><span class="res" style="font-size:22px;color:var(--muted)">VS</span><small>14:00 · Partido 2</small></div>
+        <div class="portrait"><img src="file:///F:/PROYECTOS_NODE/torneo-dota/public/heroes/axe.png" alt=""></div>
+        <div class="name">Los sumicos</div><div></div><div class="name b">Punisher</div>
+        <div class="no-id">Sin partida vinculada aún</div>
+      </article>
+    </div>
+    <p class="note">Solo los partidos con Match ID de Dota muestran el botón. El resto se ve igual que hoy.</p>
+  </div>
+
+  <div>
+    <div class="sec-title"><h1>2 · Detalle (modal)</h1><span class="tag">Datos reales de la partida 9023462170 · retratos propios</span></div>
+    <button class="detail-btn" style="max-width:340px" onclick="document.getElementById('dlg').showModal()">▸ Abrir detalle de ejemplo</button>
+  </div>
+
+  <div>
+    <div class="sec-title"><h1>3 · Admin → Resultados</h1><span class="tag">Importar desde Dota</span></div>
+    <div class="admin">
+      <div class="rc">
+        <div class="rc-top"><span>Partido 1 · Ronda 1 · 03/10/2026 14:00:00</span><span style="color:#e6b65f">PENDIENTE</span></div>
+        <div class="import">
+          <label>Match ID de Dota (opcional)</label>
+          <div class="row"><input value="9023462170"><button class="btn">Buscar</button></div>
+          <div class="preview">
+            <span class="ok">✓ Partida encontrada · 66:06 · Radiant ganó 42 – 41</span>
+            <label>¿Qué equipo jugó de Radiant?</label>
+            <div class="row"><select><option>Team Fe → Radiant · Bastardigans → Dire</option><option>Bastardigans → Radiant · Team Fe → Dire</option></select><button class="btn pri">Autocompletar</button></div>
+          </div>
+        </div>
+        <div class="team-row" style="font-size:10px;letter-spacing:.1em;color:#8d93b0;text-transform:uppercase"><span>Ganador</span><span style="text-align:center">Kills</span><span style="text-align:center">Deaths</span></div>
+        <div class="team-row"><div class="pick win">Team Fe</div><div class="num">42</div><div class="num">41</div></div>
+        <div class="team-row"><div class="pick">Bastardigans</div><div class="num">41</div><div class="num">42</div></div>
+        <div class="row" style="justify-content:space-between"><span class="auto">Autocompletado desde Dota · revisa y guarda</span><button class="btn pri">Guardar</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<dialog class="detail" id="dlg">
+  <div class="d-head">
+    <button class="d-close" onclick="this.closest('dialog').close()">×</button>
+    <div class="scoreline">
+      <div class="team"><div class="emb"><img id="empA2" alt=""></div><div><span class="side r">Radiant</span><strong>Team Fe</strong><span class="wtag">Victoria</span></div></div>
+      <div class="bigscore"><div class="n"><span class="w" id="rs"></span><i>–</i><span class="l" id="ds"></span></div>
+        <div class="facts"><span>Duración <b id="dur"></b></span><span>1.ª sangre <b id="fb"></b></span></div></div>
+      <div class="team b"><div class="emb"><img id="empB2" alt=""></div><div><span class="side d">Dire</span><strong>Bastardigans</strong></div></div>
+    </div>
+  </div>
+  <div class="d-body">
+    <div class="tb r"><div class="tb-head"><b>Team Fe · Radiant</b><span class="tag">Victoria</span></div><table><thead><tr><th class="l">Jugador</th><th>K / D / A</th><th>Nivel</th><th>Oro/min</th><th>Exp/min</th><th>Farm</th><th>Daño</th></tr></thead><tbody id="tr"></tbody></table></div>
+    <div class="tb d"><div class="tb-head"><b>Bastardigans · Dire</b><span class="tag">Derrota</span></div><table><thead><tr><th class="l">Jugador</th><th>K / D / A</th><th>Nivel</th><th>Oro/min</th><th>Exp/min</th><th>Farm</th><th>Daño</th></tr></thead><tbody id="td"></tbody></table></div>
+    <div><div class="tag" style="margin-bottom:8px">Baneados</div><div class="bans" id="bans"></div></div>
+    <div class="d-foot"><span>Match ID <b id="mid"></b> · datos de OpenDota</span><a href="#" onclick="return false">Ver en OpenDota ↗</a></div>
+  </div>
+</dialog>
+
+<script>
+  const HERO = s => `file:///F:/PROYECTOS_NODE/torneo-dota/public/heroes/${s}.png`;
+  const M = {"id": 9023462170, "radiant_win": true, "rs": 42, "ds": 41, "dur": 3966, "fb": 0, "players": [{"r": true, "nick": "NothingToGay", "hero": "Monkey King", "slug": "monkey_king", "k": 16, "d": 8, "a": 16, "lvl": 30, "gpm": 866, "xpm": 1088, "dmg": 61119, "lh": 869, "dn": 18, "nw": 46315}, {"r": true, "nick": "狙击鸭才是最强的", "hero": "Mirana", "slug": "mirana", "k": 7, "d": 3, "a": 30, "lvl": 29, "gpm": 500, "xpm": 888, "dmg": 40993, "lh": 303, "dn": 5, "nw": 26796}, {"r": true, "nick": "wsm", "hero": "Doom", "slug": "doom_bringer", "k": 6, "d": 7, "a": 22, "lvl": 28, "gpm": 646, "xpm": 839, "dmg": 28829, "lh": 475, "dn": 7, "nw": 32500}, {"r": true, "nick": "欸嘿", "hero": "Dragon Knight", "slug": "dragon_knight", "k": 8, "d": 12, "a": 27, "lvl": 27, "gpm": 540, "xpm": 733, "dmg": 45576, "lh": 401, "dn": 12, "nw": 28138}, {"r": true, "nick": null, "hero": "Enchantress", "slug": "enchantress", "k": 5, "d": 11, "a": 17, "lvl": 28, "gpm": 434, "xpm": 773, "dmg": 20886, "lh": 225, "dn": 0, "nw": 20830}, {"r": false, "nick": "♦", "hero": "Brewmaster", "slug": "brewmaster", "k": 12, "d": 4, "a": 22, "lvl": 30, "gpm": 603, "xpm": 1088, "dmg": 41703, "lh": 473, "dn": 18, "nw": 32167}, {"r": false, "nick": "adbadbadbad", "hero": "Pangolier", "slug": "pangolier", "k": 8, "d": 3, "a": 28, "lvl": 30, "gpm": 765, "xpm": 1194, "dmg": 50689, "lh": 744, "dn": 9, "nw": 42447}, {"r": false, "nick": "strong", "hero": "Clinkz", "slug": "clinkz", "k": 13, "d": 11, "a": 19, "lvl": 30, "gpm": 769, "xpm": 1010, "dmg": 70210, "lh": 718, "dn": 17, "nw": 37435}, {"r": false, "nick": "unconscious state", "hero": "Rubick", "slug": "rubick", "k": 4, "d": 8, "a": 24, "lvl": 26, "gpm": 403, "xpm": 649, "dmg": 30691, "lh": 204, "dn": 0, "nw": 20623}, {"r": false, "nick": "Мечта.", "hero": "Techies", "slug": "techies", "k": 4, "d": 17, "a": 29, "lvl": 25, "gpm": 414, "xpm": 531, "dmg": 67587, "lh": 175, "dn": 4, "nw": 16436}], "bans": [{"slug": "enigma", "team": 1}, {"slug": "dark_seer", "team": 1}, {"slug": "largo", "team": 0}, {"slug": "winter_wyvern", "team": 0}, {"slug": "bounty_hunter", "team": 1}, {"slug": "dark_willow", "team": 0}, {"slug": "earth_spirit", "team": 0}, {"slug": "bane", "team": 1}, {"slug": "keeper_of_the_light", "team": 1}, {"slug": "lone_druid", "team": 0}, {"slug": "puck", "team": 1}, {"slug": "invoker", "team": 0}, {"slug": "ember_spirit", "team": 1}, {"slug": "storm_spirit", "team": 0}]};
+  const fmt = n => n.toLocaleString('es');
+  const mmss = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  document.getElementById('rs').textContent = M.rs; document.getElementById('ds').textContent = M.ds;
+  document.getElementById('dur').textContent = mmss(M.dur); document.getElementById('fb').textContent = mmss(M.fb || 0);
+  document.getElementById('mid').textContent = M.id;
+  // Team emblems for the mockup: two hero portraits standing in for team images.
+  for (const id of ['empA1', 'empA2']) document.getElementById(id).src = HERO('juggernaut');
+  for (const id of ['empB1', 'empB2']) document.getElementById(id).src = HERO('phantom_assassin');
+  const row = p => `<tr><td class="l"><div class="pl"><img src="${HERO(p.slug)}" alt=""><div>${p.nick ? `<strong>${p.nick.replace(/</g, '&lt;')}</strong>` : '<strong class="anon">Anónimo</strong>'}<small>${p.hero}</small></div></div></td>
+    <td class="kda"><b>${p.k}</b> / <span class="d">${p.d}</span> / <span class="a">${p.a}</span></td><td>${p.lvl}</td><td class="gold">${p.gpm}</td><td>${p.xpm}</td><td>${p.lh} / ${p.dn}</td><td>${fmt(p.dmg)}</td></tr>`;
+  document.getElementById('tr').innerHTML = M.players.filter(p => p.r).map(row).join('');
+  document.getElementById('td').innerHTML = M.players.filter(p => !p.r).map(row).join('');
+  document.getElementById('bans').innerHTML = M.bans.map(b => `<img src="${HERO(b.slug)}" title="${b.slug}" alt="">`).join('');
+</script>
+</body>
+</html>

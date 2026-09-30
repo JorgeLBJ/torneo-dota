@@ -14,6 +14,8 @@ beforeEach(async () => {
   t = await makeApp();
   cookie = await t.login();
   tournament = t.repo.createTournament({ name: 'Torneo Oct', slug: 'torneo-oct' });
+  // These tests are about the bracket, not about series: playoffs are single games here.
+  tournament = t.repo.updateTournament(tournament.id, { semifinalGames: 1, finalGames: 1 });
   t.repo.setActiveTournament(tournament.id);
   base = `/admin/t/${tournament.id}/playoffs`;
   teams = ['Alpha', 'Bravo', 'Corsarios', 'Delta', 'Eclipse'].map((name, i) => t.repo.createTeam(tournament.id, { code: String.fromCharCode(65 + i), name }));

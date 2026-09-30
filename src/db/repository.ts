@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import { isHeroSlug } from '../data/heroes.js';
+import { resolveSeries, seriesLengthFor, type GameScore, type SeriesLength } from '../domain/series.js';
 import { isValidTimeZone, utcToZoned, zonedToUtc } from '../format/timezone.js';
 
 // All SQL of the application lives in this module.
@@ -18,6 +19,10 @@ export interface Tournament {
   /** Ordered tiebreak criteria applied after points. */
   tiebreakers: TiebreakerKey[];
   groupLegs: 1 | 2;
+  /** Games per match (best of 1, 3 or 5) in each phase. */
+  groupGames: SeriesLength;
+  semifinalGames: SeriesLength;
+  finalGames: SeriesLength;
   rulesText: string;
   /** IANA zone that wall-clock schedule inputs are read in and admin times are shown in. */
   timezone: string;
@@ -107,6 +112,39 @@ export interface MatchResult {
   team2Deaths: number;
 }
 
+/** One game of a match's series. `dotaSnapshot` is the compact JSON of an imported Dota match, or null. */
+export interface Game {
+  id: number;
+  matchId: number;
+  gameNumber: number;
+  winnerId: number;
+  team1Kills: number;
+  team1Deaths: number;
+  team2Kills: number;
+  team2Deaths: number;
+  radiantTeamId: number | null;
+  dotaMatchId: number | null;
+  dotaSnapshot: string | null;
+  importedAt: string | null;
+}
+
+export interface GameInput {
+  gameNumber: number;
+  winnerId: number;
+  team1Kills: number;
+  team1Deaths: number;
+  team2Kills: number;
+  team2Deaths: number;
+  radiantTeamId?: number | null;
+  dotaMatchId?: number | null;
+  dotaSnapshot?: string | null;
+  importedAt?: string | null;
+}
+
+const gameCols = (p: string) => `${p}id, ${p}match_id AS matchId, ${p}game_number AS gameNumber, ${p}winner_id AS winnerId,
+  ${p}team1_kills AS team1Kills, ${p}team1_deaths AS team1Deaths, ${p}team2_kills AS team2Kills, ${p}team2_deaths AS team2Deaths,
+  ${p}radiant_team_id AS radiantTeamId, ${p}dota_match_id AS dotaMatchId, ${p}dota_snapshot AS dotaSnapshot, ${p}imported_at AS importedAt`;
+
 export interface Admin {
   id: number;
   username: string;
@@ -123,7 +161,8 @@ export interface Session {
 export const TIEBREAKER_KEYS = ['kd', 'kills', 'h2h', 'extra'] as const;
 
 const TOURNAMENT_COLS = `id, name, slug, qualifiers, game, points_win AS pointsWin, points_loss AS pointsLoss,
-  tiebreakers, group_legs AS groupLegs, rules_text AS rulesText, timezone, stream_url AS streamUrl, is_active AS isActive, created_at AS createdAt`;
+  tiebreakers, group_legs AS groupLegs, group_games AS groupGames, semifinal_games AS semifinalGames, final_games AS finalGames,
+  rules_text AS rulesText, timezone, stream_url AS streamUrl, is_active AS isActive, created_at AS createdAt`;
 const TEAM_COLS = 'id, tournament_id AS tournamentId, code, name, captain, hero, image_key AS imageKey';
 const MATCH_COLS = `m.id, m.tournament_id AS tournamentId, m.phase, m.round, m.match_number AS matchNumber, m.is_tiebreak AS isTiebreak,
   m.starts_at AS startsAt, m.ends_at AS endsAt, t.timezone AS timezone,
@@ -158,7 +197,8 @@ export function createRepository(db: Database.Database) {
     updateTournament: db.prepare(
       `UPDATE tournaments SET name = @name, slug = @slug, qualifiers = @qualifiers, game = @game,
          points_win = @pointsWin, points_loss = @pointsLoss, tiebreakers = @tiebreakers,
-         group_legs = @groupLegs, rules_text = @rulesText, timezone = @timezone, stream_url = @streamUrl WHERE id = @id`,
+         group_legs = @groupLegs, group_games = @groupGames, semifinal_games = @semifinalGames, final_games = @finalGames,
+         rules_text = @rulesText, timezone = @timezone, stream_url = @streamUrl WHERE id = @id`,
     ),
     activeTournament: db.prepare(`SELECT ${TOURNAMENT_COLS} FROM tournaments WHERE is_active = 1`),
     clearActive: db.prepare('UPDATE tournaments SET is_active = 0 WHERE is_active = 1'),
@@ -208,14 +248,29 @@ export function createRepository(db: Database.Database) {
       'UPDATE matches SET starts_at = @startsAt, ends_at = @endsAt WHERE id = @id',
     ),
     updateMatchTeams: db.prepare('UPDATE matches SET team1_id = @team1Id, team2_id = @team2Id WHERE id = @id'),
-    recordResult: db.prepare(
+    setAggregate: db.prepare(
       `UPDATE matches SET winner_id = @winnerId, team1_kills = @team1Kills, team1_deaths = @team1Deaths,
          team2_kills = @team2Kills, team2_deaths = @team2Deaths WHERE id = @id`,
     ),
-    clearResult: db.prepare(
-      `UPDATE matches SET winner_id = NULL, team1_kills = NULL, team1_deaths = NULL,
-         team2_kills = NULL, team2_deaths = NULL WHERE id = ?`,
+    gamesByMatch: db.prepare(`SELECT ${gameCols('')} FROM match_games WHERE match_id = ? ORDER BY game_number`),
+    gamesByTournament: db.prepare(
+      `SELECT ${gameCols('g.')} FROM match_games g JOIN matches m ON m.id = g.match_id
+       WHERE m.tournament_id = ? ORDER BY g.match_id, g.game_number`,
     ),
+    upsertGame: db.prepare(
+      `INSERT INTO match_games (match_id, game_number, winner_id, team1_kills, team1_deaths, team2_kills, team2_deaths,
+         radiant_team_id, dota_match_id, dota_snapshot, imported_at)
+       VALUES (@matchId, @gameNumber, @winnerId, @team1Kills, @team1Deaths, @team2Kills, @team2Deaths,
+         @radiantTeamId, @dotaMatchId, @dotaSnapshot, @importedAt)
+       ON CONFLICT (match_id, game_number) DO UPDATE SET winner_id = excluded.winner_id,
+         team1_kills = excluded.team1_kills, team1_deaths = excluded.team1_deaths,
+         team2_kills = excluded.team2_kills, team2_deaths = excluded.team2_deaths,
+         radiant_team_id = excluded.radiant_team_id, dota_match_id = excluded.dota_match_id,
+         dota_snapshot = excluded.dota_snapshot, imported_at = excluded.imported_at`,
+    ),
+    deleteGame: db.prepare('DELETE FROM match_games WHERE match_id = ? AND game_number = ?'),
+    deleteGames: db.prepare('DELETE FROM match_games WHERE match_id = ?'),
+    matchIdsOfTournament: db.prepare('SELECT id FROM matches WHERE tournament_id = ?').pluck(),
     listGroupOrder: db.prepare(
       "SELECT id FROM matches WHERE tournament_id = ? AND phase = 'group' ORDER BY round, match_number, id",
     ),
@@ -299,6 +354,45 @@ export function createRepository(db: Database.Database) {
     },
   );
 
+  const gamesOf = (matchId: number): Game[] => q.gamesByMatch.all(matchId) as Game[];
+
+  /**
+   * Keeps matches.winner_id / kills / deaths equal to what the games say: the series winner (null while undecided)
+   * and the sums over the games (null while there are none). Called in the same transaction as every game change.
+   */
+  const refreshAggregate = (matchId: number): void => {
+    const match = matchById(matchId);
+    if (!match) return;
+    const tournament = tournamentById(match.tournamentId);
+    const games = gamesOf(matchId);
+    if (!tournament || games.length === 0 || match.team1Id === null || match.team2Id === null) {
+      q.setAggregate.run({ id: matchId, winnerId: null, team1Kills: null, team1Deaths: null, team2Kills: null, team2Deaths: null });
+      return;
+    }
+    const scores: GameScore[] = games;
+    const state = resolveSeries(match.team1Id, match.team2Id, seriesLengthFor(tournament, match.phase, match.isTiebreak), scores);
+    q.setAggregate.run({ id: matchId, winnerId: state.winnerId, ...state.totals });
+  };
+
+  const gameParams = (matchId: number, game: GameInput) => ({
+    matchId,
+    gameNumber: game.gameNumber,
+    winnerId: game.winnerId,
+    team1Kills: game.team1Kills,
+    team1Deaths: game.team1Deaths,
+    team2Kills: game.team2Kills,
+    team2Deaths: game.team2Deaths,
+    radiantTeamId: game.radiantTeamId ?? null,
+    dotaMatchId: game.dotaMatchId ?? null,
+    dotaSnapshot: game.dotaSnapshot ?? null,
+    importedAt: game.importedAt ?? null,
+  });
+
+  const assertWinner = (matchId: number, winnerId: number): void => {
+    const match = requireRow(matchById(matchId), 'Match');
+    if (winnerId !== match.team1Id && winnerId !== match.team2Id) throw new Error('The winner must be one of the match teams');
+  };
+
   const insertMatchesTx = db.transaction((matches: NewMatch[]) => {
     for (const m of matches) q.insertMatch.run(withDefaults(m));
   });
@@ -363,8 +457,15 @@ export function createRepository(db: Database.Database) {
     updateTournament(id: number, patch: TournamentPatch): Tournament {
       const next = { ...requireRow(tournamentById(id), 'Tournament'), ...patch, id };
       if (!isValidTimeZone(next.timezone)) throw new Error(`Invalid time zone "${next.timezone}"`);
-      q.updateTournament.run({ ...next, tiebreakers: next.tiebreakers.join(',') });
-      return requireRow(tournamentById(id), 'Tournament');
+      return inTransaction(() => {
+        const before = requireRow(tournamentById(id), 'Tournament');
+        q.updateTournament.run({ ...next, tiebreakers: next.tiebreakers.join(',') });
+        // A different series length changes who wins the matches that already have games.
+        if (before.groupGames !== next.groupGames || before.semifinalGames !== next.semifinalGames || before.finalGames !== next.finalGames) {
+          for (const matchId of q.matchIdsOfTournament.all(id) as number[]) refreshAggregate(matchId);
+        }
+        return requireRow(tournamentById(id), 'Tournament');
+      });
     },
     getActiveTournament(): Tournament | undefined {
       const row = q.activeTournament.get() as TournamentRow | undefined;
@@ -457,13 +558,43 @@ export function createRepository(db: Database.Database) {
       q.updateMatchTeams.run({ team1Id, team2Id, id });
       return requireRow(matchById(id), 'Match');
     },
+    /** Decides a match with one game: replaces every game of the match by game 1 (the legacy "single result"). */
     recordResult(id: number, result: MatchResult): Match {
-      q.recordResult.run({ ...result, id });
-      return requireRow(matchById(id), 'Match');
+      return inTransaction(() => {
+        assertWinner(id, result.winnerId);
+        q.deleteGames.run(id);
+        q.upsertGame.run(gameParams(id, { gameNumber: 1, ...result }));
+        refreshAggregate(id);
+        return requireRow(matchById(id), 'Match');
+      });
     },
+    /** Removes every game of the match and with them its result. */
     clearResult(id: number): Match {
-      q.clearResult.run(id);
-      return requireRow(matchById(id), 'Match');
+      return inTransaction(() => {
+        q.deleteGames.run(id);
+        refreshAggregate(id);
+        return requireRow(matchById(id), 'Match');
+      });
+    },
+
+    // Games (the series of a match). The match's winner and kills/deaths are re-derived in the same transaction.
+    listGames: gamesOf,
+    /** Every game of the tournament, ordered by match then game number. */
+    listTournamentGames: (tournamentId: number): Game[] => q.gamesByTournament.all(tournamentId) as Game[],
+    saveGame(matchId: number, game: GameInput): Match {
+      return inTransaction(() => {
+        assertWinner(matchId, game.winnerId);
+        q.upsertGame.run(gameParams(matchId, game));
+        refreshAggregate(matchId);
+        return requireRow(matchById(matchId), 'Match');
+      });
+    },
+    deleteGame(matchId: number, gameNumber: number): Match {
+      return inTransaction(() => {
+        q.deleteGame.run(matchId, gameNumber);
+        refreshAggregate(matchId);
+        return requireRow(matchById(matchId), 'Match');
+      });
     },
 
     // Admins

@@ -28,6 +28,8 @@ beforeEach(() => {
   db = openDatabase(':memory:');
   repo = createRepository(db);
   tournament = repo.createTournament({ name: 'Cup', slug: 'cup' });
+  // These tests are about the bracket, not about series: playoffs are single games here.
+  tournament = repo.updateTournament(tournament.id, { semifinalGames: 1, finalGames: 1 });
 });
 afterEach(() => db.close());
 

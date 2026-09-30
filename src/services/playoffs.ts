@@ -1,6 +1,7 @@
 import { fail, ok, type Checked } from '../checked.js';
 import type { Match, Phase, Repository, Schedule, Tournament } from '../db/repository.js';
 import { addMinutes } from '../domain/fixture.js';
+import { deleteGameResult, saveGameResult, type ImportChoice } from './games.js';
 import { validateResult, type RawResult } from './results.js';
 import type { TournamentState } from './state.js';
 
@@ -76,7 +77,10 @@ export function assignSemifinalTeams(
   return ok(true);
 }
 
-/** Records a semifinal/final result. Teams come from the derived bracket and are stored with the result. */
+/**
+ * Records one game of a semifinal/final series. Teams come from the derived bracket and are stored with the match.
+ * A semifinal whose winner changes (or disappears) drops the final, which depends on the semifinal winners.
+ */
 export function recordPlayoffResult(
   repo: Repository,
   tournament: Tournament,
@@ -84,6 +88,7 @@ export function recordPlayoffResult(
   phase: PlayoffPhase,
   number: number,
   raw: RawResult,
+  options: { gameNumber?: number; imported?: ImportChoice } = {},
 ): Checked<Match> {
   const slot = phase === 'final' ? (number === 1 ? state.bracket.final : undefined) : state.bracket.semifinals[number - 1];
   if (!slot) return fail('Partido de playoffs no encontrado.');
@@ -91,15 +96,27 @@ export function recordPlayoffResult(
   if (!checked.ok) return checked;
 
   const matches = ensurePlayoffMatches(repo, tournament);
-  const match = findMatch(matches, phase, number)!;
-  const winnerChanged = match.winnerId !== checked.value.winnerId;
+  let match = findMatch(matches, phase, number)!;
+  const previousWinner = match.winnerId;
   if (match.team1Id !== slot.team1Id || match.team2Id !== slot.team2Id) {
     repo.clearResult(match.id);
-    repo.updateMatchTeams(match.id, slot.team1Id, slot.team2Id);
+    match = repo.updateMatchTeams(match.id, slot.team1Id, slot.team2Id);
   }
-  const saved = repo.recordResult(match.id, checked.value);
-  if (phase === 'semifinal' && winnerChanged) resetFinal(repo, matches);
-  return ok(saved);
+  const saved = saveGameResult(repo, tournament, match, options.gameNumber ?? 1, raw, options.imported);
+  if (!saved.ok) return saved;
+  if (phase === 'semifinal' && saved.value.winnerId !== previousWinner) resetFinal(repo, matches);
+  return saved;
+}
+
+/** Removes one game of a playoff series (the last one loaded). */
+export function deletePlayoffGame(repo: Repository, tournament: Tournament, phase: PlayoffPhase, number: number, gameNumber: number): Checked<Match> {
+  const matches = ensurePlayoffMatches(repo, tournament);
+  const match = findMatch(matches, phase, number);
+  if (!match) return fail('Partido de playoffs no encontrado.');
+  const previousWinner = match.winnerId;
+  const removed = deleteGameResult(repo, tournament, match, gameNumber);
+  if (removed.ok && phase === 'semifinal' && removed.value.winnerId !== previousWinner) resetFinal(repo, matches);
+  return removed;
 }
 
 /**

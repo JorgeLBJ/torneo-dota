@@ -40,6 +40,8 @@ beforeEach(() => {
   db = openDatabase(':memory:');
   repo = createRepository(db);
   tournament = repo.createTournament({ name: 'Torneo Oct', slug: 'torneo-oct' });
+  // These tests are about the bracket, not about series: playoffs are single games here.
+  tournament = repo.updateTournament(tournament.id, { semifinalGames: 1, finalGames: 1 });
   teams = ['A', 'B', 'C', 'D', 'E', 'F', 'G'].map((code) =>
     repo.createTeam(tournament.id, { code, name: `Equipo ${code}`, hero: code === 'A' ? 'axe' : null }),
   );
