@@ -17,9 +17,9 @@ const seed = () => {
 };
 
 describe('001_init schema', () => {
-  it('enables foreign keys and sets user_version 4', () => {
+  it('enables foreign keys and sets user_version 5', () => {
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
-    expect(db.pragma('user_version', { simple: true })).toBe(4);
+    expect(db.pragma('user_version', { simple: true })).toBe(5);
   });
 
   it('defaults qualifiers to 4 and enforces unique slug', () => {
