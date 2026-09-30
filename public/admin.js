@@ -86,8 +86,8 @@
   }
 
   if (replaceDialog) {
-    var confirm = replaceDialog.querySelector('[data-replace-confirm]');
-    if (confirm) confirm.addEventListener('click', function () {
+    var replaceConfirm = replaceDialog.querySelector('[data-replace-confirm]');
+    if (replaceConfirm) replaceConfirm.addEventListener('click', function () {
       if (replacing) {
         var cell = replacing.target.cell;
         apply(replacing.target, replacing.hero);
@@ -174,6 +174,7 @@
   var uploadUrl = null;
   var baseRatio = 1;
   var saving = false;
+  var loadToken = 0;
 
   function showError(message) {
     errorBox.textContent = message || '';
@@ -189,6 +190,9 @@
   }
 
   function cleanup() {
+    loadToken++;
+    image.onload = null;
+    image.onerror = null;
     if (cropper) { cropper.destroy(); cropper = null; }
     if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
     image.removeAttribute('src');
@@ -241,14 +245,16 @@
     teamLabel.textContent = label;
     editor.hidden = false;
     objectUrl = URL.createObjectURL(file);
-    image.addEventListener('load', startCropper, { once: true });
+    // Only the latest file may start the cropper: a slower earlier load is ignored (and its handlers replaced).
+    var token = ++loadToken;
+    image.onload = function () { if (token === loadToken) startCropper(); };
     // A file that only has an image extension: the browser cannot decode it, so there is nothing to crop.
-    image.addEventListener('error', function () {
-      if (!objectUrl) return;
+    image.onerror = function () {
+      if (token !== loadToken) return;
       editor.hidden = true;
       saveButton.disabled = true;
       showError(WRONG);
-    }, { once: true });
+    };
     image.src = objectUrl;
     modal.showModal();
   }
