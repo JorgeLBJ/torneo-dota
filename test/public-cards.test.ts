@@ -46,3 +46,11 @@ describe('public match cards', () => {
     }
   });
 });
+
+describe('cards in one grid row', () => {
+  it('rounds stretch to the tallest in their row and the card fills the round', () => {
+    expect(rule('.days')).toContain('align-items: stretch');
+    expect(rule('.round')).toContain('grid-template-rows: auto 1fr');
+    expect(rule('.round > .matches')).toContain('align-items: stretch');
+  });
+});

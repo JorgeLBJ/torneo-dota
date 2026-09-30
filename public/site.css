@@ -145,14 +145,16 @@ footer .credit { margin-top: 8px; font-size: 11px; letter-spacing: .2em; color: 
 .chip[aria-pressed="true"] { border-color: var(--gold); color: var(--gold-hi); background: linear-gradient(180deg, rgba(200,170,110,.14), rgba(200,170,110,.03)); }
 
 /* ---------- Rounds & matches ---------- */
-.days { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px 16px; align-items: start; }
+.days { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px 16px; align-items: stretch; }
 /* Day headings, the placeholder and rounds with several matches take a whole row; a round with one match is one cell. */
 .day-head, .days > .empty { grid-column: 1 / -1; }
 .round:not([data-matches="1"]) { grid-column: 1 / -1; }
 .day-head { margin-top: 18px; }
 .day-head:first-child { margin-top: 0; }
 .tznote { margin: 0; text-align: center; color: var(--muted); font: 500 13px/1.3 var(--fl); letter-spacing: .08em; text-transform: uppercase; }
-.round { display: grid; gap: 10px; }
+/* Rounds sharing a grid row are as tall as the tallest: the card fills what is left under the header. */
+.round { display: grid; grid-template-rows: auto 1fr; gap: 10px; }
+.round > .matches { align-items: stretch; }
 .round-head { display: flex; flex-wrap: wrap; align-items: center; min-height: 21px; gap: 8px 14px; font: 600 13px/1 var(--fl); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
 .round-head b { font: 700 17px/1 var(--fd); color: var(--fg); letter-spacing: .1em; }
 .tag { padding: 4px 9px; font: 700 11px/1 var(--fl); letter-spacing: .18em; text-transform: uppercase; border: 1px solid var(--line); }
