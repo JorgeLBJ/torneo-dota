@@ -6,6 +6,8 @@ export interface StandingTeam {
 
 export interface GroupMatch {
   matchNumber: number;
+  /** An extra game to break a tie: it never counts for points or statistics, only for the `extra` criterion. */
+  isTiebreak?: boolean;
   team1Id: number | null;
   team2Id: number | null;
   winnerId: number | null;
@@ -15,7 +17,8 @@ export interface GroupMatch {
   team2Deaths: number | null;
 }
 
-export type QualificationStatus = 'pending' | 'qualified' | 'eliminated' | 'tiebreak';
+/** `tiebreak`: a tie at the cutoff nothing broke. `extra-pending`: same, but an extra game is a criterion and may still decide it. */
+export type QualificationStatus = 'pending' | 'qualified' | 'eliminated' | 'tiebreak' | 'extra-pending';
 
 export interface StandingRow {
   teamId: number;
@@ -38,7 +41,7 @@ export interface StandingRow {
   status: QualificationStatus;
 }
 
-export type TiebreakCriterion = 'kd' | 'kills' | 'h2h';
+export type TiebreakCriterion = 'kd' | 'kills' | 'h2h' | 'extra';
 
 export interface StandingsRules {
   pointsWin?: number;
@@ -53,7 +56,7 @@ const CRITERION_VALUE: Record<'kd' | 'kills', (row: StandingRow) => number> = {
   kills: (row) => row.kills,
 };
 
-const KNOWN_CRITERIA = new Set<string>(['kd', 'kills', 'h2h']);
+const KNOWN_CRITERIA = new Set<string>(['kd', 'kills', 'h2h', 'extra']);
 
 interface Acc extends StandingRow {
   results: { matchNumber: number; result: 'W' | 'L' }[];
@@ -75,6 +78,9 @@ export function computeStandings(
   const { pointsWin = 1, pointsLoss = 0, tiebreakers = ['kd', 'kills'] } = rules;
   // Stored values are not trusted: unknown or repeated criteria are skipped.
   const criteria = [...new Set(tiebreakers)].filter((name) => KNOWN_CRITERIA.has(name));
+  // Extra games are kept apart: they only ever feed the `extra` criterion.
+  const regularMatches = groupMatches.filter((m) => !m.isTiebreak);
+  const extraMatches = groupMatches.filter((m) => m.isTiebreak);
   const acc = new Map<number, Acc>();
   for (const t of teams) {
     acc.set(t.id, {
@@ -97,7 +103,7 @@ export function computeStandings(
     });
   }
 
-  for (const match of groupMatches) {
+  for (const match of regularMatches) {
     if (match.winnerId === null || match.team1Id === null || match.team2Id === null) continue;
     const sides = [
       { id: match.team1Id, kills: match.team1Kills, deaths: match.team1Deaths },
@@ -125,10 +131,10 @@ export function computeStandings(
   }
 
   // Wins of each team in the mini-league formed by `group` alone: only played matches between two members count.
-  const headToHeadWins = (group: Acc[]): Map<number, number> => {
+  const miniLeagueWins = (matches: GroupMatch[], group: Acc[]): Map<number, number> => {
     const members = new Set(group.map((row) => row.teamId));
     const wins = new Map(group.map((row) => [row.teamId, 0]));
-    for (const match of groupMatches) {
+    for (const match of matches) {
       if (match.winnerId === null || match.team1Id === null || match.team2Id === null) continue;
       if (!members.has(match.team1Id) || !members.has(match.team2Id)) continue;
       wins.set(match.winnerId, (wins.get(match.winnerId) ?? 0) + 1);
@@ -140,10 +146,9 @@ export function computeStandings(
   const split = (group: Acc[], from: number): Acc[][] => {
     const name = criteria[from];
     if (group.length < 2 || name === undefined) return [group];
+    const winsOf = (matches: GroupMatch[]) => ((wins) => (row: Acc) => wins.get(row.teamId) ?? 0)(miniLeagueWins(matches, group));
     const scoreOf: (row: Acc) => number =
-      name === 'h2h'
-        ? ((wins) => (row: Acc) => wins.get(row.teamId) ?? 0)(headToHeadWins(group))
-        : CRITERION_VALUE[name as 'kd' | 'kills'];
+      name === 'h2h' ? winsOf(regularMatches) : name === 'extra' ? winsOf(extraMatches) : CRITERION_VALUE[name as 'kd' | 'kills'];
     const levels = new Map<number, Acc[]>();
     for (const row of group) levels.set(scoreOf(row), [...(levels.get(scoreOf(row)) ?? []), row]);
     return [...levels.keys()]
@@ -168,7 +173,9 @@ export function computeStandings(
   }
   rows.splice(0, rows.length, ...ordered);
 
-  const complete = groupMatches.length > 0 && groupMatches.every((mt) => mt.winnerId !== null);
+  // The group stage is over when every regular match is played; extra games never hold it open.
+  const complete = regularMatches.length > 0 && regularMatches.every((mt) => mt.winnerId !== null);
+  const extraCanDecide = criteria.includes('extra');
 
   for (const { start, end } of groups) {
     const members = rows.slice(start, end + 1);
@@ -178,7 +185,7 @@ export function computeStandings(
       row.tiedWith = tied.map((o) => o.teamId).sort((a, b) => a - b);
       row.unresolvedTie = row.tiedWith.length > 0;
       if (!complete) row.status = 'pending';
-      else if (start < qualifiers && end >= qualifiers) row.status = 'tiebreak';
+      else if (start < qualifiers && end >= qualifiers) row.status = extraCanDecide ? 'extra-pending' : 'tiebreak';
       else row.status = start < qualifiers ? 'qualified' : 'eliminated';
     }
   }
