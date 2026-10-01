@@ -195,3 +195,54 @@ describe('output invariant', () => {
     }
   });
 });
+
+describe('nested lists are normalised, never split or left with an empty bullet', () => {
+  it('rewrites the real production HTML into one list with the sublist under its parent item', () => {
+    const prod =
+      '<h2>CREDITOS</h2><ul><li>Web auspiciada por Kendeclise Corp.</li><li>Agradecimientos especiales:</li></ul><ul><li><ul><li>Por el apoyo de tesoreros: wiba, orochi.</li><li>Por el aporte de jugadores nuevos y amigos : wiba, shanks, kairos.</li></ul></li></ul><ul><li>Mi vida Por la Horda!</li></ul>';
+    const out = clean(prod);
+    expect(out).toBe(
+      '<h2>CREDITOS</h2><ul><li>Web auspiciada por Kendeclise Corp.</li><li>Agradecimientos especiales:<ul><li>Por el apoyo de tesoreros: wiba, orochi.</li><li>Por el aporte de jugadores nuevos y amigos : wiba, shanks, kairos.</li></ul></li></ul><ul><li>Mi vida Por la Horda!</li></ul>',
+    );
+    expect(out).not.toContain('<li></li>');
+    expect(out).not.toMatch(/<li><ul>/);
+    expect(clean(out)).toBe(out);
+  });
+
+  it('puts a list that sits directly inside a list into the previous item (what Chrome indent produces)', () => {
+    expect(clean('<ul><li>A</li><ul><li>x</li><li>y</li><li>z</li></ul></ul>')).toBe('<ul><li>A<ul><li>x</li><li>y</li><li>z</li></ul></li></ul>');
+    expect(clean('<ol><li>1</li><ol><li>2</li><ol><li>3</li></ol></ol><li>4</li></ol>')).toBe('<ol><li>1<ol><li>2<ol><li>3</li></ol></li></ol></li><li>4</li></ol>');
+  });
+
+  it('merges an item that holds only a list into the item before it, keeping the rest of the list whole', () => {
+    expect(clean('<ul><li>A</li><li><ul><li>x</li></ul></li><li>B</li></ul>')).toBe('<ul><li>A<ul><li>x</li></ul></li><li>B</li></ul>');
+  });
+
+  it('a list-only list after another list joins that list last item; with nothing before it, it just becomes a list', () => {
+    expect(clean('<ul><li>A</li></ul><ul><li><ul><li>x</li></ul></li></ul>')).toBe('<ul><li>A<ul><li>x</li></ul></li></ul>');
+    expect(clean('<ul><ul><li>x</li></ul></ul>')).toBe('<ul><li>x</li></ul>');
+    expect(clean('<ul><li><ul><li>x</li></ul></li></ul>')).toBe('<ul><li>x</li></ul>');
+  });
+
+  it('leaves well-formed nesting and items with text plus a sublist alone', () => {
+    const ok = '<ul><li>A<ul><li>x</li></ul>tail</li><li>B</li></ul>';
+    expect(clean(ok)).toBe(ok);
+  });
+});
+
+describe('sublists of one item', () => {
+  it('two sublists of the same kind side by side in one item become one', () => {
+    expect(clean('<ul><li>A<ul><li>x</li></ul><ul><li>y</li></ul></li></ul>')).toBe('<ul><li>A<ul><li>x</li><li>y</li></ul></li></ul>');
+    expect(clean('<ul><li>A<ul><li>x</li></ul><ol><li>y</li></ol></li></ul>')).toBe('<ul><li>A<ul><li>x</li></ul><ol><li>y</li></ol></li></ul>');
+  });
+  it('separate top-level lists stay separate', () => {
+    expect(clean('<ul><li>A</li></ul><ul><li>B</li></ul>')).toBe('<ul><li>A</li></ul><ul><li>B</li></ul>');
+  });
+});
+
+describe('sublists added next to an existing sublist', () => {
+  it('a list placed after an item that already has a sublist joins that sublist', () => {
+    expect(clean('<ul><li>A<ul><li>x</li></ul></li><ul><li>B</li></ul></ul>')).toBe('<ul><li>A<ul><li>x</li><li>B</li></ul></li></ul>');
+    expect(clean('<ul><li>A<ul><li>x</li></ul></li><li><ul><li>B</li></ul></li></ul>')).toBe('<ul><li>A<ul><li>x</li><li>B</li></ul></li></ul>');
+  });
+});

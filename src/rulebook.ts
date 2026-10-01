@@ -185,7 +185,129 @@ export function sanitizeRulebookHtml(input: string): string {
     const entry = stack.pop()!;
     if (entry.emitted) out.push(`</${entry.tag}>`);
   }
-  return out.join('');
+  return normalizeLists(out.join(''));
+}
+
+// ---- Nested lists -----------------------------------------------------------------------------------------------
+// Browsers indent a list item by putting a list directly inside the list (<ul><li>A</li><ul>..</ul></ul>), and the
+// editor used to wrap such a list in an empty item or split the parent list. A sublist belongs INSIDE the item it
+// hangs from, so the (already sanitized, well-formed) output is rewritten as a small tree:
+//  - a list directly inside a list moves into the previous item (a new item only if there is none);
+//  - an item that holds nothing but lists, right after another item, is merged into that item;
+//  - a list whose items hold nothing but lists, right after another list, becomes sublists of that list's last item
+//    (with no list before it, it simply becomes those lists): never an empty bullet, never a split parent list.
+
+interface TreeNode {
+  /** Lower-case tag name, or '' for a text run. */
+  name: string;
+  open: string;
+  children: TreeNode[];
+}
+
+const isList = (node: TreeNode): boolean => node.name === 'ul' || node.name === 'ol';
+const isBlank = (node: TreeNode): boolean => node.name === '' && node.open.trim() === '';
+const listOnly = (li: TreeNode): boolean => {
+  const kids = li.children.filter((c) => !isBlank(c));
+  return kids.length > 0 && kids.every(isList);
+};
+
+function parseTree(html: string): TreeNode {
+  const root: TreeNode = { name: 'root', open: '', children: [] };
+  const stack: TreeNode[] = [root];
+  for (const token of html.matchAll(/<(\/?)([a-z0-9]+)[^>]*>|[^<]+/gi)) {
+    const top = stack[stack.length - 1]!;
+    if (token[2] === undefined) {
+      top.children.push({ name: '', open: token[0], children: [] });
+    } else if (token[1] === '/') {
+      if (stack.length > 1) stack.pop();
+    } else {
+      const node: TreeNode = { name: token[2].toLowerCase(), open: token[0], children: [] };
+      top.children.push(node);
+      if (!VOID.has(node.name)) stack.push(node);
+    }
+  }
+  return root;
+}
+
+function serialize(node: TreeNode): string {
+  if (node.name === '') return node.open;
+  const inner = node.children.map(serialize).join('');
+  return node.name === 'root' ? inner : VOID.has(node.name) ? node.open : `${node.open}${inner}</${node.name}>`;
+}
+
+/** Two sublists of the same kind side by side in one item are one sublist. */
+function mergeSublists(li: TreeNode): void {
+  const merged: TreeNode[] = [];
+  for (const child of li.children) {
+    const last = merged[merged.length - 1];
+    if (isList(child) && last && last.name === child.name) last.children.push(...child.children);
+    else if (isBlank(child) && last && isList(last)) continue;
+    else merged.push(child);
+  }
+  li.children = merged;
+}
+
+function fixLists(parent: TreeNode): void {
+  for (const child of parent.children) fixLists(child);
+
+  if (isList(parent)) {
+    const fixed: TreeNode[] = [];
+    let previous: TreeNode | null = null; // the last item kept
+    for (const child of parent.children) {
+      if (isList(child)) {
+        if (previous) previous.children.push(child);
+        else {
+          previous = { name: 'li', open: '<li>', children: [child] };
+          fixed.push(previous);
+        }
+      } else if (child.name === 'li') {
+        if (previous && listOnly(child)) previous.children.push(...child.children.filter((c) => !isBlank(c)));
+        else {
+          fixed.push(child);
+          previous = child;
+        }
+      } else fixed.push(child);
+    }
+    parent.children = fixed;
+    for (const li of fixed) if (li.name === 'li') mergeSublists(li);
+  }
+
+  // Lists whose every item holds only lists: sublists of the previous list's last item, or plain lists.
+  const result: TreeNode[] = [];
+  let previousList: TreeNode | null = null;
+  for (const child of parent.children) {
+    if (!isList(child)) {
+      if (!isBlank(child)) previousList = null;
+      result.push(child);
+      continue;
+    }
+    const items = child.children.filter((c) => !isBlank(c));
+    const orphan = items.length > 0 && items.every((li) => li.name === 'li' && listOnly(li));
+    if (!orphan) {
+      result.push(child);
+      previousList = child;
+      continue;
+    }
+    const lists = items.flatMap((li) => li.children.filter((c) => !isBlank(c)));
+    const host: TreeNode | undefined = previousList?.children.filter((c) => c.name === 'li').pop();
+    if (host) {
+      host.children.push(...lists);
+      mergeSublists(host);
+    }
+    else {
+      result.push(...lists);
+      previousList = lists[lists.length - 1] ?? null;
+    }
+  }
+  parent.children = result;
+}
+
+/** Rewrites sanitized, well-formed rulebook HTML so that every sublist hangs inside its parent item. */
+function normalizeLists(html: string): string {
+  if (!/<(ul|ol)>/.test(html)) return html;
+  const root = parseTree(html);
+  fixLists(root);
+  return serialize(root);
 }
 
 const escapeLegacy = (text: string): string => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

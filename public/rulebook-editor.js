@@ -114,6 +114,86 @@
     });
   }
 
+  // ---- Nested lists: the same rules as the server (src/rulebook.ts) ---------------------------------------------------
+  // Browsers indent an item by putting a list directly inside the list. A sublist belongs inside the item it hangs from:
+  //  - a list directly inside a list moves into the previous item (a new item only if there is none);
+  //  - an item holding nothing but lists, right after another item, is merged into it;
+  //  - a list whose items hold nothing but lists, right after another list, becomes sublists of that list's last item.
+  function isList(n) { return n.nodeType === 1 && /^(UL|OL)$/.test(n.tagName); }
+  function isBlank(n) { return n.nodeType === 3 && !n.nodeValue.trim(); }
+  function listOnly(li) {
+    var kids = Array.prototype.filter.call(li.childNodes, function (c) { return !isBlank(c); });
+    return kids.length > 0 && kids.every(isList);
+  }
+  // Two sublists of the same kind side by side in one item are one sublist.
+  function mergeSublists(li) {
+    Array.prototype.slice.call(li.childNodes).forEach(function (child) {
+      var before = child.previousSibling;
+      while (before && isBlank(before)) before = before.previousSibling;
+      if (isList(child) && before && isList(before) && before.tagName === child.tagName) {
+        while (child.firstChild) before.appendChild(child.firstChild);
+        li.removeChild(child);
+      }
+    });
+  }
+  function fixLists(parent, doc) {
+    // Outdenting in some browsers leaves an item inside an item: it belongs after it, as a sibling.
+    if (parent.nodeType === 1 && parent.tagName === 'LI' && parent.parentNode) {
+      var anchor = parent;
+      Array.prototype.slice.call(parent.children).forEach(function (child) {
+        if (child.tagName !== 'LI') return;
+        parent.parentNode.insertBefore(child, anchor.nextSibling);
+        anchor = child;
+      });
+    }
+    Array.prototype.slice.call(parent.children).forEach(function (child) { fixLists(child, doc); });
+    if (isList(parent)) {
+      var previous = null;
+      Array.prototype.slice.call(parent.childNodes).forEach(function (child) {
+        if (isList(child)) {
+          if (previous) {
+            previous.appendChild(child);
+          } else {
+            previous = doc.createElement('li');
+            parent.insertBefore(previous, child);
+            previous.appendChild(child);
+          }
+        } else if (child.nodeType === 1 && child.tagName === 'LI') {
+          if (previous && listOnly(child)) {
+            Array.prototype.slice.call(child.childNodes).forEach(function (c) { if (!isBlank(c)) previous.appendChild(c); });
+            parent.removeChild(child);
+          } else previous = child;
+        }
+      });
+      Array.prototype.forEach.call(parent.children, function (li) { if (li.tagName === 'LI') mergeSublists(li); });
+    }
+    var previousList = null;
+    Array.prototype.slice.call(parent.childNodes).forEach(function (child) {
+      if (!isList(child)) {
+        if (!isBlank(child)) previousList = null;
+        return;
+      }
+      var items = Array.prototype.filter.call(child.childNodes, function (c) { return !isBlank(c); });
+      var orphan = items.length > 0 && items.every(function (li) { return li.nodeType === 1 && li.tagName === 'LI' && listOnly(li); });
+      if (!orphan) {
+        previousList = child;
+        return;
+      }
+      var lists = [];
+      items.forEach(function (li) {
+        Array.prototype.forEach.call(li.childNodes, function (c) { if (!isBlank(c)) lists.push(c); });
+      });
+      var host = previousList && previousList.querySelector(':scope > li:last-of-type');
+      lists.forEach(function (l) {
+        if (host) host.appendChild(l);
+        else parent.insertBefore(l, child);
+      });
+      if (host) mergeSublists(host);
+      if (!host && lists.length) previousList = lists[lists.length - 1];
+      parent.removeChild(child);
+    });
+  }
+
   function clean(html) {
     var doc = document.implementation.createHTMLDocument('');
     var source = doc.createElement('div');
@@ -125,17 +205,7 @@
     walk(source, out, doc);
     wrapLoose(out, doc);
     Array.prototype.forEach.call(out.querySelectorAll('div.callout'), function (c) { wrapLoose(c, doc); });
-    // Browsers indent a list item by putting a list directly inside the list: move it into the previous item.
-    Array.prototype.forEach.call(out.querySelectorAll('ul > ul, ul > ol, ol > ul, ol > ol'), function (inner) {
-      var prev = inner.previousElementSibling;
-      if (prev && prev.tagName === 'LI') {
-        prev.appendChild(inner);
-      } else {
-        var li = doc.createElement('li');
-        inner.parentNode.insertBefore(li, inner);
-        li.appendChild(inner);
-      }
-    });
+    fixLists(out, doc);
     // Empty paragraphs and a lone <br> shell are noise.
     Array.prototype.forEach.call(out.querySelectorAll('p'), function (p) {
       if (!p.textContent.trim() && !p.querySelector('br,hr')) p.parentNode.removeChild(p);
@@ -313,6 +383,7 @@
           });
         }
       } else document.execCommand(cmd);
+      if (cmd === 'indent' || cmd === 'outdent') fixLists(area, document);
       sync();
     });
 
@@ -323,6 +394,7 @@
       if (sel && closest(sel.getRangeAt(0).startContainer, 'li')) {
         event.preventDefault();
         document.execCommand(event.shiftKey ? 'outdent' : 'indent');
+        fixLists(area, document);
         sync();
       }
     });
