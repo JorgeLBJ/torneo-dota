@@ -391,8 +391,8 @@ tr.row-msg .flash{margin:0}
 
 /* Live game marks */
 .rc.on{border-color:#e5402b;box-shadow:0 0 0 1px rgba(229,64,43,.35)}
-.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:700;letter-spacing:.06em;padding:3px 9px;border-radius:99px;border:1px solid #e6b65f;color:#e6b65f}
-.badge.live{border-color:#e5402b;background:#e5402b;color:#fff}
+/* Not .badge: that class is the 28px team-code tile. */
+.live-badge{display:inline-flex;align-items:center;flex:none;white-space:nowrap;font-size:11px;font-weight:700;letter-spacing:.06em;line-height:1.4;padding:3px 9px;border-radius:99px;border:1px solid #e5402b;background:#e5402b;color:#fff}
 .live-form{margin:0}
 .btn.live{border-color:#e5402b;color:#ff8a78}
 .btn.live:hover{color:#fff;border-color:#e5402b;background:rgba(229,64,43,.18)}
@@ -402,7 +402,7 @@ tr.row-msg .flash{margin:0}
 
 /* Several games live at once; the one on the stream is violet (Twitch colour). */
 .rc.tv{border-color:#a970ff;box-shadow:0 0 0 1px rgba(169,112,255,.35)}
-.badge.tv{border-color:#a970ff;background:#a970ff;color:#fff}
+.live-badge.tv{border-color:#a970ff;background:#a970ff}
 .live-actions{display:flex;flex-wrap:wrap;gap:8px}
 .btn.tv{border-color:#a970ff;color:#c9a8ff}
 .btn.tv:hover{color:#fff;background:rgba(169,112,255,.2)}

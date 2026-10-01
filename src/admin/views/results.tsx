@@ -229,9 +229,9 @@ export const ResultCard: FC<ResultCardProps> = ({ action, header, team1, team2, 
       <div class="rc-top">
         <span>{header}</span>
         {tv ? (
-          <span class="badge tv">📺 EN TRANSMISIÓN · {minutesSince(live!.startedAt, now)} min</span>
+          <span class="live-badge tv">📺 EN TRANSMISIÓN · {minutesSince(live!.startedAt, now)} min</span>
         ) : isLive ? (
-          <span class="badge live">● EN VIVO · {minutesSince(live!.startedAt, now)} min</span>
+          <span class="live-badge">● EN VIVO · {minutesSince(live!.startedAt, now)} min</span>
         ) : saved ? (
           <span class="pill ok">Guardado</span>
         ) : games.length > 0 ? (
