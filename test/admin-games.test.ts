@@ -48,7 +48,7 @@ const postJson = async (path: string, form: Record<string, string>, headers: Rec
 
 describe('Reglas: partidas por partido', () => {
   const post = (form: Record<string, string>) =>
-    t.post(`${base()}/reglas`, { points_win: '1', points_loss: '0', group_legs: '1', tiebreakers: 'kd,h2h', rules_text: '', ...form }, cookie);
+    t.post(`${base()}/reglas`, { points_win: '1', points_loss: '0', group_legs: '1', tiebreakers: 'kd,h2h', rules_html: '', ...form }, cookie);
 
   it('shows the three selects with the current values (1 / 3 / 5 by default)', async () => {
     const html = await (await t.get(`${base()}/reglas`, cookie)).text();

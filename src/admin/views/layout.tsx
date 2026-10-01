@@ -5,6 +5,9 @@ import { assetUrl } from '../../assets.js';
 import type { Admin, Team, Tournament } from '../../db/repository.js';
 import type { Flash } from '../flash.js';
 
+// The rulebook preview uses the public site's fonts and the same rulebook stylesheet, so it renders like the page.
+const RULEBOOK_FONTS =
+  'https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap';
 const FONTS =
   'https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Figtree:wght@400;500;600;700&display=swap';
 
@@ -65,11 +68,14 @@ const Document: FC<PropsWithChildren<{ title: string }>> = ({ title, children })
         <meta name="robots" content="noindex, nofollow" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="stylesheet" href={FONTS} />
+        <link rel="stylesheet" href={RULEBOOK_FONTS} />
+        <link rel="stylesheet" href={assetUrl('rulebook.css')} />
         <link rel="stylesheet" href={assetUrl('admin.css')} />
       </head>
       <body>
         {children}
         <script src={assetUrl('admin.js')} defer></script>
+        <script src={assetUrl('rulebook-editor.js')} defer></script>
       </body>
     </html>
   </>

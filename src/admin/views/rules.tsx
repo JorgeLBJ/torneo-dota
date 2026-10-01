@@ -1,6 +1,8 @@
+import { raw } from 'hono/html';
 import type { FC } from 'hono/jsx';
 import type { TiebreakerKey, Tournament } from '../../db/repository.js';
-import { PageHead, Rulebook, Select } from './parts.js';
+import { rulebookHtmlOf } from '../../rulebook.js';
+import { PageHead, Select } from './parts.js';
 
 export const TIEBREAKER_LABELS: Record<TiebreakerKey, string> = {
   kd: 'Diferencia K − D',
@@ -16,6 +18,67 @@ const HELP: Partial<Record<TiebreakerKey, string>> = {
   h2h: 'partido jugado entre los empatados',
   extra: 'partido extra entre los empatados (Fixture > Agregar partida de desempate)',
 };
+
+const TOOLBAR: (
+  | 'sep'
+  | { title: string; label: string; cmd: string; arg?: string; swatch?: string }
+)[] = [
+  { title: 'Título', label: 'T', cmd: 'block', arg: 'h2' },
+  { title: 'Subtítulo', label: 't', cmd: 'block', arg: 'h3' },
+  'sep',
+  { title: 'Negrita (Ctrl+B)', label: 'B', cmd: 'bold' },
+  { title: 'Cursiva (Ctrl+I)', label: 'I', cmd: 'italic' },
+  { title: 'Subrayado (Ctrl+U)', label: 'U', cmd: 'underline' },
+  { title: 'Tachado', label: 'S', cmd: 'strikeThrough' },
+  'sep',
+  { title: 'Lista con viñetas', label: '• —', cmd: 'insertUnorderedList' },
+  { title: 'Lista numerada', label: '1.', cmd: 'insertOrderedList' },
+  { title: 'Aumentar sangría (Tab)', label: '⇥', cmd: 'indent' },
+  { title: 'Reducir sangría (Mayús+Tab)', label: '⇤', cmd: 'outdent' },
+  'sep',
+  { title: 'Resaltar dorado', label: '', cmd: 'mark', arg: 'g', swatch: '#e6b65f' },
+  { title: 'Resaltar verde (Radiant)', label: '', cmd: 'mark', arg: 'r', swatch: '#6dbf4b' },
+  { title: 'Resaltar rojo (Dire)', label: '', cmd: 'mark', arg: 'd', swatch: '#ff7a66' },
+  'sep',
+  { title: 'Nota destacada', label: '⚠ Nota', cmd: 'callout' },
+  { title: 'Enlace', label: '🔗', cmd: 'link' },
+  { title: 'Separador', label: '―', cmd: 'hr' },
+  { title: 'Quitar formato', label: '⨯', cmd: 'removeFormat' },
+];
+
+/**
+ * The rulebook editor. Without JavaScript only the HTML textarea shows (and is sanitized on save); with it, the
+ * toolbar and the rich area replace the textarea, and the preview uses the same `.rules` stylesheet as the public page.
+ */
+const RulebookEditor: FC<{ html: string }> = ({ html }) => (
+  <div class="rb-editor" data-rb-editor>
+    <div class="rb-col">
+      <label class="rb-label">Reglamento</label>
+      <div class="rb-toolbar" role="toolbar" aria-label="Formato del reglamento" data-rb-toolbar hidden>
+        {TOOLBAR.map((item) =>
+          item === 'sep' ? (
+            <span class="rb-sep"></span>
+          ) : (
+            <button type="button" title={item.title} aria-label={item.title} data-cmd={item.cmd} data-arg={item.arg}>
+              {item.swatch ? <span class="rb-sw" style={`background:${item.swatch}`}></span> : item.label}
+            </button>
+          ),
+        )}
+      </div>
+      <div class="rb-area" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Reglamento" data-rb-area hidden></div>
+      <textarea name="rules_html" rows={14} data-rb-source>
+        {html}
+      </textarea>
+      <span class="rb-hint">Lo que pegues de Word o WhatsApp se limpia: solo quedan estos estilos.</span>
+    </div>
+    <div class="rb-col">
+      <label class="rb-label">Vista previa · idéntica a la web pública (mismas fuentes, colores y tamaños)</label>
+      <div class="rb-frame">
+        <div class="rules" data-rb-preview>{raw(html)}</div>
+      </div>
+    </div>
+  </div>
+);
 
 export const RulesView: FC<{ tournament: Tournament }> = ({ tournament }) => {
   const order = tournament.tiebreakers;
@@ -168,19 +231,11 @@ export const RulesView: FC<{ tournament: Tournament }> = ({ tournament }) => {
       <div class="card stack">
         <h2>Reglamento</h2>
         <p class="muted" style="margin:0;font-size:12px">
-          Texto que se muestra en la web pública. Usa <code>## Título</code> para secciones y <code>- </code> para
-          listas.
+          Se muestra en la pestaña «Reglas» de la web pública. Lo que pegues de Word o WhatsApp se limpia: solo quedan los
+          estilos de la barra.
         </p>
-        <textarea name="rules_text" rows={12}>
-          {tournament.rulesText}
-        </textarea>
+        <RulebookEditor html={rulebookHtmlOf(tournament)} />
       </div>
-      {tournament.rulesText.trim() ? (
-        <div class="card stack">
-          <h2>Vista previa</h2>
-          <Rulebook text={tournament.rulesText} />
-        </div>
-      ) : null}
     </form>
   );
 };

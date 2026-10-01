@@ -152,7 +152,7 @@ describe('Reglas', () => {
 
   it('can add, reorder and save it', async () => {
     const url = `/admin/t/${tournament.id}/reglas`;
-    const base = { action: 'save', points_win: '1', points_loss: '0', group_legs: '1', tiebreakers: 'kd,h2h', rules_text: '' };
+    const base = { action: 'save', points_win: '1', points_loss: '0', group_legs: '1', tiebreakers: 'kd,h2h', rules_html: '' };
     await t.post(url, { ...base, action: 'add', new_tiebreaker: 'extra' }, cookie);
     expect(current().tiebreakers).toEqual(['kd', 'h2h', 'extra']);
     const res = await t.post(url, { ...base, tiebreakers: 'kd,h2h,extra', action: 'up:extra' }, cookie);

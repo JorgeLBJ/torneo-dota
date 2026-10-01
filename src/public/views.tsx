@@ -6,7 +6,6 @@ import { assetUrl } from '../assets.js';
 import type { EmblemSources } from '../domain/emblem.js';
 import { EmblemPicture, EmblemSourcesContext, hasPicture } from '../emblem-view.js';
 import { emblemSourcesFor } from '../emblem-sources.js';
-import type { RulebookBlock } from '../markdown.js';
 import type {
   BracketMatchView,
   BracketSlotView,
@@ -88,6 +87,7 @@ export const PublicDocument: FC<PropsWithChildren<{ meta: PageMeta; links?: Page
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
         <link rel="stylesheet" href={FONTS} />
         <link rel="stylesheet" href={assetUrl('site.css')} />
+        <link rel="stylesheet" href={assetUrl('rulebook.css')} />
         <noscript>{raw('<style>.panel{display:grid!important}.tabs-bar{display:none}</style>')}</noscript>
       </head>
       <body>
@@ -654,24 +654,6 @@ const BracketPanel: FC<{ model: PublicModel }> = ({ model }) => {
 
 // ---------- Rules ----------
 
-interface RuleBox {
-  title: string;
-  blocks: RulebookBlock[];
-}
-
-/** Each `## Heading` opens a box; text before the first heading goes into a "Reglamento" box. */
-function toBoxes(blocks: RulebookBlock[]): RuleBox[] {
-  const boxes: RuleBox[] = [];
-  for (const block of blocks) {
-    if (block.type === 'heading') boxes.push({ title: block.text, blocks: [] });
-    else {
-      if (boxes.length === 0) boxes.push({ title: 'Reglamento', blocks: [] });
-      boxes[boxes.length - 1]!.blocks.push(block);
-    }
-  }
-  return boxes;
-}
-
 const RulesPanel: FC<{ model: PublicModel }> = ({ model }) => (
   <>
     <Section title="Reglas" sub="Reglamento oficial" />
@@ -696,23 +678,8 @@ const RulesPanel: FC<{ model: PublicModel }> = ({ model }) => (
           <p>Sin criterios de desempate: los equipos con los mismos puntos quedan empatados.</p>
         )}
       </article>
-      {toBoxes(model.rules.blocks).map((box) => (
-        <article class="rbox">
-          <h3>{box.title}</h3>
-          {box.blocks.map((block) =>
-            block.type === 'list' ? (
-              <ul>
-                {block.items.map((item) => (
-                  <li>{item}</li>
-                ))}
-              </ul>
-            ) : block.type === 'paragraph' ? (
-              <p>{block.text}</p>
-            ) : null,
-          )}
-        </article>
-      ))}
     </div>
+    {model.rules.html ? <div class="rules">{raw(model.rules.html)}</div> : null}
   </>
 );
 

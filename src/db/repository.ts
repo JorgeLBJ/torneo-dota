@@ -25,6 +25,8 @@ export interface Tournament {
   semifinalGames: SeriesLength;
   finalGames: SeriesLength;
   rulesText: string;
+  /** The sanitized rich-text rulebook; null until it is first saved from the editor (then rulesText is converted). */
+  rulesHtml: string | null;
   /** IANA zone that wall-clock schedule inputs are read in and admin times are shown in. */
   timezone: string;
   /** A Kick/Twitch/YouTube page URL as the admin entered it (validated); the embed is derived from it. */
@@ -166,7 +168,7 @@ export const TIEBREAKER_KEYS = ['kd', 'kills', 'h2h', 'extra'] as const;
 const TOURNAMENT_COLS = `id, name, slug, qualifiers, game, points_win AS pointsWin, points_loss AS pointsLoss,
   tiebreakers, group_legs AS groupLegs, group_games AS groupGames, semifinal_games AS semifinalGames, final_games AS finalGames,
   stream_match_id AS streamMatchId,
-  rules_text AS rulesText, timezone, stream_url AS streamUrl, is_active AS isActive, created_at AS createdAt`;
+  rules_text AS rulesText, rules_html AS rulesHtml, timezone, stream_url AS streamUrl, is_active AS isActive, created_at AS createdAt`;
 const TEAM_COLS = 'id, tournament_id AS tournamentId, code, name, captain, hero, image_key AS imageKey';
 const MATCH_COLS = `m.id, m.tournament_id AS tournamentId, m.phase, m.round, m.match_number AS matchNumber, m.is_tiebreak AS isTiebreak,
   m.starts_at AS startsAt, m.ends_at AS endsAt, t.timezone AS timezone,
@@ -205,7 +207,7 @@ export function createRepository(db: Database.Database) {
       `UPDATE tournaments SET name = @name, slug = @slug, qualifiers = @qualifiers, game = @game,
          points_win = @pointsWin, points_loss = @pointsLoss, tiebreakers = @tiebreakers,
          group_legs = @groupLegs, group_games = @groupGames, semifinal_games = @semifinalGames, final_games = @finalGames,
-         rules_text = @rulesText, timezone = @timezone, stream_url = @streamUrl WHERE id = @id`,
+         rules_text = @rulesText, rules_html = @rulesHtml, timezone = @timezone, stream_url = @streamUrl WHERE id = @id`,
     ),
     setLive: db.prepare('UPDATE matches SET live_game_number = @gameNumber, live_started_at = @startedAt WHERE id = @id'),
     setStream: db.prepare('UPDATE tournaments SET stream_match_id = @matchId WHERE id = @id'),

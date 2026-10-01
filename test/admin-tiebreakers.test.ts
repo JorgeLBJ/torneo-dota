@@ -14,7 +14,7 @@ beforeEach(async () => {
 });
 afterEach(() => t.db.close());
 
-const base = { action: 'save', points_win: '1', points_loss: '0', group_legs: '1', tiebreakers: 'kd,kills', rules_text: '' };
+const base = { action: 'save', points_win: '1', points_loss: '0', group_legs: '1', tiebreakers: 'kd,kills', rules_html: '' };
 const saved = () => t.repo.getTournamentById(tournament.id)!.tiebreakers;
 const page = async () => (await t.get(url, cookie)).text();
 const tbList = (html: string) => html.slice(html.indexOf('<ol class="tb-list">'), html.indexOf('</ol>', html.indexOf('<ol class="tb-list">')));

@@ -407,3 +407,23 @@ tr.row-msg .flash{margin:0}
 .btn.tv{border-color:#a970ff;color:#c9a8ff}
 .btn.tv:hover{color:#fff;background:rgba(169,112,255,.2)}
 .btn.tv.on{background:#a970ff;color:#fff}
+
+/* Rulebook editor: toolbar + rich area on the left, the public-looking preview on the right. */
+.rb-editor{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+.rb-col{display:grid;gap:8px;align-content:start;min-width:0}
+.rb-label{font-size:12px;color:var(--muted)}
+.rb-toolbar{display:flex;flex-wrap:wrap;gap:4px;padding:6px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px 10px 0 0}
+.rb-toolbar[hidden],.rb-area[hidden],.rb-source-off{display:none}
+.rb-toolbar button{min-width:34px;height:32px;padding:0 9px;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--fg);font:600 13px "Figtree",sans-serif;cursor:pointer}
+.rb-toolbar button:hover{background:var(--line)}
+.rb-sep{width:1px;background:var(--line);margin:4px 3px}
+.rb-sw{width:16px;height:16px;border-radius:4px;display:inline-block;vertical-align:middle}
+.rb-area{min-height:380px;max-height:70vh;overflow:auto;padding:14px 16px;border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;background:var(--panel);outline:none;font-size:14px;line-height:1.6;margin-top:-8px}
+.rb-area h2{font-size:18px;margin:.6em 0 .3em}.rb-area h3{font-size:15px;margin:.6em 0 .2em}.rb-area ul,.rb-area ol{padding-left:22px;margin:.3em 0}
+.rb-area .callout{border-left:3px solid #e6b65f;background:rgba(230,182,95,.08);padding:8px 12px;border-radius:6px;margin:.6em 0}
+.rb-area mark{background:none;font-weight:700}.rb-area mark.g{color:#e6b65f}.rb-area mark.r{color:#6dbf4b}.rb-area mark.d{color:#ff7a66}.rb-area a{color:#8fb4ff}
+.rb-source{width:100%;font-family:ui-monospace,monospace}
+.rb-hint{font-size:12px;color:var(--muted)}
+.rb-frame{padding:14px;border:1px solid var(--line);border-radius:10px;background:#07080a;overflow:auto;max-height:70vh}
+.rb-frame div.rules{max-width:none;padding:22px 24px}
+@media (max-width:900px){.rb-editor{grid-template-columns:minmax(0,1fr)}}

@@ -1,6 +1,5 @@
 import { raw } from 'hono/html';
 import type { Child, FC, JSX, PropsWithChildren } from 'hono/jsx';
-import { renderRulebook } from '../../markdown.js';
 
 export const PageHead: FC<PropsWithChildren<{ title: string; sub?: Child }>> = ({ title, sub, children }) => (
   <div class="head">
@@ -9,25 +8,6 @@ export const PageHead: FC<PropsWithChildren<{ title: string; sub?: Child }>> = (
       {sub ? <p class="sub">{sub}</p> : null}
     </div>
     {children ? <div class="actions">{children}</div> : null}
-  </div>
-);
-
-/** Renders rulebook text safely: blocks are plain text and JSX escapes every string. */
-export const Rulebook: FC<{ text: string }> = ({ text }) => (
-  <div class="md">
-    {renderRulebook(text).map((block) =>
-      block.type === 'heading' ? (
-        <h2>{block.text}</h2>
-      ) : block.type === 'list' ? (
-        <ul>
-          {block.items.map((item) => (
-            <li>{item}</li>
-          ))}
-        </ul>
-      ) : (
-        <p>{block.text}</p>
-      ),
-    )}
   </div>
 );
 

@@ -3,6 +3,7 @@ import { TIEBREAKER_KEYS, type TiebreakerKey } from '../../db/repository.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { intOrNull, rawStr, readBody, str } from '../form.js';
 import { isSeriesLength, type SeriesLength } from '../../domain/series.js';
+import { MAX_RULEBOOK_HTML, sanitizeRulebookHtml } from '../../rulebook.js';
 import { setFlash } from '../flash.js';
 import { renderPage } from '../render.js';
 import { RulesView } from '../views/rules.js';
@@ -14,7 +15,7 @@ const PHASES = [
   { field: 'semifinal_games', key: 'semifinalGames', phase: 'semifinal', label: 'las semifinales' },
   { field: 'final_games', key: 'finalGames', phase: 'final', label: 'la final' },
 ] as const;
-const MAX_RULES_LENGTH = 20000;
+
 
 /** The submitted order: any list (even empty) of known criteria, none repeated. */
 function parseOrder(csv: string): TiebreakerKey[] | null {
@@ -88,12 +89,14 @@ export function rulesRoutes(deps: Deps) {
       lengths[key] = value;
     }
 
-    const rulesText = rawStr(body, 'rules_text');
-    if (rulesText.length > MAX_RULES_LENGTH) return error('El reglamento es demasiado largo (máximo 20 000 caracteres).');
+    // The rich rulebook: sanitized here (and again on every render). A form without the field keeps what is saved.
+    const submittedHtml = body['rules_html'] === undefined ? undefined : rawStr(body, 'rules_html');
+    if (submittedHtml !== undefined && submittedHtml.length > MAX_RULEBOOK_HTML) return error('El reglamento es demasiado largo (máximo 60 000 caracteres).');
+    const rulesHtml = submittedHtml === undefined ? tournament.rulesHtml : sanitizeRulebookHtml(submittedHtml);
 
     const groupLegs = Number(legs) as 1 | 2;
     const formatChanged = groupLegs !== tournament.groupLegs && repo.listMatches(tournament.id, 'group').length > 0;
-    repo.updateTournament(tournament.id, { pointsWin, pointsLoss, tiebreakers, groupLegs, rulesText, ...lengths });
+    repo.updateTournament(tournament.id, { pointsWin, pointsLoss, tiebreakers, groupLegs, rulesHtml, ...lengths });
     deps.events.tournamentChanged(tournament.id);
     if (formatChanged) setFlash(c, 'warn', 'Reglas guardadas. Regenera el fixture para aplicar el nuevo formato.');
     else setFlash(c, 'ok', 'Reglas guardadas.');

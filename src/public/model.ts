@@ -4,7 +4,7 @@ import { resolveSeries, seriesLengthFor, type SeriesLength } from '../domain/ser
 import { describeStream, type StreamView } from '../domain/stream.js';
 import { zonedToUtc } from '../format/timezone.js';
 import type { QualificationStatus, StandingRow } from '../domain/standings.js';
-import { renderRulebook, type RulebookBlock } from '../markdown.js';
+import { rulebookHtmlOf } from '../rulebook.js';
 import type { TournamentState } from '../services/state.js';
 
 // Pure view model of the public page: everything the templates need, already derived and formatted.
@@ -216,7 +216,8 @@ export interface PublicModel {
     tiebreakers: string[];
     /** e.g. "K−D, luego kills" */
     legendTiebreak: string;
-    blocks: RulebookBlock[];
+    /** The rulebook as sanitized HTML (the rich text, or the old text converted). */
+    html: string;
     qualifiers: number;
     pointsWin: string;
     pointsLoss: string;
@@ -464,7 +465,7 @@ function buildRules(state: TournamentState): PublicModel['rules'] {
     summary,
     tiebreakers: tournament.tiebreakers.map((k) => TIEBREAK_LONG[k]),
     legendTiebreak: tournament.tiebreakers.map((k) => TIEBREAK_SHORT[k]).join(', luego '),
-    blocks: renderRulebook(tournament.rulesText),
+    html: rulebookHtmlOf(tournament),
     qualifiers: tournament.qualifiers,
     pointsWin: points(tournament.pointsWin),
     pointsLoss: points(tournament.pointsLoss),

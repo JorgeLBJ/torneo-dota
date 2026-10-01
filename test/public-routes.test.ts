@@ -184,10 +184,21 @@ describe('playoffs and rules tabs', () => {
     expect(body).toContain('Top 4');
     expect(body).toContain('1.º vs 4.º · 2.º vs 3.º');
     expect(body).toContain('Diferencia de kills y deaths (K − D)');
-    expect(body).toContain('<h3>Generales</h3>');
+    expect(body).toContain('<h2>Generales</h2>');
     expect(body).toContain('<li>Cinco jugadores</li>');
     expect(body).toContain('&lt;b&gt;x&lt;/b&gt;');
     expect(body).not.toContain('<li><b>x</b></li>');
+  });
+
+  it('renders the rich rulebook with the shared stylesheet, sanitizing it again even if the stored HTML is hostile', async () => {
+    t.repo.updateTournament(tournament.id, {
+      rulesHtml: '<h2>Formato</h2><p>Hola <mark class="g">oro</mark><script>alert(1)</script><img src=x onerror=alert(1)></p><div class="callout">Nota</div><a href="javascript:alert(1)">mal</a><a href="https://ok.example">bien</a>',
+    });
+    const body = await html('/');
+    expect(body).toMatch(/<link rel="stylesheet" href="\/assets\/rulebook\.css\?v=[0-9a-f]{10}"/);
+    expect(body).toContain('<div class="rules"><h2>Formato</h2><p>Hola <mark class="g">oro</mark></p><div class="callout">Nota</div>mal<a href="https://ok.example" rel="noopener noreferrer" target="_blank">bien</a></div>');
+    expect(body).not.toContain('alert(1)');
+    expect(body).not.toContain('onerror');
   });
 });
 

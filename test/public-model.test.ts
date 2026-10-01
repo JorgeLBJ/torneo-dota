@@ -236,6 +236,7 @@ describe('rules', () => {
     ]);
     expect(r.tiebreakers).toEqual(['Mayor cantidad de kills', 'Diferencia de kills y deaths (K − D)']);
     expect(r.legendTiebreak).toBe('kills, luego K−D');
-    expect(r.blocks).toEqual([{ type: 'heading', text: 'Generales' }, { type: 'list', items: ['Cinco jugadores'] }]);
+    // no rich rulebook saved yet: the old text is converted
+    expect(r.html).toBe('<h2>Generales</h2><ul><li>Cinco jugadores</li></ul>');
   });
 });
