@@ -98,7 +98,9 @@ export function rulesRoutes(deps: Deps) {
 
     const groupLegs = Number(legs) as 1 | 2;
     const formatChanged = groupLegs !== tournament.groupLegs && repo.listMatches(tournament.id, 'group').length > 0;
-    repo.updateTournament(tournament.id, { pointsWin, pointsLoss, tiebreakers, groupLegs, rulesHtml, ...lengths });
+    // An unchecked checkbox is simply absent, so the form carries a marker: marker + no box = off; no marker = keep.
+    const showTiebreakBox = str(body, 'show_tiebreak_present') === '' ? tournament.showTiebreakBox : str(body, 'show_tiebreak_box') !== '';
+    repo.updateTournament(tournament.id, { pointsWin, pointsLoss, tiebreakers, groupLegs, rulesHtml, showTiebreakBox, ...lengths });
     deps.events.tournamentChanged(tournament.id);
     if (formatChanged) setFlash(c, 'warn', 'Reglas guardadas. Regenera el fixture para aplicar el nuevo formato.');
     else setFlash(c, 'ok', 'Reglas guardadas.');

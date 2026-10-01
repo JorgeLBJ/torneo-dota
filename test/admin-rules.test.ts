@@ -65,6 +65,25 @@ describe('rules screen', () => {
     });
   });
 
+  it('the tiebreak box option: checked by default, off only when the form says so, untouched by forms without the marker', async () => {
+    let html = await (await t.get(url, cookie)).text();
+    expect(html).toMatch(/<input[^>]*type="checkbox"[^>]*name="show_tiebreak_box"[^>]*checked/);
+    expect(html).toContain('Mostrar el cuadro «Desempate» en la página pública');
+    // an old form (no marker, no checkbox) does not flip it
+    await t.post(url, base, cookie);
+    expect(t.repo.getTournamentById(tournament.id)!.showTiebreakBox).toBe(true);
+    // the new form with the box unchecked: marker present, checkbox absent
+    await t.post(url, { ...base, show_tiebreak_present: '1' }, cookie);
+    expect(t.repo.getTournamentById(tournament.id)!.showTiebreakBox).toBe(false);
+    html = await (await t.get(url, cookie)).text();
+    expect(html).not.toMatch(/name="show_tiebreak_box"[^>]*checked/);
+    // old forms still leave it off
+    await t.post(url, base, cookie);
+    expect(t.repo.getTournamentById(tournament.id)!.showTiebreakBox).toBe(false);
+    await t.post(url, { ...base, show_tiebreak_present: '1', show_tiebreak_box: '1' }, cookie);
+    expect(t.repo.getTournamentById(tournament.id)!.showTiebreakBox).toBe(true);
+  });
+
   it('sanitizes the rulebook on save: nothing hostile reaches the database', async () => {
     const dirty = '<h2 onclick="x">Hola</h2><script>alert(1)</script><p><img src=x onerror=alert(1)><a href="javascript:alert(1)">a</a><mark class="g">b</mark></p>';
     await t.post(url, { ...base, rules_html: dirty }, cookie);

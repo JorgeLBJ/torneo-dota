@@ -27,6 +27,8 @@ export interface Tournament {
   rulesText: string;
   /** The sanitized rich-text rulebook; null until it is first saved from the editor (then rulesText is converted). */
   rulesHtml: string | null;
+  /** Whether the public Reglas tab shows the auto-generated "Desempate" box. */
+  showTiebreakBox: boolean;
   /** IANA zone that wall-clock schedule inputs are read in and admin times are shown in. */
   timezone: string;
   /** A Kick/Twitch/YouTube page URL as the admin entered it (validated); the embed is derived from it. */
@@ -168,7 +170,7 @@ export const TIEBREAKER_KEYS = ['kd', 'kills', 'h2h', 'extra'] as const;
 const TOURNAMENT_COLS = `id, name, slug, qualifiers, game, points_win AS pointsWin, points_loss AS pointsLoss,
   tiebreakers, group_legs AS groupLegs, group_games AS groupGames, semifinal_games AS semifinalGames, final_games AS finalGames,
   stream_match_id AS streamMatchId,
-  rules_text AS rulesText, rules_html AS rulesHtml, timezone, stream_url AS streamUrl, is_active AS isActive, created_at AS createdAt`;
+  rules_text AS rulesText, rules_html AS rulesHtml, show_tiebreak_box AS showTiebreakBox, timezone, stream_url AS streamUrl, is_active AS isActive, created_at AS createdAt`;
 const TEAM_COLS = 'id, tournament_id AS tournamentId, code, name, captain, hero, image_key AS imageKey';
 const MATCH_COLS = `m.id, m.tournament_id AS tournamentId, m.phase, m.round, m.match_number AS matchNumber, m.is_tiebreak AS isTiebreak,
   m.starts_at AS startsAt, m.ends_at AS endsAt, t.timezone AS timezone,
@@ -178,9 +180,10 @@ const MATCH_FROM = 'FROM matches m JOIN tournaments t ON t.id = m.tournament_id'
 const ADMIN_COLS = 'id, username, password_hash AS passwordHash, created_at AS createdAt';
 const SESSION_COLS = 'id, admin_id AS adminId, expires_at AS expiresAt';
 
-type TournamentRow = Omit<Tournament, 'tiebreakers' | 'isActive'> & {
+type TournamentRow = Omit<Tournament, 'tiebreakers' | 'isActive' | 'showTiebreakBox'> & {
   tiebreakers: string;
   isActive: number;
+  showTiebreakBox: number;
 };
 type MatchRow = Omit<Match, 'scheduledDate' | 'startTime' | 'endTime' | 'isTiebreak'> & { timezone: string; isTiebreak: number };
 
@@ -194,7 +197,7 @@ type ScheduleDayRow = Omit<ScheduleDay, 'startTimes'> & { startTimes: string };
 
 function toTournament(row: TournamentRow): Tournament {
   const known = row.tiebreakers.split(',').filter((k): k is TiebreakerKey => (TIEBREAKER_KEYS as readonly string[]).includes(k));
-  return { ...row, tiebreakers: [...new Set(known)], isActive: row.isActive === 1 };
+  return { ...row, tiebreakers: [...new Set(known)], isActive: row.isActive === 1, showTiebreakBox: row.showTiebreakBox === 1 };
 }
 
 export function createRepository(db: Database.Database, now: () => Date = () => new Date()) {
@@ -207,7 +210,7 @@ export function createRepository(db: Database.Database, now: () => Date = () => 
       `UPDATE tournaments SET name = @name, slug = @slug, qualifiers = @qualifiers, game = @game,
          points_win = @pointsWin, points_loss = @pointsLoss, tiebreakers = @tiebreakers,
          group_legs = @groupLegs, group_games = @groupGames, semifinal_games = @semifinalGames, final_games = @finalGames,
-         rules_text = @rulesText, rules_html = @rulesHtml, timezone = @timezone, stream_url = @streamUrl WHERE id = @id`,
+         rules_text = @rulesText, rules_html = @rulesHtml, show_tiebreak_box = @showTiebreakBox, timezone = @timezone, stream_url = @streamUrl WHERE id = @id`,
     ),
     setLive: db.prepare('UPDATE matches SET live_game_number = @gameNumber, live_started_at = @startedAt WHERE id = @id'),
     setStream: db.prepare('UPDATE tournaments SET stream_match_id = @matchId WHERE id = @id'),
@@ -531,7 +534,7 @@ export function createRepository(db: Database.Database, now: () => Date = () => 
       if (!isValidTimeZone(next.timezone)) throw new Error(`Invalid time zone "${next.timezone}"`);
       return inTransaction(() => {
         const before = requireRow(tournamentById(id), 'Tournament');
-        q.updateTournament.run({ ...next, tiebreakers: next.tiebreakers.join(',') });
+        q.updateTournament.run({ ...next, tiebreakers: next.tiebreakers.join(','), showTiebreakBox: next.showTiebreakBox ? 1 : 0 });
         // A different series length changes who wins the matches that already have games.
         if (before.groupGames !== next.groupGames || before.semifinalGames !== next.semifinalGames || before.finalGames !== next.finalGames) {
           for (const matchId of q.matchIdsOfTournament.all(id) as number[]) refreshAggregate(matchId);

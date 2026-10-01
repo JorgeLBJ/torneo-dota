@@ -190,6 +190,20 @@ describe('playoffs and rules tabs', () => {
     expect(body).not.toContain('<li><b>x</b></li>');
   });
 
+  it('hides the whole tiebreak box when the admin turns it off, keeping the summary, the rulebook and the standings legend', async () => {
+    t.repo.updateTournament(tournament.id, { rulesHtml: '<p>Mi reglamento</p>' });
+    let body = await html('/');
+    expect(body).toContain('class="rules-grid"');
+    expect(body).toContain('<h3>Desempate</h3>');
+    t.repo.updateTournament(tournament.id, { showTiebreakBox: false });
+    body = await html('/');
+    expect(body).not.toContain('rules-grid');
+    expect(body).not.toContain('<h3>Desempate</h3>');
+    expect(body).toContain('<small>Victoria</small>');
+    expect(body).toContain('Mi reglamento');
+    expect(body).toMatch(/Desempate:/);
+  });
+
   it('renders the rich rulebook with the shared stylesheet, sanitizing it again even if the stored HTML is hostile', async () => {
     t.repo.updateTournament(tournament.id, {
       rulesHtml: '<h2>Formato</h2><p>Hola <mark class="g">oro</mark><script>alert(1)</script><img src=x onerror=alert(1)></p><div class="callout">Nota</div><a href="javascript:alert(1)">mal</a><a href="https://ok.example">bien</a>',

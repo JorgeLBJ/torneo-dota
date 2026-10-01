@@ -665,6 +665,7 @@ const RulesPanel: FC<{ model: PublicModel }> = ({ model }) => (
         </div>
       ))}
     </div>
+    {model.rules.showTiebreakBox ? (
     <div class="rules-grid">
       <article class="rbox">
         <h3>Desempate</h3>
@@ -679,6 +680,7 @@ const RulesPanel: FC<{ model: PublicModel }> = ({ model }) => (
         )}
       </article>
     </div>
+    ) : null}
     {model.rules.html ? <div class="rules">{raw(model.rules.html)}</div> : null}
   </>
 );

@@ -230,6 +230,11 @@ export const RulesView: FC<{ tournament: Tournament }> = ({ tournament }) => {
       </div>
       <div class="card stack">
         <h2>Reglamento</h2>
+        <label class="f" style="display:flex;gap:6px;align-items:center">
+          <input type="hidden" name="show_tiebreak_present" value="1" />
+          <input type="checkbox" name="show_tiebreak_box" value="1" checked={tournament.showTiebreakBox} />
+          Mostrar el cuadro «Desempate» en la página pública
+        </label>
         <p class="muted" style="margin:0;font-size:12px">
           Se muestra en la pestaña «Reglas» de la web pública. Lo que pegues de Word o WhatsApp se limpia: solo quedan los
           estilos de la barra.

@@ -54,6 +54,13 @@ describe('tournament rules', () => {
     expect(repo.getTournamentById(t.id)).toEqual(updated);
   });
 
+  it('shows the tiebreak box by default and can hide it', () => {
+    const t = repo.createTournament({ name: 'Cup', slug: 'cup' });
+    expect(t.showTiebreakBox).toBe(true);
+    expect(repo.updateTournament(t.id, { showTiebreakBox: false }).showTiebreakBox).toBe(false);
+    expect(repo.updateTournament(t.id, { pointsWin: 2 }).showTiebreakBox).toBe(false);
+  });
+
   it('rejects an invalid number of legs', () => {
     const t = repo.createTournament({ name: 'Cup', slug: 'cup' });
     expect(() => repo.updateTournament(t.id, { groupLegs: 3 as 1 })).toThrow();

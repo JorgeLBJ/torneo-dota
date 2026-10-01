@@ -218,6 +218,8 @@ export interface PublicModel {
     legendTiebreak: string;
     /** The rulebook as sanitized HTML (the rich text, or the old text converted). */
     html: string;
+    /** Show the auto-generated "Desempate" box in the Reglas tab. */
+    showTiebreakBox: boolean;
     qualifiers: number;
     pointsWin: string;
     pointsLoss: string;
@@ -466,6 +468,7 @@ function buildRules(state: TournamentState): PublicModel['rules'] {
     tiebreakers: tournament.tiebreakers.map((k) => TIEBREAK_LONG[k]),
     legendTiebreak: tournament.tiebreakers.map((k) => TIEBREAK_SHORT[k]).join(', luego '),
     html: rulebookHtmlOf(tournament),
+    showTiebreakBox: tournament.showTiebreakBox,
     qualifiers: tournament.qualifiers,
     pointsWin: points(tournament.pointsWin),
     pointsLoss: points(tournament.pointsLoss),
