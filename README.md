@@ -62,7 +62,7 @@ Lista de pasos para un torneo nuevo (en el panel):
 
 - [ ] **Torneos**: crear el torneo y marcarlo como activo
 - [ ] **Configuración**: nombre, slug, juego, zona horaria, días del calendario y horas de inicio
-- [ ] **Reglas**: puntos, criterios de desempate, formato (una o dos vueltas), texto del reglamento
+- [ ] **Reglas**: puntos, criterios de desempate, formato (una o dos vueltas), reglamento con formato
 - [ ] **Equipos**: agregar los equipos y elegir un emblema de héroe para cada uno
 - [ ] **Fixture**: generarlo y, si hace falta, ajustarlo a mano
 - [ ] **Resultados**: registrar los resultados a medida que terminan los partidos
@@ -128,6 +128,10 @@ Las páginas públicas no envían cabeceras que impidan incrustarlas, por lo que
 
 **Privacidad.** OpenDota solo tiene las partidas de jugadores que activaron **«Exponer datos públicos de partidas»** (en Dota 2: Ajustes > Opciones > Avanzadas). Si ningún jugador lo activó, la partida no se encuentra o sus jugadores salen como «Anónimo». De cada partida se guarda solo lo necesario para mostrarla: nick público, héroe, kills/deaths/asistencias, nivel, oro y experiencia por minuto, last hits/denies, daño, baneos, duración y primera sangre; no se guardan IDs de cuenta ni la respuesta completa del proveedor. Las consultas a OpenDota se hacen siempre desde el servidor (timeout de 8 s, un reintento ante errores 5xx, caché de 10 minutos) y con límite de frecuencia por administrador.
 
+### Reglamento con formato
+
+En **Reglas** el reglamento se escribe con un editor de botones (título, subtítulo, negrita, cursiva, subrayado, tachado, listas con viñetas o numeradas con sangría, resaltado dorado/verde/rojo, nota destacada, enlace, separador y quitar formato) y una vista previa que usa la misma hoja de estilos (`public/rulebook.css`) y las mismas fuentes que la web pública. Lo que se pega de Word o WhatsApp se limpia en el navegador, y el servidor vuelve a filtrarlo al guardar y al mostrarlo con una lista estricta de etiquetas (sin scripts, estilos, imágenes ni enlaces `javascript:`; los enlaces solo `http(s)` y `mailto`, siempre con `rel="noopener noreferrer"`). El límite es de 60 000 caracteres. Un reglamento escrito con la sintaxis anterior (`## Título`, `- ítem`) se convierte solo hasta que se guarde desde el editor.
+
 ### Zonas horarias
 
 | Dónde | Comportamiento |
@@ -146,9 +150,9 @@ Cambiar la zona de un torneo mantiene los partidos existentes en el mismo instan
 
 ### Partida en vivo
 
-Los datos en vivo de Dota no se pueden obtener solos (OpenDota solo lista las partidas de alto ranking, nunca las privadas), así que el admin marca cuál se está jugando. En **Resultados** (o **Playoffs**), pulsa **▶ Marcar en vivo** en el juego que empieza; se habilita cuando están los dos equipos y solo para el siguiente juego sin resultado de la serie. Marcar otro partido reemplaza al actual, y **■ Quitar en vivo** lo apaga a mano. Se apaga solo al guardar el resultado de ese juego y si se borra el resultado, cambian los equipos o se reinician los playoffs.
+Los datos en vivo de Dota no se pueden obtener solos (OpenDota solo lista las partidas de alto ranking, nunca las privadas), así que el admin marca cuál se está jugando. En **Resultados** (o **Playoffs**), pulsa **▶ Marcar en vivo** en el juego que empieza; se habilita cuando están los dos equipos y solo para el siguiente juego sin resultado de la serie. Se pueden marcar varios partidos a la vez (uno por partido), y **■ Quitar en vivo** apaga el de ese partido a mano. Si hay transmisión, **📺 Pasar al stream** marca cuál de los partidos en vivo es el que se está transmitiendo (solo uno a la vez; es opcional). Se apaga solo al guardar el resultado de ese juego y si se borra el resultado, cambian los equipos o se reinician los playoffs.
 
-En el sitio público aparece una franja sobre el reproductor (fase, equipos, marcador y juegos de la serie, y «Empezó hace N min»), la tarjeta del partido se resalta con «En juego» y todas las pestañas muestran un aviso con enlace. Sin partida marcada, nada de esto aparece. Con `prefers-reduced-motion` no hay parpadeo.
+En el sitio público, la pestaña «En vivo» lista una fila por partido en juego sobre el reproductor (el de la transmisión primero y en violeta, con el rótulo «En transmisión: A vs B» sobre el video), las tarjetas se resaltan con «En juego» y todas las pestañas muestran un aviso con enlace («En juego: A vs B» o «N partidas en juego»). Sin partida marcada, nada de esto aparece. Con `prefers-reduced-motion` no hay parpadeo.
 
 ### Transmisión en vivo
 
