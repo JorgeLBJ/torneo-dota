@@ -39,7 +39,8 @@ export const PlayoffsView: FC<PlayoffsViewProps> = ({ tournament, state, slots, 
       prefix={seedPrefix}
       match={stored(slot)}
       matchId={slot.matchId}
-      live={tournament.live}
+      live={state.liveMarks.find((mark) => mark.matchId === slot.matchId) ?? null}
+      onStream={slot.matchId !== null && tournament.streamMatchId === slot.matchId}
       now={now}
       games={state.gamesByMatch.get(slot.matchId ?? -1) ?? []}
       length={phase === 'final' ? tournament.finalGames : tournament.semifinalGames}

@@ -1,4 +1,5 @@
 import type { Game, Match, ScheduleDay, Team, TiebreakerKey } from '../db/repository.js';
+import type { LiveMark } from '../domain/live.js';
 import { resolveSeries, seriesLengthFor, type SeriesLength } from '../domain/series.js';
 import { describeStream, type StreamView } from '../domain/stream.js';
 import { zonedToUtc } from '../format/timezone.js';
@@ -91,6 +92,8 @@ export interface PublicLive {
   series: PublicSeries | null;
   /** ISO UTC instant the admin marked it. */
   startedAt: string;
+  /** This is the match on the stream (at most one live match is). */
+  inStream: boolean;
 }
 
 export interface PublicMatch {
@@ -110,8 +113,10 @@ export interface PublicMatch {
   isTiebreak: boolean;
   series: PublicSeries | null;
   hasDetail: boolean;
-  /** The game being played now when this is the live match, otherwise null. */
+  /** The game being played now when this match is live, otherwise null. */
   liveGame: number | null;
+  /** This live match is the one on the stream. */
+  inStream: boolean;
 }
 
 export interface PublicRound {
@@ -164,6 +169,7 @@ export interface BracketMatchView {
   series: PublicSeries | null;
   hasDetail: boolean;
   liveGame: number | null;
+  inStream: boolean;
   /** ISO UTC start; the visible `when` text is the server-side (tournament zone) fallback. */
   startsAt: string | null;
   when: string | null;
@@ -190,8 +196,8 @@ export interface PublicModel {
   /** The tournament's live stream, ready to embed, or null. */
   stream: StreamView | null;
   phases: PublicPhase[];
-  /** What is being played right now, or null. */
-  live: PublicLive | null;
+  /** The games being played right now: the one on the stream first, then by start. Empty when nothing is live. */
+  live: PublicLive[];
   progress: { played: number; total: number; percent: number };
   teams: Team[];
   days: PublicDay[];
@@ -273,7 +279,8 @@ function buildDays(state: TournamentState, live: Set<number>, nextRound: number 
     isTiebreak: m.isTiebreak,
     series: buildSeries(state, m),
     hasDetail: hasDetail(state, m.id),
-    liveGame: state.tournament.live?.matchId === m.id ? state.tournament.live.gameNumber : null,
+    liveGame: liveGameOf(state, m.id),
+    inStream: inStreamOf(state, m.id),
   });
 
   const byDate = new Map<string | null, Match[]>();
@@ -388,7 +395,8 @@ function buildBracket(state: TournamentState, days: ScheduleDay[]): PublicModel[
       matchId: stored?.id ?? null,
       series,
       hasDetail: stored ? hasDetail(state, stored.id) : false,
-      liveGame: stored && state.tournament.live?.matchId === stored.id ? state.tournament.live.gameNumber : null,
+      liveGame: stored ? liveGameOf(state, stored.id) : null,
+      inStream: stored ? inStreamOf(state, stored.id) : false,
       startsAt: startsAt('semifinal', i + 1),
       when: when('semifinal', i + 1),
       slots: [view(ids[0], 0), view(ids[1], 1)],
@@ -421,7 +429,8 @@ function buildBracket(state: TournamentState, days: ScheduleDay[]): PublicModel[
       matchId: finalStored?.id ?? null,
       series: finalSeries,
       hasDetail: finalStored ? hasDetail(state, finalStored.id) : false,
-      liveGame: finalStored && state.tournament.live?.matchId === finalStored.id ? state.tournament.live.gameNumber : null,
+      liveGame: finalStored ? liveGameOf(state, finalStored.id) : null,
+      inStream: finalStored ? inStreamOf(state, finalStored.id) : false,
       startsAt: startsAt('final', 1),
       when: when('final', 1),
       slots: [finalView(bracket.final.team1Id, 'Ganador SF1', 0), finalView(bracket.final.team2Id, 'Ganador SF2', 1)],
@@ -469,9 +478,22 @@ function matchLabel(match: Match): string {
   return `Ronda ${match.round} · Partido ${match.matchNumber}`;
 }
 
-function buildLive(state: TournamentState): PublicLive | null {
-  const mark = state.tournament.live;
-  if (!mark) return null;
+const liveGameOf = (state: TournamentState, matchId: number): number | null =>
+  state.liveMarks.find((mark) => mark.matchId === matchId)?.gameNumber ?? null;
+
+const inStreamOf = (state: TournamentState, matchId: number): boolean =>
+  state.tournament.streamMatchId === matchId && state.liveMarks.some((mark) => mark.matchId === matchId);
+
+function buildLive(state: TournamentState): PublicLive[] {
+  const lives: PublicLive[] = [];
+  for (const mark of state.liveMarks) {
+    const live = buildLiveOf(state, mark);
+    if (live) lives.push(live);
+  }
+  return lives;
+}
+
+function buildLiveOf(state: TournamentState, mark: LiveMark): PublicLive | null {
   const match = [...state.allGroupMatches, ...state.playoffMatches].find((m) => m.id === mark.matchId);
   const teamA = match?.team1Id == null ? undefined : state.teamsById.get(match.team1Id);
   const teamB = match?.team2Id == null ? undefined : state.teamsById.get(match.team2Id);
@@ -493,6 +515,7 @@ function buildLive(state: TournamentState): PublicLive | null {
     gameNumber: mark.gameNumber,
     series,
     startedAt: mark.startedAt,
+    inStream: inStreamOf(state, match.id),
   };
 }
 

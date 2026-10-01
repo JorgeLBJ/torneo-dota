@@ -3,7 +3,7 @@ import type { Match } from '../../db/repository.js';
 import { loadState } from '../../services/state.js';
 import { seriesLengthFor } from '../../domain/series.js';
 import { deleteGameResult, saveGameResult } from '../../services/games.js';
-import { clearLive, markLive } from '../../services/live.js';
+import { clearLive, markLive, setStream, unstreamMatch } from '../../services/live.js';
 import { parseGameNumber, readGameForm } from '../game-form.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { isDate, readBody, str } from '../form.js';
@@ -50,6 +50,7 @@ export function resultRoutes(deps: Deps) {
         filter={filter}
         standings={state.standings}
         gamesByMatch={state.gamesByMatch}
+        liveMarks={state.liveMarks}
         now={deps.now()}
       />,
     );
@@ -105,9 +106,17 @@ export function resultRoutes(deps: Deps) {
       setFlash(c, 'error', 'Ese juego no existe.');
       return c.redirect(back, 303);
     }
-    if (str(body, 'action') === 'clear') {
+    const verb = str(body, 'action');
+    if (verb === 'clear') {
       if (clearLive(repo, tournament, match.id, gameNumber)) setFlash(c, 'ok', 'Partida en vivo quitada.');
       else setFlash(c, 'warn', 'Ese partido ya no estaba en vivo.');
+    } else if (verb === 'stream') {
+      const done = setStream(repo, tournament, match.id);
+      if (!done.ok) setFlash(c, 'error', done.error);
+      else setFlash(c, 'ok', `Partido ${match.matchNumber} pasado al stream.`);
+    } else if (verb === 'unstream') {
+      if (unstreamMatch(repo, tournament, match.id)) setFlash(c, 'ok', 'Partida quitada del stream.');
+      else setFlash(c, 'warn', 'Ese partido ya no estaba en el stream.');
     } else {
       const marked = markLive(repo, tournament, match, gameNumber, deps.now());
       if (!marked.ok) setFlash(c, 'error', marked.error);

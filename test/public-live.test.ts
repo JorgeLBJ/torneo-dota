@@ -37,7 +37,7 @@ const groupMatch = (n = 1, round = 1, t1 = a, t2 = b): Match =>
   t.repo.createMatch({ tournamentId: tournament.id, phase: 'group', round, matchNumber: n, team1Id: t1.id, team2Id: t2.id });
 const game = (matchId: number, number: number, winner: Team) =>
   t.repo.saveGame(matchId, { gameNumber: number, winnerId: winner.id, team1Kills: 20, team1Deaths: 10, team2Kills: 10, team2Deaths: 20 });
-const goLive = (m: Match, gameNumber = 1) => t.repo.setLive(tournament.id, { matchId: m.id, gameNumber, startedAt: STARTED });
+const goLive = (m: Match, gameNumber = 1, startedAt = STARTED) => t.repo.setLive(m.id, { gameNumber, startedAt });
 const model = () => buildPublicModel(loadState(t.repo, t.repo.getTournamentById(tournament.id)!), t.repo.listScheduleDays(tournament.id), { now: NOW });
 const home = async () => (await t.get('/')).text();
 const panel = (html: string, key: string) => {
@@ -49,13 +49,13 @@ const panel = (html: string, key: string) => {
 describe('public model: the live game', () => {
   it('is null when nothing is marked', () => {
     groupMatch();
-    expect(model().live).toBeNull();
+    expect(model().live).toEqual([]);
   });
 
   it('a group match: label with round and match, both teams, no series for a best of 1', () => {
     const m = groupMatch(11, 4);
     goLive(m);
-    expect(model().live).toMatchObject({
+    expect(model().live[0]).toMatchObject({
       matchId: m.id,
       phase: 'group',
       label: 'Ronda 4 · Partido 11',
@@ -75,7 +75,7 @@ describe('public model: the live game', () => {
     game(sf2.id, 1, b);
     game(sf2.id, 2, c);
     goLive(sf2, 3);
-    expect(model().live).toMatchObject({
+    expect(model().live[0]).toMatchObject({
       phase: 'semifinal',
       label: 'Semifinal 2 · Juego 3 de 3',
       gameNumber: 3,
@@ -87,10 +87,10 @@ describe('public model: the live game', () => {
     setLengths({ semifinalGames: 1 });
     assignSemifinalTeams(t.repo, tournament, [a.id, d.id, b.id, c.id]);
     goLive(t.repo.listMatches(tournament.id, 'semifinal')[0]!);
-    expect(model().live!.label).toBe('Semifinal 1');
+    expect(model().live[0]!.label).toBe('Semifinal 1');
     const final = t.repo.createMatch({ tournamentId: tournament.id, phase: 'final', round: 1, matchNumber: 1, team1Id: a.id, team2Id: b.id });
     goLive(final, 1);
-    expect(model().live!.label).toBe('Gran final · Juego 1 de 5');
+    expect(model().live.map((l) => l.label)).toEqual(['Semifinal 1', 'Gran final · Juego 1 de 5']);
   });
 
   it('teams carry their group position once the table has results', () => {
@@ -98,7 +98,7 @@ describe('public model: the live game', () => {
     t.repo.recordResult(played.id, { winnerId: b.id, team1Kills: 20, team1Deaths: 10, team2Kills: 10, team2Deaths: 20 });
     const live = groupMatch(2, 2, a, c);
     goLive(live);
-    const { live: view } = model();
+    const view = model().live[0];
     const position = (id: number) => model().standings.findIndex((row) => row.team.id === id) + 1;
     expect(view!.subtitleA).toBe(`${position(a.id)}.º de grupos`);
     expect(view!.subtitleB).toBe(`${position(c.id)}.º de grupos`);
@@ -128,7 +128,7 @@ describe('elapsed time', () => {
   it('is left out, not shown as NaN, when the start or the server clock is unusable', () => {
     goLive(groupMatch());
     expect(strip(() => {})).toContain('Empezó hace');
-    const badStart = strip((m) => { m.live!.startedAt = 'garbage'; });
+    const badStart = strip((m) => { m.live[0]!.startedAt = 'garbage'; });
     expect(badStart).not.toContain('Empezó hace');
     expect(badStart).not.toContain('NaN');
     const badClock = strip((m) => { m.serverNow = ''; });
@@ -149,6 +149,16 @@ describe('share text', () => {
     expect(share.description).toContain('Twitch');
   });
 
+  it('says how many games are on when several are live, and which one is on the stream', () => {
+    const m1 = groupMatch(1, 1, a, b);
+    const m2 = groupMatch(2, 1, c, d);
+    goLive(m1);
+    goLive(m2);
+    expect(buildShare(model()).description).toBe('2 partidas en juego');
+    t.repo.setStream(tournament.id, m2.id);
+    expect(buildShare(model()).description).toBe('2 partidas en juego · En transmisión: Equipo C vs Equipo D');
+  });
+
   it('without a stream it still says who is playing', () => {
     goLive(groupMatch());
     expect(buildShare(model()).description).toContain('En juego: Equipo A vs Equipo B');
@@ -164,33 +174,33 @@ describe('public page: the live strip', () => {
   it('no strip, no notice and no highlighted card when nothing is live', async () => {
     groupMatch();
     const html = await home();
-    expect(html).not.toContain('live-strip');
+    expect(html).not.toContain('live-list');
     expect(html).not.toContain('live-notice');
     expect(html).not.toContain('on-air');
   });
 
-  it('the En vivo tab shows the strip above the player, with the phase, the teams and the elapsed time', async () => {
+  it('the En vivo tab lists the live match above the player, with phase, teams and elapsed time', async () => {
     t.repo.updateTournament(tournament.id, { streamUrl: 'https://www.twitch.tv/nbh_ind' });
     goLive(groupMatch(11, 4));
     const tab = panel(await home(), 'envivo');
-    const strip = tab.indexOf('class="live-strip"');
-    expect(strip).toBeGreaterThan(-1);
-    expect(strip).toBeLessThan(tab.indexOf('data-stream-frame'));
+    const list = tab.indexOf('class="live-list"');
+    expect(list).toBeGreaterThan(-1);
+    expect(list).toBeLessThan(tab.indexOf('data-stream-frame'));
     expect(tab).toContain('En juego');
     expect(tab).toContain('Ronda 4 · Partido 11');
     expect(tab).toContain('Equipo A');
     expect(tab).toContain('Equipo B');
     expect(tab).toMatch(/Empezó hace <b data-live-start="2026-10-03T19:00:00.000Z">23 min<\/b>/);
-    expect(tab).not.toContain('class="ls-series"');
+    expect(tab).not.toContain('En transmisión');
   });
 
-  it('without a configured stream the strip still shows, above the empty state', async () => {
+  it('without a configured stream the list still shows, above the empty state', async () => {
     goLive(groupMatch());
     const tab = panel(await home(), 'envivo');
-    expect(tab.indexOf('class="live-strip"')).toBeLessThan(tab.indexOf('stream-empty'));
+    expect(tab.indexOf('class="live-list"')).toBeLessThan(tab.indexOf('stream-empty'));
   });
 
-  it('a series shows the score and a chip per game, the current one marked', async () => {
+  it('a series row shows the score of the series and its game', async () => {
     assignSemifinalTeams(t.repo, tournament, [a.id, d.id, b.id, c.id]);
     const sf2 = t.repo.listMatches(tournament.id, 'semifinal').find((m) => m.matchNumber === 2)!;
     game(sf2.id, 1, b);
@@ -198,10 +208,26 @@ describe('public page: the live strip', () => {
     goLive(sf2, 3);
     const tab = panel(await home(), 'envivo');
     expect(tab).toContain('Semifinal 2 · Juego 3 de 3');
-    expect(tab).toMatch(/class="ls-series"[^>]*><span>1<\/span><i>–<\/i><span>1<\/span>/);
-    expect(tab).toMatch(/<span class="w1">J1 · Equipo B<\/span>/);
-    expect(tab).toMatch(/<span class="w2">J2 · Equipo C<\/span>/);
-    expect(tab).toMatch(/<span class="now">J3 · ahora<\/span>/);
+    expect(tab).toMatch(/<div class="lr-score"><span>1<\/span><i>–<\/i><span>1<\/span><\/div>/);
+  });
+
+  it('several live matches: one row each, the one on the stream first and in violet with the player caption', async () => {
+    t.repo.updateTournament(tournament.id, { streamUrl: 'https://www.twitch.tv/nbh_ind' });
+    const m1 = groupMatch(1, 1, a, b);
+    const m2 = groupMatch(2, 1, c, d);
+    goLive(m1, 1, '2026-10-03T19:00:00.000Z');
+    goLive(m2, 1, '2026-10-03T19:10:00.000Z');
+    let tab = panel(await home(), 'envivo');
+    expect(tab.match(/class="lrow/g)).toHaveLength(2);
+    expect(tab).not.toContain('En transmisión');
+    expect(tab.indexOf('Equipo A')).toBeLessThan(tab.indexOf('Equipo C'));
+    t.repo.setStream(tournament.id, m2.id);
+    tab = panel(await home(), 'envivo');
+    expect(tab.match(/class="lrow/g)).toHaveLength(2);
+    expect(tab.indexOf('Equipo C')).toBeLessThan(tab.indexOf('Equipo A'));
+    expect(tab).toMatch(/class="lrow tv"/);
+    expect(tab.match(/📺 En transmisión/g)).toHaveLength(2); // the row pill and the player caption
+    expect(tab).toContain('📺 En transmisión: Equipo C vs Equipo D');
   });
 });
 
@@ -223,6 +249,29 @@ describe('public page: cards and the notice', () => {
     const html = await home();
     expect(html).toMatch(/class="bm on-air"/);
     expect(html).toContain('En juego · J3');
+  });
+
+  it('the match on the stream is violet on its card and says so', async () => {
+    const m1 = groupMatch(1, 1, a, b);
+    const m2 = groupMatch(2, 1, c, d);
+    goLive(m1);
+    goLive(m2);
+    t.repo.setStream(tournament.id, m2.id);
+    const html = await home();
+    expect(html.match(/<article class="match[^"]*on-air/g)).toHaveLength(2);
+    expect(html.match(/<article class="match[^"]*on-air tv/g)).toHaveLength(1);
+    expect(html).toMatch(/<span class="now-pill tv">📺 En transmisión<\/span>/);
+  });
+
+  it('the notice counts the games when several are live and links to the stream or to the matches', async () => {
+    goLive(groupMatch(1, 1, a, b));
+    goLive(groupMatch(2, 1, c, d));
+    let html = await home();
+    expect(html).toMatch(/<a class="live-notice" href="#partidos">[^]*2 partidas en juego/);
+    t.repo.updateTournament(tournament.id, { streamUrl: 'https://www.twitch.tv/nbh_ind' });
+    html = await home();
+    expect(html).toMatch(/<a class="live-notice" href="#envivo">[^]*2 partidas en juego[^]*Ver en vivo/);
+    expect(html).not.toContain('En juego: Equipo A vs Equipo B');
   });
 
   it('a notice at the top links to the En vivo tab when there is a stream', async () => {

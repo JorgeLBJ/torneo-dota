@@ -399,3 +399,11 @@ tr.row-msg .flash{margin:0}
 .btn.stop{background:#e5402b;border-color:#e5402b;color:#fff}
 .btn.stop:hover{filter:brightness(1.1);color:#fff}
 .rc .hint{font-size:12px;color:var(--muted)}
+
+/* Several games live at once; the one on the stream is violet (Twitch colour). */
+.rc.tv{border-color:#a970ff;box-shadow:0 0 0 1px rgba(169,112,255,.35)}
+.badge.tv{border-color:#a970ff;background:#a970ff;color:#fff}
+.live-actions{display:flex;flex-wrap:wrap;gap:8px}
+.btn.tv{border-color:#a970ff;color:#c9a8ff}
+.btn.tv:hover{color:#fff;background:rgba(169,112,255,.2)}
+.btn.tv.on{background:#a970ff;color:#fff}

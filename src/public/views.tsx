@@ -150,78 +150,82 @@ export function elapsedText(startedAt: string, nowIso: string): string {
   return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')} min`;
 }
 
-/** The red pulsing pill: "En juego" (plus the game of a series, e.g. "En juego · J3"). */
-const NowPill: FC<{ game?: number | null }> = ({ game = null }) => (
-  <span class="now-pill">
-    <span class="now-dot"></span>En juego{game !== null ? ` · J${game}` : ''}
-  </span>
-);
+/** The red pulsing pill: "En juego" (plus the game of a series, e.g. "En juego · J3"); violet when on the stream. */
+const NowPill: FC<{ game?: number | null; tv?: boolean }> = ({ game = null, tv = false }) =>
+  tv ? (
+    <span class="now-pill tv">📺 En transmisión{game !== null ? ` · J${game}` : ''}</span>
+  ) : (
+    <span class="now-pill">
+      <span class="now-dot"></span>En juego{game !== null ? ` · J${game}` : ''}
+    </span>
+  );
 
-/** Shown on every tab while a game is marked live: who is playing and where to watch (the stream, else the card). */
+/** Shown on every tab while games are live: who is playing (or how many) and where to watch (the stream, else the cards). */
 const LiveNotice: FC<{ model: PublicModel }> = ({ model }) => {
   const { live } = model;
-  if (!live) return null;
-  const href = model.stream ? '#envivo' : live.phase === 'group' ? '#partidos' : '#playoffs';
+  const [first] = live;
+  if (!first) return null;
+  const href = model.stream ? '#envivo' : first.phase === 'group' ? '#partidos' : '#playoffs';
   return (
     <a class="live-notice" href={href}>
       <span>
-        🔴 En juego: {live.teamA.name} vs {live.teamB.name}
+        {live.length === 1 ? `🔴 En juego: ${first.teamA.name} vs ${first.teamB.name}` : `🔴 ${live.length} partidas en juego`}
       </span>
-      <b>{model.stream ? 'Ver en vivo' : 'Ver partido'}</b>
+      <b>{model.stream ? 'Ver en vivo' : live.length === 1 ? 'Ver partido' : 'Ver partidos'}</b>
     </a>
   );
 };
 
-const LiveSide: FC<{ team: Team; subtitle: string; side: 'a' | 'b' }> = ({ team, subtitle, side }) => (
-  <div class={`ls-side ${side}`}>
-    <div class="ls-emb">
+const LiveTeam: FC<{ team: Team; side: 'a' | 'b' }> = ({ team, side }) => (
+  <div class={`lr-team ${side}`}>
+    <div class="lr-emb">
       <Portrait team={team} />
     </div>
-    <div>
+    <div class="lr-name">
       <strong {...fitName(team.name)}>{team.name}</strong>
-      {subtitle ? <small>{subtitle}</small> : null}
     </div>
   </div>
 );
 
-/** The strip above the player: phase, teams, series score and games (best of 3/5 only) and the elapsed time. */
-const LiveStrip: FC<{ live: PublicLive; now: string }> = ({ live, now }) => {
+/** One compact row per live match; the one on the stream is violet. */
+const LiveRow: FC<{ live: PublicLive; now: string }> = ({ live, now }) => {
   const { series, teamA, teamB } = live;
   const elapsed = elapsedText(live.startedAt, now);
-  const chip = (g: { number: number; winnerId: number }) => (
-    <span class={g.winnerId === teamA.id ? 'w1' : 'w2'}>
-      J{g.number} · {g.winnerId === teamA.id ? teamA.name : teamB.name}
-    </span>
-  );
   return (
-    <div class="live-strip">
-      <LiveSide team={teamA} subtitle={live.subtitleA} side="a" />
-      <div class="ls-center">
-        <NowPill />
-        <span class="ls-phase">{live.label}</span>
+    <div class={`lrow ${live.inStream ? 'tv' : ''}`}>
+      <div class="lr-meta">
+        <NowPill tv={live.inStream} />
+        <span class="lr-phase">{live.label}</span>
+      </div>
+      <LiveTeam team={teamA} side="a" />
+      <div class="lr-score">
         {series ? (
           <>
-            <div class="ls-series" aria-label="Marcador de la serie">
-              <span>{series.wins[0]}</span>
-              <i>–</i>
-              <span>{series.wins[1]}</span>
-            </div>
-            <div class="ls-games">
-              {series.games.map(chip)}
-              <span class="now">J{live.gameNumber} · ahora</span>
-            </div>
+            <span>{series.wins[0]}</span>
+            <i>–</i>
+            <span>{series.wins[1]}</span>
           </>
-        ) : null}
-        {elapsed ? (
-          <span class="ls-elapsed">
-            Empezó hace <b data-live-start={live.startedAt}>{elapsed}</b>
-          </span>
-        ) : null}
+        ) : (
+          <i>vs</i>
+        )}
       </div>
-      <LiveSide team={teamB} subtitle={live.subtitleB} side="b" />
+      <LiveTeam team={teamB} side="b" />
+      {elapsed ? (
+        <div class="lr-el">
+          Empezó hace <b data-live-start={live.startedAt}>{elapsed}</b>
+        </div>
+      ) : null}
     </div>
   );
 };
+
+const LiveList: FC<{ live: PublicLive[]; now: string }> = ({ live, now }) => (
+  <div class="live-list">
+    {live.map((item) => (
+      <LiveRow live={item} now={now} />
+    ))}
+  </div>
+);
 
 // ---------- Hero ----------
 
@@ -318,8 +322,8 @@ const MatchCard: FC<{ match: PublicMatch; time: string | null; live: boolean; de
   const running = series !== null && !match.played && series.games.length > 0;
   const teamIds = [match.teamA?.id, match.teamB?.id].filter((id) => id !== undefined).join(' ');
   return (
-    <article class={`match ${match.isNext ? 'is-next' : ''} ${live ? 'is-live' : ''} ${match.liveGame !== null ? 'on-air' : ''}`} data-teams={teamIds} id={`m-${match.id}`}>
-      {match.liveGame !== null ? <NowPill game={match.series ? match.liveGame : null} /> : null}
+    <article class={`match ${match.isNext ? 'is-next' : ''} ${live ? 'is-live' : ''} ${match.liveGame !== null ? (match.inStream ? 'on-air tv' : 'on-air') : ''}`} data-teams={teamIds} id={`m-${match.id}`}>
+      {match.liveGame !== null ? <NowPill game={match.series ? match.liveGame : null} tv={match.inStream} /> : null}
       <MatchSide team={match.teamA} side="a" match={match} index={0} />
       {match.played || running ? (
         <div class="mid">
@@ -427,12 +431,20 @@ const MatchesPanel: FC<{ model: PublicModel }> = ({ model }) => (
 // iframe element across live refreshes (moving or re-creating an iframe would restart the video).
 const StreamPanel: FC<{ model: PublicModel }> = ({ model }) => {
   const { stream } = model;
+  const onStream = model.live.find((l) => l.inStream);
   return (
     <>
       <Section title="En vivo" sub={stream?.label} />
-      {model.live ? <LiveStrip live={model.live} now={model.serverNow} /> : null}
+      {model.live.length > 0 ? <LiveList live={model.live} now={model.serverNow} /> : null}
       {stream ? (
         <>
+          {onStream ? (
+            <p class="stream-now">
+              <span class="now-pill tv">
+                📺 En transmisión: {onStream.teamA.name} vs {onStream.teamB.name}
+              </span>
+            </p>
+          ) : null}
           <div class="stream-frame" data-stream-frame data-embed={stream.embedUrl}>
             <iframe
               src={stream.embedUrl}
@@ -580,8 +592,8 @@ const BracketSlot: FC<{ slot: BracketSlotView }> = ({ slot }) =>
   );
 
 const BracketMatch: FC<{ match: BracketMatchView; detailBase: string }> = ({ match, detailBase }) => (
-  <div class={`bm ${match.liveGame !== null ? 'on-air' : ''}`}>
-    {match.liveGame !== null ? <NowPill game={match.series ? match.liveGame : null} /> : null}
+  <div class={`bm ${match.liveGame !== null ? (match.inStream ? 'on-air tv' : 'on-air') : ''}`}>
+    {match.liveGame !== null ? <NowPill game={match.series ? match.liveGame : null} tv={match.inStream} /> : null}
     <header>
       <span>
         {match.title}

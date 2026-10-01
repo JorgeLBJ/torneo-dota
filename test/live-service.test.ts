@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openDatabase } from '../src/db/open.js';
 import { createRepository, type Match, type Repository, type Team, type Tournament } from '../src/db/repository.js';
 import { saveGameResult } from '../src/services/games.js';
-import { clearLive, markLive } from '../src/services/live.js';
+import { clearLive, clearStream, markLive, setStream } from '../src/services/live.js';
 import { assignSemifinalTeams, clearPlayoffResult, markPlayoffLive, resetPlayoffs } from '../src/services/playoffs.js';
 import { loadState } from '../src/services/state.js';
 
@@ -23,7 +23,8 @@ beforeEach(() => {
 afterEach(() => db.close());
 
 const fresh = () => repo.getTournamentById(tournament.id)!;
-const live = () => fresh().live;
+const lives = () => repo.listLive(tournament.id);
+const live = () => lives()[0] ?? null;
 const groupMatch = (n = 1, t1: number | null = teams[0]!.id, t2: number | null = teams[1]!.id): Match =>
   repo.createMatch({ tournamentId: tournament.id, phase: 'group', round: n, matchNumber: n, team1Id: t1, team2Id: t2 });
 const raw = (winner: number) => ({ winner: String(winner), t1Kills: '20', t1Deaths: '10', t2Kills: '10', t2Deaths: '20' });
@@ -36,12 +37,15 @@ describe('markLive', () => {
     expect(live()).toEqual({ matchId: m.id, gameNumber: 1, startedAt: '2026-10-03T19:00:00.000Z' });
   });
 
-  it('marking another game replaces the current one', () => {
+  it('marking another match keeps the others live: several games at once', () => {
     const m1 = groupMatch(1);
     const m2 = groupMatch(2, teams[2]!.id, teams[3]!.id);
     markLive(repo, fresh(), m1, 1, NOW);
     markLive(repo, fresh(), m2, 1, LATER);
-    expect(live()).toEqual({ matchId: m2.id, gameNumber: 1, startedAt: '2026-10-03T19:30:00.000Z' });
+    expect(lives()).toEqual([
+      { matchId: m1.id, gameNumber: 1, startedAt: '2026-10-03T19:00:00.000Z' },
+      { matchId: m2.id, gameNumber: 1, startedAt: '2026-10-03T19:30:00.000Z' },
+    ]);
   });
 
   it('marking the game that is already live keeps its start time', () => {
@@ -92,6 +96,18 @@ describe('clearLive and the automatic clearing', () => {
     expect(clearLive(repo, fresh(), m.id, 1)).toBe(false);
   });
 
+  it('a stale clear (another match or game) leaves the live games alone', () => {
+    repo.updateTournament(tournament.id, { groupGames: 3 });
+    const m1 = groupMatch(1);
+    const m2 = groupMatch(2, teams[2]!.id, teams[3]!.id);
+    markLive(repo, fresh(), m1, 1, NOW);
+    markLive(repo, fresh(), m2, 1, NOW);
+    expect(clearLive(repo, fresh(), m1.id, 2)).toBe(false);
+    expect(clearLive(repo, fresh(), m1.id, 1)).toBe(true);
+    expect(lives()).toMatchObject([{ matchId: m2.id }]);
+    expect(clearLive(repo, fresh(), 9999, 1)).toBe(false);
+  });
+
   it('saving the result of the live game turns it off through the normal save', () => {
     const m = groupMatch();
     markLive(repo, fresh(), m, 1, NOW);
@@ -107,6 +123,44 @@ describe('clearLive and the automatic clearing', () => {
     expect(live()).toMatchObject({ gameNumber: 2 });
     save(m, 2, teams[1]!);
     expect(live()).toBeNull();
+  });
+});
+
+describe('the match on the stream', () => {
+  it('only a live match of the tournament can be put on the stream; the new one replaces the old', () => {
+    const m1 = groupMatch(1);
+    const m2 = groupMatch(2, teams[2]!.id, teams[3]!.id);
+    expect(setStream(repo, fresh(), m1.id)).toEqual({ ok: false, error: 'Solo se puede pasar al stream una partida en vivo.' });
+    markLive(repo, fresh(), m1, 1, NOW);
+    markLive(repo, fresh(), m2, 1, NOW);
+    expect(setStream(repo, fresh(), m1.id)).toEqual({ ok: true, value: undefined });
+    expect(fresh().streamMatchId).toBe(m1.id);
+    setStream(repo, fresh(), m2.id);
+    expect(fresh().streamMatchId).toBe(m2.id);
+    clearStream(repo, fresh());
+    expect(fresh().streamMatchId).toBeNull();
+    expect(lives()).toHaveLength(2);
+  });
+
+  it('a foreign match is refused', () => {
+    const other = repo.createTournament({ name: 'Otra', slug: 'otra' });
+    const x = repo.createTeam(other.id, { code: 'X', name: 'X' });
+    const y = repo.createTeam(other.id, { code: 'Y', name: 'Y' });
+    const foreign = repo.createMatch({ tournamentId: other.id, phase: 'group', round: 1, matchNumber: 1, team1Id: x.id, team2Id: y.id });
+    repo.setLive(foreign.id, { gameNumber: 1, startedAt: NOW.toISOString() });
+    expect(setStream(repo, fresh(), foreign.id)).toMatchObject({ ok: false });
+  });
+
+  it('clearing the live mark of the stream match, or saving its result, takes it off the stream', () => {
+    const m = groupMatch();
+    markLive(repo, fresh(), m, 1, NOW);
+    setStream(repo, fresh(), m.id);
+    clearLive(repo, fresh(), m.id, 1);
+    expect(fresh().streamMatchId).toBeNull();
+    markLive(repo, fresh(), m, 1, NOW);
+    setStream(repo, fresh(), m.id);
+    save(m, 1, teams[0]!);
+    expect(fresh().streamMatchId).toBeNull();
   });
 });
 
@@ -178,7 +232,7 @@ describe('markPlayoffLive validates before it mutates', () => {
     const after = t.repo.listMatches(tournament.id, 'semifinal').find((m) => m.matchNumber === 1)!;
     expect([after.team1Id, after.team2Id]).toEqual([a!.id, d!.id]);
     expect(t.repo.listGames(sf1.id)).toHaveLength(1);
-    expect(t.repo.getTournamentById(tournament.id)!.live).toBeNull();
+    expect(t.repo.listLive(tournament.id)).toEqual([]);
     t.db.close();
   });
 });

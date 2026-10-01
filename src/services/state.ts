@@ -1,4 +1,5 @@
 import type { Game, Match, Repository, Team, Tournament } from '../db/repository.js';
+import type { LiveMark } from '../domain/live.js';
 import { buildPlayoffs, type Bracket, type PlayoffMatch } from '../domain/playoffs.js';
 import { computeStandings, type StandingRow } from '../domain/standings.js';
 
@@ -17,6 +18,8 @@ export interface TournamentState {
   bracket: Bracket;
   /** The games of every match, in game order. */
   gamesByMatch: Map<number, Game[]>;
+  /** The games being played right now: the one on the stream first, then by the moment they were marked. */
+  liveMarks: LiveMark[];
   /** Group matches without a recorded winner. */
   pendingGroup: number;
   groupComplete: boolean;
@@ -66,6 +69,7 @@ export function loadState(repo: Repository, tournament: Tournament): TournamentS
     standings,
     bracket,
     gamesByMatch,
+    liveMarks: repo.listLive(tournament.id),
     pendingGroup,
     groupComplete: groupMatches.length > 0 && pendingGroup === 0,
   };

@@ -1,4 +1,4 @@
-import type { Child, FC } from 'hono/jsx';
+import type { Child, FC, PropsWithChildren } from 'hono/jsx';
 import type { Game, Match, Team, Tournament } from '../../db/repository.js';
 import type { LiveMark } from '../../domain/live.js';
 import { resolveSeries, seriesLengthFor, type SeriesLength, type SeriesState } from '../../domain/series.js';
@@ -29,8 +29,9 @@ export interface ResultCardProps {
   editHref?: string;
   /** The stored match this card is about (null for a playoff match that does not exist yet). */
   matchId?: number | null;
-  /** The tournament's live game, and the current time to say for how long. */
+  /** The live mark of this match (null when it is not live), whether it is the one on the stream, and the time. */
   live?: LiveMark | null;
+  onStream?: boolean;
   now?: Date;
 }
 
@@ -163,28 +164,40 @@ const seriesLine = (state: SeriesState, team1: Team, team2: Team): string => {
 
 const minutesSince = (iso: string, now: Date): number => Math.max(0, Math.floor((now.getTime() - Date.parse(iso)) / 60000));
 
-/** "▶ Marcar en vivo" / "■ Quitar en vivo" for one game. A separate form: the game form is not nested. */
-const LiveForm: FC<{ action: string; number: number; isLive: boolean; hidden?: Record<string, string> }> = ({ action, number, isLive, hidden }) => (
+/** One button of a live action; each is its own form, because the game form cannot be nested. */
+const LiveButton: FC<PropsWithChildren<{ action: string; number: number; verb: string; cls: string; hidden?: Record<string, string> }>> = ({ action, number, verb, cls, hidden, children }) => (
   <form class="live-form" method="post" action={`${action}/juego/${number}/en-vivo`}>
     {Object.entries(hidden ?? {}).map(([name, value]) => (
       <input type="hidden" name={name} value={value} />
     ))}
-    <input type="hidden" name="action" value={isLive ? 'clear' : 'mark'} />
-    {isLive ? (
-      <button class="btn sm stop" type="submit">
-        ■ Quitar en vivo
-      </button>
-    ) : (
-      <button class="btn sm live" type="submit">
-        ▶ Marcar en vivo
-      </button>
-    )}
+    <input type="hidden" name="action" value={verb} />
+    <button class={`btn sm ${cls}`} type="submit">
+      {children}
+    </button>
   </form>
 );
 
-export const ResultCard: FC<ResultCardProps> = ({ action, header, team1, team2, prefix, match, games = [], length = 1, hidden, editHref, matchId = null, live = null, now = new Date() }) => {
+/** The live actions of one game: mark it, or (when live) remove it and move it on or off the stream. */
+const LiveForm: FC<{ action: string; number: number; isLive: boolean; onStream: boolean; hidden?: Record<string, string> }> = ({ action, number, isLive, onStream, hidden }) =>
+  isLive ? (
+    <div class="live-actions">
+      <LiveButton action={action} number={number} verb="clear" cls="stop" hidden={hidden}>
+        ■ Quitar en vivo
+      </LiveButton>
+      <LiveButton action={action} number={number} verb={onStream ? 'unstream' : 'stream'} cls={onStream ? 'tv on' : 'tv'} hidden={hidden}>
+        {onStream ? '📺 En el stream' : '📺 Pasar al stream'}
+      </LiveButton>
+    </div>
+  ) : (
+    <LiveButton action={action} number={number} verb="mark" cls="live" hidden={hidden}>
+      ▶ Marcar en vivo
+    </LiveButton>
+  );
+
+export const ResultCard: FC<ResultCardProps> = ({ action, header, team1, team2, prefix, match, games = [], length = 1, hidden, editHref, matchId = null, live = null, onStream = false, now = new Date() }) => {
   const saved = match?.winnerId != null;
   const isLive = live !== null && matchId !== null && live.matchId === matchId;
+  const tv = isLive && onStream;
   if (!team1 || !team2) {
     return (
       <div class="rc open">
@@ -212,10 +225,12 @@ export const ResultCard: FC<ResultCardProps> = ({ action, header, team1, team2, 
   const state = resolveSeries(team1.id, team2.id, length, games);
   const byNumber = new Map(games.map((g) => [g.gameNumber, g]));
   return (
-    <div class={`rc series ${saved ? 'saved' : 'open'}${isLive ? ' on' : ''}`}>
+    <div class={`rc series ${saved ? 'saved' : 'open'}${tv ? ' tv' : isLive ? ' on' : ''}`}>
       <div class="rc-top">
         <span>{header}</span>
-        {isLive ? (
+        {tv ? (
+          <span class="badge tv">📺 EN TRANSMISIÓN · {minutesSince(live!.startedAt, now)} min</span>
+        ) : isLive ? (
           <span class="badge live">● EN VIVO · {minutesSince(live!.startedAt, now)} min</span>
         ) : saved ? (
           <span class="pill ok">Guardado</span>
@@ -232,7 +247,7 @@ export const ResultCard: FC<ResultCardProps> = ({ action, header, team1, team2, 
           const thisLive = isLive && live!.gameNumber === number;
           return (
             <>
-              {thisLive || (!game && number === state.nextGame) ? <LiveForm action={action} number={number} isLive={thisLive} hidden={hidden} /> : null}
+              {thisLive || (!game && number === state.nextGame) ? <LiveForm action={action} number={number} isLive={thisLive} onStream={onStream} hidden={hidden} /> : null}
               <GameForm action={action} number={number} multi={multi} team1={team1} team2={team2} prefix={prefix} game={game} hidden={hidden} />
             </>
           );
@@ -246,7 +261,9 @@ export const ResultCard: FC<ResultCardProps> = ({ action, header, team1, team2, 
       })}
       {state.nextGame !== null || isLive ? (
         <span class="hint">
-          {isLive ? 'Al guardar el resultado de este juego, el «en vivo» se apaga solo.' : 'Marcar otro partido reemplaza al actual.'}
+          {isLive
+            ? 'Al guardar el resultado de este juego, el «en vivo» se apaga solo.'
+            : 'Se pueden marcar varios a la vez. Solo uno puede estar «en el stream». Cada uno se apaga al guardar su resultado.'}
         </span>
       ) : null}
     </div>
@@ -306,10 +323,11 @@ export interface ResultsViewProps {
   filter: string;
   standings: StandingRow[];
   gamesByMatch: Map<number, Game[]>;
+  liveMarks: LiveMark[];
   now: Date;
 }
 
-export const ResultsView: FC<ResultsViewProps> = ({ tournament, cards, dates, hasUndated, filter, standings, gamesByMatch, now }) => (
+export const ResultsView: FC<ResultsViewProps> = ({ tournament, cards, dates, hasUndated, filter, standings, gamesByMatch, liveMarks, now }) => (
   <>
     <PageHead
       title="Resultados"
@@ -357,7 +375,8 @@ export const ResultsView: FC<ResultsViewProps> = ({ tournament, cards, dates, ha
           team2={team2}
           match={match}
           matchId={match.id}
-          live={tournament.live}
+          live={liveMarks.find((mark) => mark.matchId === match.id) ?? null}
+          onStream={tournament.streamMatchId === match.id}
           now={now}
           games={gamesByMatch.get(match.id) ?? []}
           length={seriesLengthFor(tournament, match.phase, match.isTiebreak)}

@@ -22,6 +22,8 @@ afterEach(() => t.db.close());
 
 const base = () => `/admin/t/${tournament.id}`;
 const fresh = () => t.repo.getTournamentById(tournament.id)!;
+const lives = () => t.repo.listLive(tournament.id);
+const live = () => lives()[0] ?? null;
 const groupMatch = (n = 1, t1: Team | null = a, t2: Team | null = b): Match =>
   t.repo.createMatch({ tournamentId: tournament.id, phase: 'group', round: n, matchNumber: n, team1Id: t1?.id ?? null, team2Id: t2?.id ?? null });
 const page = async (path = '/resultados?fecha=todos') => (await t.get(`${base()}${path}`, cookie)).text();
@@ -34,7 +36,7 @@ describe('Resultados: marcar en vivo', () => {
     const html = await page();
     expect(html).toContain('▶ Marcar en vivo');
     expect(html).not.toContain('EN VIVO ·');
-    expect(html).toContain('Marcar otro partido reemplaza al actual.');
+    expect(html).toContain('Se pueden marcar varios a la vez.');
   });
 
   it('marking sets the live game, tells the public page and shows the badge with the minutes', async () => {
@@ -43,7 +45,7 @@ describe('Resultados: marcar en vivo', () => {
     t.events.onTournamentChanged(tournament.id, () => changes++);
     const res = await mark(m);
     expect(res.status).toBe(303);
-    expect(fresh().live).toEqual({ matchId: m.id, gameNumber: 1, startedAt: NOW.toISOString() });
+    expect(live()).toEqual({ matchId: m.id, gameNumber: 1, startedAt: NOW.toISOString() });
     expect(changes).toBe(1);
     const html = await page();
     expect(html).toContain('● EN VIVO · 0 min');
@@ -54,23 +56,73 @@ describe('Resultados: marcar en vivo', () => {
 
   it('the badge counts the minutes since it was marked', async () => {
     const m = groupMatch();
-    t.repo.setLive(tournament.id, { matchId: m.id, gameNumber: 1, startedAt: '2026-10-03T19:00:00.000Z' });
+    t.repo.setLive(m.id, { gameNumber: 1, startedAt: '2026-10-03T19:00:00.000Z' });
     expect(await page()).toContain('● EN VIVO · 23 min');
   });
 
-  it('marking another match replaces the current one', async () => {
+  it('marking another match keeps the first one live: several games at once', async () => {
     const m1 = groupMatch(1);
     const m2 = groupMatch(2, c, d);
     await mark(m1);
     await mark(m2);
-    expect(fresh().live!.matchId).toBe(m2.id);
+    expect(lives().map((l) => l.matchId)).toEqual([m1.id, m2.id]);
+    const html = await page();
+    expect(html.match(/● EN VIVO · /g)).toHaveLength(2);
+  });
+
+  it('"Pasar al stream" puts a live match on the stream, only one at a time, and toggles off', async () => {
+    const m1 = groupMatch(1);
+    const m2 = groupMatch(2, c, d);
+    await mark(m1);
+    await mark(m2);
+    const res = await mark(m1, 1, 'stream');
+    expect(res.status).toBe(303);
+    expect(fresh().streamMatchId).toBe(m1.id);
+    let html = await page();
+    expect(html).toContain('📺 EN TRANSMISIÓN · 0 min');
+    expect(html).toContain('📺 En el stream');
+    expect(html).toContain('📺 Pasar al stream');
+    expect(html).toMatch(/class="rc series open tv"/);
+    await mark(m2, 1, 'stream');
+    expect(fresh().streamMatchId).toBe(m2.id);
+    await mark(m2, 1, 'unstream');
+    expect(fresh().streamMatchId).toBeNull();
+    expect(lives()).toHaveLength(2);
+    html = await page();
+    expect(html).not.toContain('EN TRANSMISIÓN');
+  });
+
+  it('the stream button only exists on a live match, and the server refuses a match that is not live', async () => {
+    const m = groupMatch();
+    expect(await page()).not.toContain('Pasar al stream');
+    const res = await mark(m, 1, 'stream');
+    expect(await flashText(t, res, cookie)).toContain('Solo se puede pasar al stream una partida en vivo.');
+    expect(fresh().streamMatchId).toBeNull();
+  });
+
+  it('clearing the live mark of the stream match takes it off the stream', async () => {
+    const m = groupMatch();
+    await mark(m);
+    await mark(m, 1, 'stream');
+    await mark(m, 1, 'clear');
+    expect(fresh().streamMatchId).toBeNull();
+  });
+
+  it('a stale "unstream" for another match leaves the stream alone', async () => {
+    const m1 = groupMatch(1);
+    const m2 = groupMatch(2, c, d);
+    await mark(m1);
+    await mark(m2);
+    await mark(m1, 1, 'stream');
+    await mark(m2, 1, 'unstream');
+    expect(fresh().streamMatchId).toBe(m1.id);
   });
 
   it('"Quitar en vivo" clears it, and clearing nothing is harmless', async () => {
     const m = groupMatch();
     await mark(m);
     await mark(m, 1, 'clear');
-    expect(fresh().live).toBeNull();
+    expect(live()).toBeNull();
     expect((await mark(m, 1, 'clear')).status).toBe(303);
   });
 
@@ -81,18 +133,18 @@ describe('Resultados: marcar en vivo', () => {
     await mark(m2);
     const res = await mark(m1, 1, 'clear');
     expect(await flashText(t, res, cookie)).toContain('Ese partido ya no estaba en vivo.');
-    expect(fresh().live).toMatchObject({ matchId: m2.id, gameNumber: 1 });
+    expect(live()).toMatchObject({ matchId: m2.id, gameNumber: 1 });
     await mark(m2, 2, 'clear');
-    expect(fresh().live).toMatchObject({ matchId: m2.id, gameNumber: 1 });
+    expect(live()).toMatchObject({ matchId: m2.id, gameNumber: 1 });
     await mark(m2, 1, 'clear');
-    expect(fresh().live).toBeNull();
+    expect(live()).toBeNull();
   });
 
   it('saving the result of the live game turns it off by itself', async () => {
     const m = groupMatch();
     await mark(m);
     await t.post(`${base()}/resultados/${m.id}/juego/1`, result(a), cookie);
-    expect(fresh().live).toBeNull();
+    expect(live()).toBeNull();
     expect(await page()).not.toContain('EN VIVO ·');
   });
 
@@ -103,7 +155,7 @@ describe('Resultados: marcar en vivo', () => {
     expect(html).toContain('Se habilita cuando están los dos equipos.');
     const res = await mark(open);
     expect(await flashText(t, res, cookie)).toContain('El partido todavía no tiene los dos equipos definidos.');
-    expect(fresh().live).toBeNull();
+    expect(live()).toBeNull();
   });
 
   it('an already played game has no live button and the server refuses it', async () => {
@@ -120,11 +172,11 @@ describe('Resultados: marcar en vivo', () => {
     expect(await flashText(t, await mark(m, 2), cookie)).toContain('Marca primero el juego 1');
     await t.post(`${base()}/resultados/${m.id}/juego/1`, result(a), cookie);
     await mark(m, 2);
-    expect(fresh().live).toMatchObject({ matchId: m.id, gameNumber: 2 });
+    expect(live()).toMatchObject({ matchId: m.id, gameNumber: 2 });
     const html = await page();
     expect(html).toContain('● EN VIVO');
     await t.post(`${base()}/resultados/${m.id}/juego/2`, result(a), cookie);
-    expect(fresh().live).toBeNull();
+    expect(live()).toBeNull();
     expect(await flashText(t, await mark(m, 3), cookie)).toContain('La serie ya está decidida.');
   });
 
@@ -138,7 +190,7 @@ describe('Resultados: marcar en vivo', () => {
     const other = t.repo.createTournament({ name: 'Otra', slug: 'otra' });
     expect((await t.post(`/admin/t/${other.id}/resultados/${m.id}/juego/1/en-vivo`, { action: 'mark' }, cookie)).status).toBe(404);
     expect(await flashText(t, await mark(m, 9), cookie)).toContain('Ese juego no existe.');
-    expect(fresh().live).toBeNull();
+    expect(live()).toBeNull();
   });
 });
 
@@ -153,12 +205,12 @@ describe('Playoffs: marcar en vivo', () => {
     await setup();
     await markPlayoff('semifinal', 2);
     const sf2 = t.repo.listMatches(tournament.id, 'semifinal').find((m) => m.matchNumber === 2)!;
-    expect(fresh().live).toMatchObject({ matchId: sf2.id, gameNumber: 1 });
+    expect(live()).toMatchObject({ matchId: sf2.id, gameNumber: 1 });
     const html = await (await t.get(`${base()}/playoffs`, cookie)).text();
     expect(html).toContain('● EN VIVO · 0 min');
     expect(html).toContain('■ Quitar en vivo');
     await t.post(`${base()}/playoffs/semifinal/2/juego/1`, result(b), cookie);
-    expect(fresh().live).toBeNull();
+    expect(live()).toBeNull();
   });
 
   it('the final is disabled until both finalists exist', async () => {
@@ -173,9 +225,20 @@ describe('Playoffs: marcar en vivo', () => {
     await setup();
     await markPlayoff('semifinal', 2);
     await markPlayoff('semifinal', 1, 1, 'clear');
-    expect(fresh().live).not.toBeNull();
+    expect(live()).not.toBeNull();
     await markPlayoff('semifinal', 2, 1, 'clear');
-    expect(fresh().live).toBeNull();
+    expect(live()).toBeNull();
+  });
+
+  it('two semifinals can be live together and one goes to the stream', async () => {
+    await setup();
+    await markPlayoff('semifinal', 1);
+    await markPlayoff('semifinal', 2);
+    expect(lives()).toHaveLength(2);
+    await t.post(`${base()}/playoffs/semifinal/2/juego/1/en-vivo`, { action: 'stream' }, cookie);
+    const sf2 = t.repo.listMatches(tournament.id, 'semifinal').find((m) => m.matchNumber === 2)!;
+    expect(fresh().streamMatchId).toBe(sf2.id);
+    expect(lives()[0]!.matchId).toBe(sf2.id);
   });
 
   it('refuses unknown playoff matches and clears by hand', async () => {
@@ -183,6 +246,6 @@ describe('Playoffs: marcar en vivo', () => {
     expect((await markPlayoff('semifinal', 3)).status).toBe(404);
     await markPlayoff('semifinal', 1);
     await markPlayoff('semifinal', 1, 1, 'clear');
-    expect(fresh().live).toBeNull();
+    expect(live()).toBeNull();
   });
 });

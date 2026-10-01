@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup varias en vivo y reglamento</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800;900&family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+  :root { --bg:#07080a; --panel:#0f1114; --panel-2:#15181c; --line:rgba(255,255,255,.08); --line-2:rgba(200,170,110,.28);
+    --fg:#e8e4dc; --muted:#8c8a86; --gold:#c8aa6e; --gold-hi:#f0dcaa; --radiant:#6dbf4b; --dire:#d2452f; --live:#e5402b; --tw:#a970ff;
+    --fd:"Cinzel",serif; --fl:"Barlow Condensed",sans-serif; --fb:"Barlow",system-ui,sans-serif; color-scheme:dark; }
+  * { box-sizing:border-box } body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 var(--fb) }
+  .wrap { max-width:1180px; margin:0 auto; padding:28px 16px 60px; display:grid; gap:48px }
+  .tag { font:600 12px var(--fl); letter-spacing:.2em; text-transform:uppercase; color:var(--muted) }
+  h1.sec { margin:0; font:800 24px var(--fd); letter-spacing:.06em; text-transform:uppercase }
+  .sec-title { display:flex; gap:14px; align-items:baseline; flex-wrap:wrap; border-bottom:1px solid var(--line); padding-bottom:10px; margin-bottom:16px }
+  .note { font:500 13px var(--fl); letter-spacing:.04em; color:var(--muted); margin:10px 0 0 }
+  .switch { display:inline-flex; border:1px solid var(--line-2); margin-left:auto }
+  .switch button { background:none; border:0; color:var(--muted); font:600 12px var(--fl); letter-spacing:.14em; text-transform:uppercase; padding:6px 12px; cursor:pointer }
+  .switch button.on { background:rgba(200,170,110,.14); color:var(--gold-hi) }
+  .pill { display:inline-flex; align-items:center; gap:7px; padding:3px 10px; background:var(--live); color:#fff; font:700 11px var(--fl); letter-spacing:.2em; text-transform:uppercase; white-space:nowrap }
+  .pill.tv { background:var(--tw) }
+  .dot { width:7px; height:7px; border-radius:50%; background:#fff; animation:pulse 1.4s infinite }
+  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.25 } }
+
+  /* notice */
+  .notice { display:flex; gap:12px; align-items:center; justify-content:center; flex-wrap:wrap; padding:10px 16px; border:1px solid rgba(229,64,43,.5); background:rgba(229,64,43,.08); font:600 14px var(--fl); letter-spacing:.12em; text-transform:uppercase }
+  .notice a { background:var(--live); color:#fff; padding:3px 10px; text-decoration:none; font-size:12px }
+
+  /* live list */
+  .live-list { display:grid; gap:8px }
+  .lrow { position:relative; display:grid; grid-template-columns:150px 1fr auto 1fr 120px; align-items:center; gap:14px; padding:10px 16px;
+    background:linear-gradient(180deg,var(--panel-2),var(--panel)); border:1px solid rgba(229,64,43,.35) }
+  .lrow::before,.lrow::after { content:""; position:absolute; top:0; bottom:0; width:3px } .lrow::before { left:0; background:var(--radiant) } .lrow::after { right:0; background:var(--dire) }
+  .lrow.tv { border-color:var(--tw); background:radial-gradient(60% 140% at 50% 0%, rgba(169,112,255,.16), transparent 70%), linear-gradient(180deg,var(--panel-2),var(--panel)); box-shadow:0 0 0 1px rgba(169,112,255,.25) }
+  .lrow .meta { display:grid; gap:4px } .lrow .phase { font:600 12px var(--fl); letter-spacing:.14em; color:var(--gold); text-transform:uppercase }
+  .t { display:flex; align-items:center; gap:10px; min-width:0 } .t.b { flex-direction:row-reverse; text-align:right }
+  .t img { width:72px; aspect-ratio:16/9; object-fit:cover; border:1px solid var(--line) } .t strong { font:800 16px var(--fd); text-transform:uppercase; overflow-wrap:normal }
+  .sc { font:900 26px var(--fd); display:flex; gap:8px; align-items:baseline } .sc i { font-style:normal; color:var(--muted); font-size:16px }
+  .el { font:500 12px var(--fl); letter-spacing:.12em; color:var(--muted); text-transform:uppercase; text-align:right }
+  .player { margin-top:12px; aspect-ratio:16/9; border:1px solid var(--line); background:#000 center/cover; position:relative; display:grid; place-items:center; overflow:hidden }
+  .player::after { content:""; position:absolute; inset:0; background:linear-gradient(180deg,transparent 55%,rgba(0,0,0,.75)) }
+  .play { position:relative; z-index:1; width:72px; height:72px; border-radius:50%; background:rgba(0,0,0,.55); border:2px solid rgba(255,255,255,.8); display:grid; place-items:center; color:#fff; font-size:28px }
+  .player .ch { position:absolute; z-index:1; left:14px; bottom:12px; display:flex; gap:10px; align-items:center; font:600 13px var(--fl); letter-spacing:.12em; color:#ddd; text-transform:uppercase }
+
+  /* cards */
+  .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr)); gap:16px }
+  .match { position:relative; display:grid; grid-template-columns:1fr auto 1fr; background:linear-gradient(180deg,var(--panel-2),var(--panel)); border:1px solid var(--line) }
+  .match::before,.match::after { content:""; position:absolute; top:0; bottom:0; width:3px } .match::before { left:0; background:var(--radiant) } .match::after { right:0; background:var(--dire) }
+  .match.on-air { border-color:rgba(229,64,43,.6); box-shadow:0 0 0 2px rgba(229,64,43,.18), 0 0 26px rgba(229,64,43,.14) }
+  .match.on-air.tv { border-color:var(--tw); box-shadow:0 0 0 2px rgba(169,112,255,.25), 0 0 26px rgba(169,112,255,.18) }
+  .match .ptr { margin:12px; aspect-ratio:16/9; border:1px solid var(--line); overflow:hidden } .match .ptr img { width:100%; height:100%; object-fit:cover; display:block }
+  .match .mid { align-self:center; display:grid; justify-items:center; gap:2px } .match .vs { font:800 22px var(--fd); color:var(--muted) } .match small { font:600 11px var(--fl); letter-spacing:.14em; color:var(--muted); text-transform:uppercase }
+  .match .nm { padding:0 12px 12px; font:700 14px var(--fd); text-transform:uppercase } .match .nm.b { text-align:right }
+  .match .pill { position:absolute; top:-11px; left:50%; transform:translateX(-50%); font-size:10px; padding:2px 9px }
+
+  /* admin */
+  .admin { font-family:"Figtree",system-ui,sans-serif; background:#0c0e18; border:1px dashed #272c45; padding:18px; border-radius:14px; color:#eceef7 }
+  .agrid { display:grid; gap:14px; grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr)) }
+  .rc { background:#141726; border:1px solid #272c45; border-radius:14px; padding:14px; display:grid; gap:10px }
+  .rc.on { border-color:#e5402b } .rc.tv { border-color:#a970ff; box-shadow:0 0 0 1px rgba(169,112,255,.35) }
+  .rc-top { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; color:#8d93b0 }
+  .badge { font-size:11px; font-weight:700; padding:3px 9px; border-radius:99px; border:1px solid #e6b65f; color:#e6b65f; white-space:nowrap }
+  .badge.live { background:#e5402b; border-color:#e5402b; color:#fff } .badge.tv { background:#a970ff; border-color:#a970ff; color:#fff }
+  .team { display:flex; align-items:center; gap:10px; height:38px; padding:0 12px; border:1px solid #272c45; border-radius:10px; font-size:14px }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center }
+  .btn { height:36px; padding:0 14px; border-radius:99px; border:1px solid #272c45; background:transparent; color:#eceef7; font:600 13px "Figtree",sans-serif; cursor:pointer }
+  .btn.live { border-color:#e5402b; color:#ff8a78 } .btn.stop { background:#e5402b; border-color:#e5402b; color:#fff }
+  .btn.tv { border-color:#a970ff; color:#c9a8ff } .btn.tv.on { background:#a970ff; color:#fff } .btn.pri { background:#e6b65f; border-color:#e6b65f; color:#1a1405; margin-left:auto }
+  .hint { font-size:12px; color:#8d93b0 }
+
+  /* rule editor */
+  .ed { display:grid; grid-template-columns:1fr 1fr; gap:14px }
+  .ed-col { display:grid; gap:8px; align-content:start } .ed-col > label { font-size:12px; color:#8d93b0 }
+  .tb { display:flex; flex-wrap:wrap; gap:4px; padding:6px; background:#1b1f33; border:1px solid #272c45; border-radius:10px 10px 0 0 }
+  .tb button { min-width:34px; height:32px; padding:0 9px; border-radius:7px; border:1px solid transparent; background:transparent; color:#d6d9ea; font:600 13px "Figtree",sans-serif; cursor:pointer }
+  .tb button:hover { background:#272c45 } .tb .sep { width:1px; background:#272c45; margin:4px 3px }
+  .tb .sw { width:16px; height:16px; border-radius:4px; display:inline-block; vertical-align:middle }
+  .area { min-height:380px; padding:14px 16px; background:#141726; border:1px solid #272c45; border-top:0; border-radius:0 0 10px 10px; outline:none; font-size:14px; line-height:1.6 }
+  .area h2 { font-size:18px; margin:.6em 0 .3em } .area h3 { font-size:15px; margin:.6em 0 .2em } .area ul, .area ol { padding-left:22px; margin:.3em 0 }
+  .area .callout { border-left:3px solid #e6b65f; background:rgba(230,182,95,.08); padding:8px 12px; border-radius:6px; margin:.6em 0 }
+  .area mark.g { background:none; color:#e6b65f; font-weight:700 } .area mark.r { background:none; color:#6dbf4b; font-weight:700 } .area mark.d { background:none; color:#ff7a66; font-weight:700 }
+  .area a { color:#8fb4ff }
+
+  /* public rulebook */
+  .rules { background:linear-gradient(180deg,var(--panel-2),var(--panel)); border:1px solid var(--line); padding:26px 30px; max-width:820px; font:15px/1.55 var(--fb); color:var(--fg); text-align:left }
+  .rules b, .rules strong { font-weight:700 } .rules p { margin:.5em 0 }
+  /* The admin preview uses the SAME .rules class and fonts as the public page: only the frame differs. */
+  .preview-frame { background:var(--bg); padding:14px; border-radius:10px; border:1px solid #272c45 }
+  .preview-frame .rules { padding:22px 24px; max-width:none }
+  .rules h2 { font:800 22px var(--fd); letter-spacing:.05em; text-transform:uppercase; margin:.4em 0 .5em; color:var(--gold-hi); border-bottom:1px solid var(--line-2); padding-bottom:6px }
+  .rules h3 { font:700 15px var(--fl); letter-spacing:.18em; text-transform:uppercase; color:var(--gold); margin:1.2em 0 .3em }
+  .rules ul, .rules ol { padding-left:24px; margin:.4em 0 } .rules li { margin:.25em 0 } .rules li::marker { color:var(--gold) }
+  .rules .callout { border-left:3px solid var(--gold); background:rgba(200,170,110,.07); padding:10px 14px; margin:1em 0 }
+  .rules mark { background:none; font-weight:700 } .rules mark.g { color:var(--gold-hi) } .rules mark.r { color:var(--radiant) } .rules mark.d { color:var(--dire) }
+  .rules hr { border:0; border-top:1px solid var(--line); margin:1.4em 0 } .rules a { color:var(--gold) }
+
+  @media (max-width:820px) {
+    .lrow { grid-template-columns:1fr auto 1fr; } .lrow .meta { grid-column:1/-1; display:flex; gap:10px; align-items:center; flex-wrap:wrap }
+    .lrow .el { grid-column:1/-1; text-align:left } .t, .t.b { flex-direction:column; text-align:center; gap:6px } .t img { width:64px } .t strong { font-size:13px }
+    .ed { grid-template-columns:1fr }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <section>
+    <div class="sec-title"><h1 class="sec">1 · Varias partidas en vivo</h1><span class="tag">Pestaña «En vivo»</span>
+      <div class="switch" role="group" aria-label="Variante">
+        <button class="on" data-v="tv">Con «En transmisión»</button><button data-v="flat">Todas iguales</button>
+      </div>
+    </div>
+    <div class="notice">🔴 3 partidas en juego <a href="#">Ver en vivo</a></div>
+    <div class="live-list" id="list" style="margin-top:14px"></div>
+    <div class="player" id="player"><div class="play">▶</div><div class="ch"><span class="pill tv" id="tvpill">📺 En transmisión: Bastardigans vs Chacales</span><span>Twitch · nbh_ind</span></div></div>
+    <p class="note" id="vnote"></p>
+  </section>
+
+  <section>
+    <div class="sec-title"><h1 class="sec">2 · Partidos</h1><span class="tag">Cada tarjeta en juego se resalta</span></div>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section>
+    <div class="sec-title"><h1 class="sec">3 · Admin · Resultados</h1><span class="tag">Varias en vivo a la vez</span></div>
+    <div class="admin"><div class="agrid" id="admin"></div></div>
+  </section>
+
+  <section>
+    <div class="sec-title"><h1 class="sec">4 · Admin · Reglamento</h1><span class="tag">Editor con botones (pruébalo: escribe y usa la barra)</span></div>
+    <div class="admin">
+      <div class="ed">
+        <div class="ed-col">
+          <label>Reglamento</label>
+          <div>
+            <div class="tb" id="tb">
+              <button data-b="h2" title="Título">T</button><button data-b="h3" title="Subtítulo" style="font-size:11px">T</button>
+              <span class="sep"></span>
+              <button data-c="bold" title="Negrita"><b>B</b></button><button data-c="italic" title="Cursiva"><i>I</i></button>
+              <button data-c="underline" title="Subrayado"><u>U</u></button><button data-c="strikeThrough" title="Tachado"><s>S</s></button>
+              <span class="sep"></span>
+              <button data-c="insertUnorderedList" title="Lista con viñetas">• —</button><button data-c="insertOrderedList" title="Lista numerada">1.</button>
+              <span class="sep"></span>
+              <button data-m="g" title="Resaltar dorado"><span class="sw" style="background:#e6b65f"></span></button>
+              <button data-m="r" title="Resaltar verde Radiant"><span class="sw" style="background:#6dbf4b"></span></button>
+              <button data-m="d" title="Resaltar rojo Dire"><span class="sw" style="background:#ff7a66"></span></button>
+              <span class="sep"></span>
+              <button data-x="callout" title="Nota destacada">⚠ Nota</button><button data-x="link" title="Enlace">🔗</button><button data-x="hr" title="Separador">―</button>
+              <button data-c="removeFormat" title="Quitar formato">⨯</button>
+            </div>
+            <div class="area" id="area" contenteditable="true"></div>
+          </div>
+          <span class="hint">Lo que pegues de Word o WhatsApp se limpia: solo quedan estos estilos.</span>
+        </div>
+        <div class="ed-col"><label>Vista previa · idéntica a la web pública (mismas fuentes, colores y tamaños)</label><div class="preview-frame"><div class="rules" id="prev"></div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-title"><h1 class="sec">5 · Web pública · Reglas</h1><span class="tag">Con el estilo del sitio</span></div>
+    <div class="rules" id="pub"></div>
+  </section>
+</div>
+
+<script>
+  const H = s => `file:///F:/PROYECTOS_NODE/torneo-dota/public/heroes/${s}.png`;
+  const LIVE = [
+    { phase: 'Semifinal 2 · Juego 3 de 3', a: 'Bastardigans', ha: 'phantom_assassin', b: 'Chacales', hb: 'lina', sc: '1 – 1', min: 23, tv: true },
+    { phase: 'Ronda 6 · Partido 17', a: 'Team Fe', ha: 'juggernaut', b: 'NBH', hb: 'sven', sc: '', min: 18 },
+    { phase: 'Ronda 6 · Partido 18', a: 'Los Sumicos', ha: 'invoker', b: 'Punisher', hb: 'pudge', sc: '', min: 9 },
+  ];
+  let variant = 'tv';
+  function render() {
+    const tv = variant === 'tv';
+    document.getElementById('list').innerHTML = LIVE.map(m => {
+      const isTv = tv && m.tv;
+      return `<div class="lrow ${isTv ? 'tv' : ''}">
+        <div class="meta">${isTv ? '<span class="pill tv">📺 En transmisión</span>' : '<span class="pill"><span class="dot"></span>En juego</span>'}<span class="phase">${m.phase}</span></div>
+        <div class="t"><img src="${H(m.ha)}" alt=""><strong>${m.a}</strong></div>
+        <div class="sc">${m.sc ? m.sc.replace('–', '<i>–</i>') : '<i>vs</i>'}</div>
+        <div class="t b"><img src="${H(m.hb)}" alt=""><strong>${m.b}</strong></div>
+        <div class="el">hace ${m.min} min</div></div>`;
+    }).join('');
+    document.getElementById('tvpill').style.display = tv ? '' : 'none';
+    document.getElementById('vnote').textContent = tv
+      ? 'El admin elige cuál partida va en el stream: esa fila se destaca en violeta (color Twitch) y aparece sobre el reproductor. Las demás siguen como «En juego».'
+      : 'Todas las partidas en juego se ven iguales; el reproductor no dice cuál se está transmitiendo.';
+    document.getElementById('cards').innerHTML = LIVE.map(m => `
+      <article class="match on-air ${tv && m.tv ? 'tv' : ''}">
+        <span class="pill ${tv && m.tv ? 'tv' : ''}">${tv && m.tv ? '📺 En transmisión · J3' : '<span class="dot"></span>En juego' + (m.sc ? ' · J3' : '')}</span>
+        <div class="ptr"><img src="${H(m.ha)}" alt=""></div><div class="mid"><span class="vs">${m.sc || 'VS'}</span><small>${m.phase.split(' · ').pop()}</small></div><div class="ptr"><img src="${H(m.hb)}" alt=""></div>
+        <div class="nm">${m.a}</div><div></div><div class="nm b">${m.b}</div></article>`).join('');
+    document.getElementById('admin').innerHTML = LIVE.map(m => {
+      const isTv = tv && m.tv;
+      return `<div class="rc ${isTv ? 'tv' : 'on'}">
+        <div class="rc-top"><span>${m.phase}</span><span class="badge ${isTv ? 'tv' : 'live'}">${isTv ? '📺 EN TRANSMISIÓN' : '● EN VIVO'} · ${m.min} min</span></div>
+        <div class="team">${m.a}</div><div class="team">${m.b}</div>
+        <div class="row"><button class="btn stop">■ Quitar en vivo</button>${tv ? `<button class="btn tv ${isTv ? 'on' : ''}">📺 ${isTv ? 'En el stream' : 'Pasar al stream'}</button>` : ''}<button class="btn pri">Guardar</button></div>
+      </div>`;
+    }).join('') + `<div class="rc"><div class="rc-top"><span>Ronda 7 · Partido 19</span><span class="badge">PENDIENTE</span></div>
+        <div class="team">Chacales</div><div class="team">Los Pibes</div>
+        <div class="row"><button class="btn live">▶ Marcar en vivo</button><button class="btn pri">Guardar</button></div>
+        <span class="hint">Se pueden marcar varios a la vez. ${tv ? 'Solo uno puede estar «en el stream».' : ''} Cada uno se apaga al guardar su resultado.</span></div>`;
+  }
+  document.querySelectorAll('.switch button').forEach(b => b.onclick = () => {
+    variant = b.dataset.v; document.querySelectorAll('.switch button').forEach(x => x.classList.toggle('on', x === b)); render();
+  });
+  render();
+  document.getElementById('player').style.backgroundImage = `url(file:///F:/PROYECTOS_NODE/torneo-dota/public/img/hero-bg.jpg)`;
+
+  // ---- Rulebook editor demo ----
+  const SAMPLE = `<h2>Reglamento del torneo</h2>
+<p>Bienvenidos al <b>Torneo Dota 2 [NBH-IND]</b>. Lee todo antes de tu primera partida.</p>
+<h3>Formato</h3>
+<ol><li>Fase de grupos: todos contra todos, <mark class="g">al mejor de 1</mark>.</li><li>Semifinales: <mark class="g">al mejor de 3</mark> (1.º vs 4.º, 2.º vs 3.º).</li><li>Final: <mark class="g">al mejor de 5</mark>.</li></ol>
+<h3>Puntos y desempate</h3>
+<ul><li>Victoria: <b>1 punto</b> · Derrota: <b>0</b>.</li><li>Empate en puntos: se define por
+  <ul><li>diferencia de kills y deaths (K−D),</li><li>resultado jugado entre los equipos empatados,</li><li>juego adicional si sigue el empate.</li></ul></li></ul>
+<div class="callout">⚠ <b>Importante:</b> el equipo que no se presente <u>15 minutos</u> después de la hora pierde la partida.</div>
+<h3>Lados</h3>
+<p>El equipo de la izquierda en el fixture elige lado: <mark class="r">Radiant</mark> o <mark class="d">Dire</mark>.</p>
+<hr><p>Dudas: escribe a los organizadores por <a href="#">WhatsApp</a>.</p>`;
+  const area = document.getElementById('area'), prev = document.getElementById('prev'), pub = document.getElementById('pub');
+  area.innerHTML = SAMPLE;
+  const sync = () => { prev.innerHTML = area.innerHTML; pub.innerHTML = area.innerHTML; };
+  sync(); area.addEventListener('input', sync);
+  document.getElementById('tb').addEventListener('mousedown', e => {
+    const b = e.target.closest('button'); if (!b) return; e.preventDefault();
+    if (b.dataset.c) document.execCommand(b.dataset.c);
+    if (b.dataset.b) document.execCommand('formatBlock', false, b.dataset.b);
+    if (b.dataset.m) { const s = getSelection(); if (s.rangeCount && !s.isCollapsed) { const m = document.createElement('mark'); m.className = b.dataset.m; s.getRangeAt(0).surroundContents(m); } }
+    if (b.dataset.x === 'hr') document.execCommand('insertHorizontalRule');
+    if (b.dataset.x === 'link') { const u = prompt('Enlace (https://…)'); if (u) document.execCommand('createLink', false, u); }
+    if (b.dataset.x === 'callout') { const s = getSelection(); const t = s.toString() || 'Escribe aquí la nota'; document.execCommand('insertHTML', false, `<div class="callout">⚠ <b>Importante:</b> ${t}</div>`); }
+    sync();
+  });
+</script>
+</body>
+</html>

@@ -77,11 +77,17 @@ export function buildShare(model: PublicModel | null): Share {
   const liveRound = finished ? undefined : model.days.flatMap((d) => d.rounds).find((r) => r.status === 'live');
 
   // The admin marked a game as being played: say who is playing, before anything derived from the schedule.
-  if (model.live && !finished) {
-    const playing = `En juego: ${model.live.teamA.name} vs ${model.live.teamB.name}`;
+  if (model.live.length > 0 && !finished) {
+    const [first] = model.live;
+    const onStream = model.live.find((l) => l.inStream);
+    const versus = (l: typeof first) => `${l!.teamA.name} vs ${l!.teamB.name}`;
+    const playing =
+      model.live.length === 1
+        ? `En juego: ${versus(first)}`
+        : `${model.live.length} partidas en juego${onStream ? ` · En transmisión: ${versus(onStream)}` : ''}`;
     return {
       title: clip(oneLine(`🔴 EN VIVO · ${state.title}`), 200),
-      description: clip(model.stream ? `${playing} · Míralo en vivo en ${model.stream.label}` : playing, MAX_DESCRIPTION),
+      description: clip(model.stream && model.live.length === 1 ? `${playing} · Míralo en vivo en ${model.stream.label}` : playing, MAX_DESCRIPTION),
     };
   }
   if (liveRound && model.stream) {
