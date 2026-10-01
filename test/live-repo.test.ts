@@ -16,7 +16,7 @@ let c: Team;
 
 beforeEach(() => {
   db = openDatabase(':memory:');
-  repo = createRepository(db);
+  repo = createRepository(db, () => new Date('2026-10-03T21:00:00.000Z'));
   tournament = repo.createTournament({ name: 'Copa', slug: 'copa' });
   a = repo.createTeam(tournament.id, { code: 'A', name: 'Alpha' });
   b = repo.createTeam(tournament.id, { code: 'B', name: 'Bravo' });
@@ -148,14 +148,51 @@ describe('the live mark turns itself off when it stops being true', () => {
     expect(live()).toBeNull();
   });
 
-  it('the next game of a series stays live until it is saved', () => {
+  it('saving the live game of a series that is not decided moves the mark to the next game, now', () => {
     repo.updateTournament(tournament.id, { semifinalGames: 3 });
     const m = match('semifinal');
+    mark(m, 1);
     game(m.id, 1, a);
-    mark(m, 2);
-    expect(live()).toMatchObject({ gameNumber: 2 });
-    game(m.id, 2, b);
+    expect(lives()).toEqual([{ matchId: m.id, gameNumber: 2, startedAt: '2026-10-03T21:00:00.000Z' }]);
+    game(m.id, 2, b); // 1-1: the decider is next
+    expect(lives()).toEqual([{ matchId: m.id, gameNumber: 3, startedAt: '2026-10-03T21:00:00.000Z' }]);
+    game(m.id, 3, a); // decided
     expect(live()).toBeNull();
+  });
+
+  it('the match stays on the stream while its mark advances, and leaves it when the series is decided', () => {
+    repo.updateTournament(tournament.id, { finalGames: 5 });
+    const m = match('final');
+    const other = match('group', 2, [b.id, c.id]);
+    mark(m, 1);
+    mark(other, 1);
+    repo.setStream(tournament.id, m.id);
+    game(m.id, 1, a);
+    expect(stream()).toBe(m.id);
+    expect(lives()[0]).toMatchObject({ matchId: m.id, gameNumber: 2 });
+    game(m.id, 2, a);
+    game(m.id, 3, a); // 3-0 wins a best of 5
+    expect(stream()).toBeNull();
+    expect(lives().map((l) => l.matchId)).toEqual([other.id]);
+  });
+
+  it('a best of 1 (and so a tiebreak game) is cleared, stream included', () => {
+    const m = match('group');
+    mark(m);
+    repo.setStream(tournament.id, m.id);
+    game(m.id, 1, a);
+    expect(live()).toBeNull();
+    expect(stream()).toBeNull();
+  });
+
+  it('saving or correcting a game that is not the live one leaves the mark alone while it stays true', () => {
+    repo.updateTournament(tournament.id, { finalGames: 5 });
+    const m = match('final');
+    game(m.id, 1, a);
+    game(m.id, 2, b);
+    mark(m, 3, '2026-10-03T20:00:00.000Z');
+    game(m.id, 1, b); // correct an earlier game: 1-... still undecided, game 3 still next
+    expect(lives()).toEqual([{ matchId: m.id, gameNumber: 3, startedAt: '2026-10-03T20:00:00.000Z' }]);
   });
 
   it('correcting an earlier game so the series is decided, or the game is no longer next', () => {

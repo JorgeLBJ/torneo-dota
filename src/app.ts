@@ -31,14 +31,14 @@ export const MAX_UPLOAD_BYTES = 30 * 1024 * 1024;
 const IMAGE_UPLOAD_PATH = /^\/admin\/t\/\d+\/equipos\/lote$/; // the Equipos batch save, which may carry cropped images
 
 export function createApp({ db, config }: CreateAppOptions) {
-  const repo = createRepository(db);
+  const now = clockOf(config);
+  const repo = createRepository(db, now);
   const events = createEvents();
   const limiter = new LoginRateLimiter();
   const accountLimiter = new LoginRateLimiter();
   const uploadLimiter = new LoginRateLimiter({ maxFailures: 30, windowMs: 60_000 });
   const images = config.imageStore ?? null;
   const dota = config.dotaSource ?? new CachedDotaSource(new OpenDotaSource());
-  const now = clockOf(config);
   const app = new Hono();
 
   const smallBodies = bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (c) => c.text('La solicitud es demasiado grande.', 413) });

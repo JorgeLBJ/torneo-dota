@@ -38,10 +38,6 @@ export function setStream(repo: Repository, tournament: Tournament, matchId: num
   return ok(undefined);
 }
 
-export function clearStream(repo: Repository, tournament: Tournament): void {
-  repo.setStream(tournament.id, null);
-}
-
 /** Takes a match off the stream only when it is still the one there (a stale button must not remove another). */
 export function unstreamMatch(repo: Repository, tournament: Tournament, matchId: number | null): boolean {
   const current = repo.getTournamentById(tournament.id)?.streamMatchId ?? null;

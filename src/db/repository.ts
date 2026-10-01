@@ -197,7 +197,7 @@ function toTournament(row: TournamentRow): Tournament {
   return { ...row, tiebreakers: [...new Set(known)], isActive: row.isActive === 1 };
 }
 
-export function createRepository(db: Database.Database) {
+export function createRepository(db: Database.Database, now: () => Date = () => new Date()) {
   const q = {
     insertTournament: db.prepare('INSERT INTO tournaments (name, slug, qualifiers) VALUES (@name, @slug, @qualifiers)'),
     tournamentById: db.prepare(`SELECT ${TOURNAMENT_COLS} FROM tournaments WHERE id = ?`),
@@ -437,6 +437,24 @@ export function createRepository(db: Database.Database) {
     if (invalid) clearLiveOf(matchId);
   };
 
+  /**
+   * After a game is saved: when it was the live game of a series that is still open, the mark moves on to the next game
+   * (started now, still on the stream if the match was); otherwise the usual reconciliation turns the mark off.
+   */
+  const advanceLiveAfterSave = (matchId: number, savedGame: number): void => {
+    const match = matchById(matchId);
+    const live = q.liveOfMatch.get(matchId) as { gameNumber: number } | undefined;
+    if (match && live && live.gameNumber === savedGame) {
+      const tournament = requireRow(tournamentById(match.tournamentId), 'Tournament');
+      const length = seriesLengthFor(tournament, match.phase, match.isTiebreak);
+      if (liveEligibility(match.team1Id, match.team2Id, length, gamesOf(matchId), savedGame + 1) === null) {
+        q.setLive.run({ id: matchId, gameNumber: savedGame + 1, startedAt: now().toISOString() });
+        return;
+      }
+    }
+    reconcileLiveOf(matchId);
+  };
+
   const reconcileLive = (tournamentId: number): void => {
     for (const mark of q.liveOfTournament.all(tournamentId) as { matchId: number }[]) reconcileLiveOf(mark.matchId);
   };
@@ -669,7 +687,7 @@ export function createRepository(db: Database.Database) {
         assertWinner(matchId, game.winnerId);
         q.upsertGame.run(gameParams(matchId, game));
         refreshAggregate(matchId);
-        reconcileLiveOf(matchId);
+        advanceLiveAfterSave(matchId, game.gameNumber);
         return requireRow(matchById(matchId), 'Match');
       });
     },

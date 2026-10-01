@@ -93,6 +93,8 @@ export function rulesRoutes(deps: Deps) {
     const submittedHtml = body['rules_html'] === undefined ? undefined : rawStr(body, 'rules_html');
     if (submittedHtml !== undefined && submittedHtml.length > MAX_RULEBOOK_HTML) return error('El reglamento es demasiado largo (máximo 60 000 caracteres).');
     const rulesHtml = submittedHtml === undefined ? tournament.rulesHtml : sanitizeRulebookHtml(submittedHtml);
+    // Escaping can make the cleaned text longer than what was typed: the cap holds for what is stored.
+    if (rulesHtml !== null && rulesHtml.length > MAX_RULEBOOK_HTML) return error('El reglamento es demasiado largo (máximo 60 000 caracteres).');
 
     const groupLegs = Number(legs) as 1 | 2;
     const formatChanged = groupLegs !== tournament.groupLegs && repo.listMatches(tournament.id, 'group').length > 0;

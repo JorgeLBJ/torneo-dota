@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openDatabase } from '../src/db/open.js';
 import { createRepository, type Match, type Repository, type Team, type Tournament } from '../src/db/repository.js';
 import { saveGameResult } from '../src/services/games.js';
-import { clearLive, clearStream, markLive, setStream } from '../src/services/live.js';
+import { clearLive, markLive, setStream } from '../src/services/live.js';
 import { assignSemifinalTeams, clearPlayoffResult, markPlayoffLive, resetPlayoffs } from '../src/services/playoffs.js';
 import { loadState } from '../src/services/state.js';
 
@@ -115,13 +115,13 @@ describe('clearLive and the automatic clearing', () => {
     expect(live()).toBeNull();
   });
 
-  it('the next game of a series is live after the previous one is saved, and turns off with its own result', () => {
+  it('saving the live game moves the mark to the next game while the series is open, and turns off when it is decided', () => {
     repo.updateTournament(tournament.id, { groupGames: 3 });
     const m = groupMatch();
+    markLive(repo, fresh(), m, 1, NOW);
     save(m, 1, teams[0]!);
-    markLive(repo, fresh(), repo.getMatch(m.id)!, 2, NOW);
     expect(live()).toMatchObject({ gameNumber: 2 });
-    save(m, 2, teams[1]!);
+    save(m, 2, teams[0]!); // 2-0
     expect(live()).toBeNull();
   });
 });
@@ -137,7 +137,7 @@ describe('the match on the stream', () => {
     expect(fresh().streamMatchId).toBe(m1.id);
     setStream(repo, fresh(), m2.id);
     expect(fresh().streamMatchId).toBe(m2.id);
-    clearStream(repo, fresh());
+    repo.setStream(tournament.id, null);
     expect(fresh().streamMatchId).toBeNull();
     expect(lives()).toHaveLength(2);
   });
@@ -184,11 +184,13 @@ describe('playoffs', () => {
     expect(live()).toBeNull();
   });
 
-  it('a semifinal game is live until its result is saved', async () => {
+  it('a semifinal game is live until its result is saved, then the next game of the series (best of 3) until it is decided', async () => {
     setup();
     mark('semifinal', 1, 1);
     const sf1 = repo.listMatches(tournament.id, 'semifinal').find((m) => m.matchNumber === 1)!;
     saveGameResult(repo, fresh(), sf1, 1, raw(teams[0]!.id));
+    expect(live()).toMatchObject({ matchId: sf1.id, gameNumber: 2 });
+    saveGameResult(repo, fresh(), repo.getMatch(sf1.id)!, 2, raw(teams[0]!.id));
     expect(live()).toBeNull();
   });
 

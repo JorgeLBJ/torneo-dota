@@ -140,6 +140,24 @@ describe('Resultados: marcar en vivo', () => {
     expect(live()).toBeNull();
   });
 
+  it('saving the live game of an open series advances the badge to the next game, keeping the stream', async () => {
+    t.repo.updateTournament(tournament.id, { groupGames: 3 });
+    const m = groupMatch();
+    await mark(m);
+    await mark(m, 1, 'stream');
+    let changes = 0;
+    t.events.onTournamentChanged(tournament.id, () => changes++);
+    await t.post(`${base()}/resultados/${m.id}/juego/1`, result(a), cookie);
+    expect(live()).toMatchObject({ matchId: m.id, gameNumber: 2, startedAt: NOW.toISOString() });
+    expect(fresh().streamMatchId).toBe(m.id);
+    expect(changes).toBeGreaterThan(0);
+    const html = await page();
+    expect(html).toContain('📺 EN TRANSMISIÓN · 0 min');
+    await t.post(`${base()}/resultados/${m.id}/juego/2`, result(a), cookie);
+    expect(live()).toBeNull();
+    expect(fresh().streamMatchId).toBeNull();
+  });
+
   it('saving the result of the live game turns it off by itself', async () => {
     const m = groupMatch();
     await mark(m);
@@ -201,7 +219,7 @@ describe('Playoffs: marcar en vivo', () => {
   const markPlayoff = (phase: string, number: number, game = 1, action = 'mark') =>
     t.post(`${base()}/playoffs/${phase}/${number}/juego/${game}/en-vivo`, { action }, cookie);
 
-  it('marks a semifinal game; the page shows the badge; saving the game turns it off', async () => {
+  it('marks a semifinal game; the page shows the badge; saving the game moves it to the next game and deciding the series turns it off', async () => {
     await setup();
     await markPlayoff('semifinal', 2);
     const sf2 = t.repo.listMatches(tournament.id, 'semifinal').find((m) => m.matchNumber === 2)!;
@@ -210,6 +228,8 @@ describe('Playoffs: marcar en vivo', () => {
     expect(html).toContain('● EN VIVO · 0 min');
     expect(html).toContain('■ Quitar en vivo');
     await t.post(`${base()}/playoffs/semifinal/2/juego/1`, result(b), cookie);
+    expect(live()).toMatchObject({ matchId: sf2.id, gameNumber: 2 });
+    await t.post(`${base()}/playoffs/semifinal/2/juego/2`, result(b), cookie);
     expect(live()).toBeNull();
   });
 

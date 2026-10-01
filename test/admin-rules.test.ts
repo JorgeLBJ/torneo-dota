@@ -80,6 +80,15 @@ describe('rules screen', () => {
     expect(t.repo.getTournamentById(tournament.id)).toMatchObject({ rulesText: '## Viejo\n- Uno', rulesHtml: '<p>Nuevo</p>' });
   });
 
+  it('the cap also applies to the sanitized output', async () => {
+    // Under the cap as typed, over it once the sanitizer has rebuilt it (every bare "&" becomes "&amp;")
+    const html = '&'.repeat(14000);
+    expect(html.length).toBeLessThan(60000);
+    const res = await t.post(url, { ...base, rules_html: html }, cookie);
+    expect(await flashText(t, res, cookie)).toContain('reglamento');
+    expect(t.repo.getTournamentById(tournament.id)!.rulesHtml).toBeNull();
+  });
+
   it('an emptied rulebook is saved as empty, not converted back from the old text', async () => {
     t.repo.updateTournament(tournament.id, { rulesText: '## Viejo\n- Uno' });
     await t.post(url, { ...base, rules_html: '' }, cookie);

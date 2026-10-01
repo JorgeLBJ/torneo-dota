@@ -119,6 +119,17 @@ describe('public model: the live game', () => {
   });
 });
 
+describe('after the live game of a series is saved', () => {
+  it('the public row and phase label show the next game', () => {
+    assignSemifinalTeams(t.repo, tournament, [a.id, d.id, b.id, c.id]);
+    const sf2 = t.repo.listMatches(tournament.id, 'semifinal').find((m) => m.matchNumber === 2)!;
+    goLive(sf2, 1);
+    expect(model().live[0]!.label).toBe('Semifinal 2 · Juego 1 de 3');
+    game(sf2.id, 1, b);
+    expect(model().live[0]).toMatchObject({ label: 'Semifinal 2 · Juego 2 de 3', gameNumber: 2 });
+  });
+});
+
 describe('elapsed time', () => {
   const strip = (mutate: (m: ReturnType<typeof model>) => void) => {
     const m = model();
