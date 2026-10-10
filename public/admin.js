@@ -117,23 +117,32 @@
   });
 })();
 
-// Observadores: the .cfg download is built in the browser from the text on the page (the token is never stored
-// server side, so there is no URL that could serve it again).
+// Observadores: the .cfg and the .bat installer are built in the browser from the text on the page (the token is never
+// stored server side, so there is no URL that could serve it again). The installer is saved with CRLF line endings
+// (the HTML parser normalizes them away).
 (function () {
-  var button = document.querySelector('[data-cfg-download]');
-  var source = document.getElementById('cfgText');
-  if (!button || !source) return;
-  button.addEventListener('click', function () {
-    var blob = new Blob([source.textContent], { type: 'text/plain;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var link = document.createElement('a');
-    link.href = url;
-    link.download = button.getAttribute('data-cfg-download');
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-  });
+  function wire(attribute, sourceId, crlf) {
+    var button = document.querySelector('[' + attribute + ']');
+    var source = document.getElementById(sourceId);
+    if (!button || !source) return;
+    button.addEventListener('click', function () {
+      var text = source.textContent;
+      if (crlf) text = text.replace(/?
+/g, '
+');
+      var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var link = document.createElement('a');
+      link.href = url;
+      link.download = button.getAttribute(attribute);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    });
+  }
+  wire('data-cfg-download', 'cfgText', false);
+  wire('data-installer-download', 'installerText', true);
 })();
 
 // Team rows (Equipos): every change (fields, hero, uploaded image, removal) is STAGED in its row. Nothing is saved

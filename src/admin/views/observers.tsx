@@ -8,6 +8,8 @@ export interface CreatedObserver {
   token: string;
   cfg: string;
   filename: string;
+  installer: string;
+  installerFilename: string;
 }
 
 const CreatedPanel: FC<{ created: CreatedObserver }> = ({ created }) => (
@@ -18,22 +20,42 @@ const CreatedPanel: FC<{ created: CreatedObserver }> = ({ created }) => (
     </div>
     <ol>
       <li>
-        Descarga <b>{created.filename}</b> y cópialo en la carpeta{' '}
-        <code>…\steamapps\common\dota 2 beta\game\dota\cfg\gamestate_integration\</code> (créala si no existe).
+        Descarga el instalador y ábrelo (doble clic). Si Windows muestra «Windows protegió su PC», pulsa <b>Más información</b> y luego{' '}
+        <b>Ejecutar de todas formas</b>.
       </li>
       <li>
-        En Steam, abre las propiedades de Dota 2 y agrega la opción de lanzamiento <code>-gamestateintegration</code>.
+        Abre Dota desde el acceso directo <b>Dota 2 (Torneo)</b> del escritorio (siempre desde ahí durante el torneo).
       </li>
-      <li>Reinicia Dota 2 y entra a la sala de la partida como espectador. Debe quedarse mirando la partida hasta el final.</li>
+      <li>Entra al lobby como espectador y quédate hasta el final de la partida.</li>
     </ol>
     <p>
-      <button class="btn pri" type="button" data-cfg-download={created.filename}>
-        Descargar .cfg
+      <button class="btn pri" type="button" data-installer-download={created.installerFilename}>
+        Descargar instalador (.bat)
       </button>
     </p>
+    <p class="muted">El instalador contiene el token de este observador: no lo compartas.</p>
     <details>
-      <summary>Ver contenido del archivo</summary>
+      <summary>Instalación manual</summary>
+      <ol>
+        <li>
+          Descarga <b>{created.filename}</b> y cópialo en la carpeta{' '}
+          <code>…steamappscommondota 2 betagamedotacfggamestate_integration</code> (créala si no existe).
+        </li>
+        <li>
+          En Steam, abre las propiedades de Dota 2 y agrega la opción de lanzamiento <code>-gamestateintegration</code>.
+        </li>
+        <li>Reinicia Dota 2 y entra a la sala de la partida como espectador.</li>
+      </ol>
+      <p>
+        <button class="btn" type="button" data-cfg-download={created.filename}>
+          Descargar .cfg
+        </button>
+      </p>
+    </details>
+    <details>
+      <summary>Ver contenido de los archivos</summary>
       <pre id="cfgText" data-token={created.token}>{created.cfg}</pre>
+      <pre id="installerText">{created.installer}</pre>
     </details>
   </section>
 );

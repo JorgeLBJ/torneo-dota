@@ -35,6 +35,13 @@ describe('Observadores screen', () => {
     expect(html).toContain('gamestate_integration_torneo.cfg');
     expect(html).toContain('-gamestateintegration');
     expect(html).toContain('Descargar .cfg');
+    expect(html).toContain('Descargar instalador (.bat)');
+    expect(html).toMatch(/data-installer-download="instalar-observador-torneo-juan\.bat"/);
+    expect(html).toContain('id="installerText"');
+    expect(html).toContain('-applaunch 570 -gamestateintegration');
+    expect(html).toContain('Instalación manual');
+    expect(html).toContain('Ejecutar de todas formas');
+    expect(html).toContain('Dota 2 (Torneo)');
     expect(res.headers.get('cache-control')).toBe('no-store');
 
     // Stored hashed, never in plaintext.
