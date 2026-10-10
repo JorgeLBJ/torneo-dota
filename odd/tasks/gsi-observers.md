@@ -91,6 +91,9 @@ Tournament games are private lobbies. Valve's `GetMatchDetails` answers `500 {}`
 - Hero portraits on the capture detail (376b4dc, RED test then GREEN) and aligned Radiant/Dire columns (53df141); checked in the browser on the real capture 9037383577. User asked to keep the read-only 'Vinculada a' (kept).
 - Native review T7 + portraits (base 578844e, medium, slice budget, granted): approved, acknowledged (lineage review-dc3c00e141c71cec). Advisory: the Resultados hint shows on a final capture even when the mapper cannot convert it (src/admin/views/captures.tsx:269-273).
 
+- T8 parent check: vitest 1143 passed / 1 pre-existing fail; typecheck clean; browser on :3417: a new capture posted while /admin/capturas was open appeared without reload with the cap-new animation (class added then removed).
+- Native review T8 (base 53df141, medium, granted): approved, acknowledged (lineage review-3a44af1348f5923d). Advisory fixed in e238953: a change arriving during an in-flight refresh was dropped (final state could stay 'En curso') and changes during an SSE reconnect were missed; now a missed flag re-triggers after the fetch and the 'hello' on reconnect triggers a refresh. Verified in the browser: in-progress then final posted 150 ms apart -> row shows FINALIZADA. Remaining advisories: client code has no DOM tests; details restore by index; a dangling read in test/admin-captures-live.test.ts.
+
 ## Next step
 - Capture a real spectator POST_GAME payload, replace the synthetic fixture and adjust `src/dota/gsi.ts`; decide on pushing / PR slicing (user).
 
