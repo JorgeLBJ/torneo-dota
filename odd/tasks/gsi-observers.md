@@ -96,6 +96,9 @@ Tournament games are private lobbies. Valve's `GetMatchDetails` answers `500 {}`
 
 - User confirmed 2026-10-10 on their own PC: with Capturas GSI open (page loaded after the T8 restart), watching another replay made the capture appear and update live without F5. Earlier F5 was needed only because that tab predated the T8 server restart.
 
+- DELIVERED 2026-10-10: feat/gsi-observers fast-forwarded into main (b10c500..521d034), branch deleted, pushed. VPS: pre-deploy backup ~/backups/torneos-2026-10-10-0256-pre-gsi.db; `docker compose build --pull && up -d`; container healthy, user_version 12 -> 14, 21 matches intact, on mbd_edge. Public checks: /healthz 200, POST /gsi without token 401, /admin/capturas 303 (login), / 200.
+- Still unverified in prod: a Dota client posting to the https uri (first observer test with a prod token). e238953 (live-refresh fix) stays under the review budget, pending.
+
 ## Next step
 - Capture a real spectator POST_GAME payload, replace the synthetic fixture and adjust `src/dota/gsi.ts`; decide on pushing / PR slicing (user).
 
