@@ -98,6 +98,8 @@ td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
 .hero:hover{border-color:var(--gold)}
 .hero.sel{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
 .hero.taken{opacity:.3;cursor:not-allowed}
+.cap-hero{display:inline-flex;align-items:center;gap:10px;white-space:nowrap}
+.cap-hero img{width:48px;aspect-ratio:16/9;object-fit:cover;border-radius:4px;flex-shrink:0}
 
 @media (max-width:760px){
   .shell{grid-template-columns:1fr}

@@ -171,6 +171,14 @@ describe('Capture detail', () => {
     expect(html).toContain('15.0k');
   });
 
+  it('shows each hero with its portrait next to the name', async () => {
+    capture(9028047526, { final: true });
+    const html = await (await t.get('/admin/capturas/9028047526', cookie)).text();
+    expect(html).toMatch(/<img[^>]+src="\/assets\/heroes\/axe\.png"/);
+    expect(html).toMatch(/<img[^>]+src="\/assets\/heroes\/crystal_maiden\.png"/);
+    expect(html).toContain('Crystal Maiden');
+  });
+
   it('keeps the raw JSON collapsed and escaped', async () => {
     const state = sample();
     state.player.team2.player0.name = '<script>alert(1)</script>';

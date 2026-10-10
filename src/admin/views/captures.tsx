@@ -5,6 +5,7 @@ import type { DotaPlayerLine } from '../../dota/snapshot.js';
 import { formatDuration } from '../../dota/import.js';
 import { formatDateTime } from '../../format/datetime.js';
 import type { CaptureState } from '../../gsi/state.js';
+import { heroImage } from './parts.js';
 
 export type CaptureFilter = 'todas' | 'en-curso' | 'sin-vincular' | 'vinculadas';
 
@@ -208,7 +209,12 @@ const SideTable: FC<{ side: 'radiant' | 'dire'; players: DotaPlayerLine[]; won: 
           {players.map((p) => (
             <tr>
               <td data-label="Jugador">{p.nick ?? <span class="muted">—</span>}</td>
-              <td data-label="Héroe">{p.heroName}</td>
+              <td data-label="Héroe">
+                <span class="cap-hero">
+                  {p.heroSlug ? <img src={heroImage(p.heroSlug)} alt="" loading="lazy" /> : null}
+                  {p.heroName}
+                </span>
+              </td>
               <td data-label="Nivel">{p.level}</td>
               <td data-label="K / D / A">
                 {p.kills} / {p.deaths} / {p.assists}
