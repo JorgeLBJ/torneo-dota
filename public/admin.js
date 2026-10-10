@@ -1270,6 +1270,9 @@
   var REFRESH_MS = 3000;
   var source = null;
   var inFlight = false;
+  // A change that arrived while a refresh was in flight: refresh once more when it ends, so the last
+  // state (e.g. the final one) is never lost.
+  var missed = false;
   var stopped = false;
 
   function rowKeys(root) {
@@ -1357,7 +1360,11 @@
   }
 
   function refresh() {
-    if (inFlight || stopped) return;
+    if (stopped) return;
+    if (inFlight) {
+      missed = true;
+      return;
+    }
     if (busy()) {
       // A dialog is open: try again later instead of destroying it.
       window.setTimeout(function () {
@@ -1380,6 +1387,10 @@
       .catch(function () {})
       .then(function () {
         inFlight = false;
+        if (missed) {
+          missed = false;
+          throttle.trigger();
+        }
       });
   }
 
@@ -1400,6 +1411,12 @@
   }
 
   source = new EventSource('/admin/capturas/eventos');
+  // `hello` arrives on every (re)connect; after a reconnect, changes sent while disconnected were missed.
+  var connectedOnce = false;
+  source.addEventListener('hello', function () {
+    if (connectedOnce) throttle.trigger();
+    connectedOnce = true;
+  });
   source.addEventListener('change', function () {
     throttle.trigger();
   });
