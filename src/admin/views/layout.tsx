@@ -38,7 +38,7 @@ export interface NavInfo {
   publicUrl?: string;
 }
 
-export type Section = 'torneos' | 'config' | 'reglas' | 'equipos' | 'fixture' | 'resultados' | 'playoffs' | 'usuarios' | 'cuenta';
+export type Section = 'torneos' | 'config' | 'reglas' | 'equipos' | 'fixture' | 'resultados' | 'playoffs' | 'usuarios' | 'observadores' | 'cuenta';
 
 interface LayoutProps {
   title: string;
@@ -48,7 +48,7 @@ interface LayoutProps {
   flash?: Flash;
 }
 
-const SECTIONS: { key: Exclude<Section, 'torneos' | 'usuarios' | 'cuenta'>; path: string; label: string }[] = [
+const SECTIONS: { key: Exclude<Section, 'torneos' | 'usuarios' | 'observadores' | 'cuenta'>; path: string; label: string }[] = [
   { key: 'config', path: 'config', label: 'Configuración' },
   { key: 'reglas', path: 'reglas', label: 'Reglas' },
   { key: 'equipos', path: 'equipos', label: 'Equipos' },
@@ -121,6 +121,9 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, active, admi
                   </a>
                 ))
               : null}
+            <a href="/admin/observadores" class={active === 'observadores' ? 'on' : ''}>
+              Observadores
+            </a>
             <a href="/admin/usuarios" class={active === 'usuarios' ? 'on' : ''}>
               Usuarios
             </a>

@@ -1,0 +1,122 @@
+import type { FC } from 'hono/jsx';
+import type { ObserverToken } from '../../db/repository.js';
+import { formatDateTime } from '../../format/datetime.js';
+
+/** The token and cfg of an observer that was created in this very response. */
+export interface CreatedObserver {
+  name: string;
+  token: string;
+  cfg: string;
+  filename: string;
+}
+
+const CreatedPanel: FC<{ created: CreatedObserver }> = ({ created }) => (
+  <section class="card" aria-labelledby="createdTitle">
+    <h2 id="createdTitle">Token de «{created.name}»</h2>
+    <div class="note" role="alert">
+      Este token se muestra una sola vez y no se guarda en el servidor. Descarga el archivo ahora; si lo pierdes, revoca el token y crea otro.
+    </div>
+    <ol>
+      <li>
+        Descarga <b>{created.filename}</b> y cópialo en la carpeta{' '}
+        <code>…\steamapps\common\dota 2 beta\game\dota\cfg\gamestate_integration\</code> (créala si no existe).
+      </li>
+      <li>
+        En Steam, abre las propiedades de Dota 2 y agrega la opción de lanzamiento <code>-gamestateintegration</code>.
+      </li>
+      <li>Reinicia Dota 2 y entra a la sala de la partida como espectador. Debe quedarse mirando la partida hasta el final.</li>
+    </ol>
+    <p>
+      <button class="btn pri" type="button" data-cfg-download={created.filename}>
+        Descargar .cfg
+      </button>
+    </p>
+    <details>
+      <summary>Ver contenido del archivo</summary>
+      <pre id="cfgText" data-token={created.token}>{created.cfg}</pre>
+    </details>
+  </section>
+);
+
+export const ObserversView: FC<{ observers: ObserverToken[]; created?: CreatedObserver }> = ({ observers, created }) => (
+  <>
+    <div class="head">
+      <div>
+        <h1>Observadores</h1>
+        <p class="sub">
+          Personas que miran cada partida como espectadores. Su cliente de Dota envía el estado del juego a la web para poder importar el resultado.
+        </p>
+      </div>
+    </div>
+    {created ? <CreatedPanel created={created} /> : null}
+    <div class="card scroll-x">
+      <table class="cards">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Token</th>
+            <th>Creado</th>
+            <th>Última señal</th>
+            <th>Estado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {observers.length === 0 ? (
+            <tr>
+              <td colspan={6} class="muted">
+                Aún no hay observadores.
+              </td>
+            </tr>
+          ) : null}
+          {observers.map((o) => (
+            <tr>
+              <td data-label="Nombre">
+                <b>{o.name}</b>
+              </td>
+              <td class="muted" data-label="Token">
+                <code>{o.tokenPrefix}…</code>
+              </td>
+              <td class="muted" data-label="Creado">{formatDateTime(o.createdAt)}</td>
+              <td class="muted" data-label="Última señal">{o.lastSeenAt ? formatDateTime(o.lastSeenAt) : '—'}</td>
+              <td data-label="Estado">
+                {o.revokedAt ? <span class="pill">Revocado</span> : <span class="pill ok">Activo</span>}
+              </td>
+              <td>
+                {o.revokedAt ? null : (
+                  <form method="post" action={`/admin/observadores/${o.id}/revocar`}>
+                    <button class="btn sm danger" type="submit" data-confirm-open={`revokeDialog${o.id}`}>
+                      Revocar
+                    </button>
+                    <dialog id={`revokeDialog${o.id}`} class="confirm-modal" aria-labelledby={`revokeTitle${o.id}`}>
+                      <h2 id={`revokeTitle${o.id}`}>¿Revocar a {o.name}?</h2>
+                      <p>Su cliente de Dota dejará de ser aceptado. Para volver a capturar necesitará un token nuevo.</p>
+                      <div class="actions">
+                        <button class="btn" type="button" autofocus data-confirm-cancel>
+                          Cancelar
+                        </button>
+                        <button class="btn pri" type="submit">
+                          Revocar token
+                        </button>
+                      </div>
+                    </dialog>
+                  </form>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <form class="card row-form" method="post" action="/admin/observadores">
+      <h2>Agregar observador</h2>
+      <label class="f">
+        Nombre del observador
+        <input name="name" autocomplete="off" required maxlength={60} />
+      </label>
+      <button class="btn pri" type="submit">
+        Crear token
+      </button>
+    </form>
+  </>
+);

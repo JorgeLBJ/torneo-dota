@@ -159,6 +159,16 @@ export interface Admin {
   createdAt: string;
 }
 
+export interface ObserverToken {
+  id: number;
+  name: string;
+  /** First characters of the token, to tell tokens apart; the token itself is never stored. */
+  tokenPrefix: string;
+  createdAt: string;
+  lastSeenAt: string | null;
+  revokedAt: string | null;
+}
+
 export interface Session {
   id: string;
   adminId: number;
@@ -177,6 +187,7 @@ const MATCH_COLS = `m.id, m.tournament_id AS tournamentId, m.phase, m.round, m.m
   m.team1_id AS team1Id, m.team2_id AS team2Id, m.winner_id AS winnerId,
   m.team1_kills AS team1Kills, m.team1_deaths AS team1Deaths, m.team2_kills AS team2Kills, m.team2_deaths AS team2Deaths`;
 const MATCH_FROM = 'FROM matches m JOIN tournaments t ON t.id = m.tournament_id';
+const OBSERVER_COLS = `id, name, token_prefix AS tokenPrefix, created_at AS createdAt, last_seen_at AS lastSeenAt, revoked_at AS revokedAt`;
 const ADMIN_COLS = 'id, username, password_hash AS passwordHash, created_at AS createdAt';
 const SESSION_COLS = 'id, admin_id AS adminId, expires_at AS expiresAt';
 
@@ -313,6 +324,12 @@ export function createRepository(db: Database.Database, now: () => Date = () => 
     countAdmins: db.prepare('SELECT COUNT(*) FROM admins').pluck(),
     deleteAdmin: db.prepare('DELETE FROM admins WHERE id = ?'),
     setAdminPassword: db.prepare('UPDATE admins SET password_hash = ? WHERE id = ?'),
+    insertObserver: db.prepare('INSERT INTO observer_tokens (name, token_hash, token_prefix) VALUES (?, ?, ?)'),
+    observerById: db.prepare(`SELECT ${OBSERVER_COLS} FROM observer_tokens WHERE id = ?`),
+    listObservers: db.prepare(`SELECT ${OBSERVER_COLS} FROM observer_tokens ORDER BY id DESC`),
+    activeObserverByHash: db.prepare(`SELECT ${OBSERVER_COLS} FROM observer_tokens WHERE token_hash = ? AND revoked_at IS NULL`),
+    revokeObserver: db.prepare("UPDATE observer_tokens SET revoked_at = datetime('now') WHERE id = ? AND revoked_at IS NULL"),
+    touchObserver: db.prepare("UPDATE observer_tokens SET last_seen_at = datetime('now') WHERE id = ?"),
     deleteOtherSessions: db.prepare('DELETE FROM sessions WHERE admin_id = ? AND id <> ?'),
 
     insertSession: db.prepare('INSERT INTO sessions (id, admin_id, expires_at) VALUES (?, ?, ?)'),
@@ -721,6 +738,22 @@ export function createRepository(db: Database.Database, now: () => Date = () => 
     countAdmins: () => q.countAdmins.get() as number,
     deleteAdmin(id: number): void {
       q.deleteAdmin.run(id);
+    },
+
+    // Observer tokens (Game State Integration)
+    createObserverToken(name: string, tokenHash: string, tokenPrefix: string): ObserverToken {
+      const info = q.insertObserver.run(name, tokenHash, tokenPrefix);
+      return requireRow(q.observerById.get(Number(info.lastInsertRowid)) as ObserverToken | undefined, 'Observer token');
+    },
+    listObserverTokens: () => q.listObservers.all() as ObserverToken[],
+    getObserverToken: (id: number) => q.observerById.get(id) as ObserverToken | undefined,
+    findActiveObserverByHash: (tokenHash: string) => q.activeObserverByHash.get(tokenHash) as ObserverToken | undefined,
+    /** Revoking twice keeps the first revocation time. */
+    revokeObserverToken(id: number): void {
+      q.revokeObserver.run(id);
+    },
+    touchObserverLastSeen(id: number): void {
+      q.touchObserver.run(id);
     },
 
     // Sessions

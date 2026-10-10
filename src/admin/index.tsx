@@ -5,6 +5,7 @@ import { loginRoutes, logoutRoutes, requireAdmin } from './routes/auth.js';
 import { configRoutes } from './routes/config.js';
 import { dotaRoutes } from './routes/dota.js';
 import { fixtureRoutes } from './routes/fixture.js';
+import { observerRoutes } from './routes/observers.js';
 import { playoffRoutes } from './routes/playoffs.js';
 import { resultRoutes } from './routes/results.js';
 import { rulesRoutes } from './routes/rules.js';
@@ -38,6 +39,7 @@ export function adminApp(deps: Deps) {
   app.route('/', logoutRoutes(deps));
   app.use('/t/:tid/*', tournamentScope(deps));
   app.route('/', userRoutes(deps));
+  app.route('/', observerRoutes(deps));
   app.route('/', accountRoutes(deps));
   app.route('/', tournamentListRoutes(deps));
   for (const routes of [configRoutes, streamRoutes, rulesRoutes, teamRoutes, fixtureRoutes, resultRoutes, playoffRoutes, dotaRoutes]) app.route('/t/:tid', routes(deps));

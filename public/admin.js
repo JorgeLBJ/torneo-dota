@@ -117,6 +117,25 @@
   });
 })();
 
+// Observadores: the .cfg download is built in the browser from the text on the page (the token is never stored
+// server side, so there is no URL that could serve it again).
+(function () {
+  var button = document.querySelector('[data-cfg-download]');
+  var source = document.getElementById('cfgText');
+  if (!button || !source) return;
+  button.addEventListener('click', function () {
+    var blob = new Blob([source.textContent], { type: 'text/plain;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = button.getAttribute('data-cfg-download');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  });
+})();
+
 // Team rows (Equipos): every change (fields, hero, uploaded image, removal) is STAGED in its row. Nothing is saved
 // until "Guardar cambios", which sends ONE batch for all changed rows; the server validates the final state of the
 // whole tournament, so heroes and codes can move between teams in the same save. Each team has a hero OR its own
