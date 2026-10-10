@@ -94,6 +94,8 @@ Tournament games are private lobbies. Valve's `GetMatchDetails` answers `500 {}`
 - T8 parent check: vitest 1143 passed / 1 pre-existing fail; typecheck clean; browser on :3417: a new capture posted while /admin/capturas was open appeared without reload with the cap-new animation (class added then removed).
 - Native review T8 (base 53df141, medium, granted): approved, acknowledged (lineage review-3a44af1348f5923d). Advisory fixed in e238953: a change arriving during an in-flight refresh was dropped (final state could stay 'En curso') and changes during an SSE reconnect were missed; now a missed flag re-triggers after the fetch and the 'hello' on reconnect triggers a refresh. Verified in the browser: in-progress then final posted 150 ms apart -> row shows FINALIZADA. Remaining advisories: client code has no DOM tests; details restore by index; a dangling read in test/admin-captures-live.test.ts.
 
+- User confirmed 2026-10-10 on their own PC: with Capturas GSI open (page loaded after the T8 restart), watching another replay made the capture appear and update live without F5. Earlier F5 was needed only because that tab predated the T8 server restart.
+
 ## Next step
 - Capture a real spectator POST_GAME payload, replace the synthetic fixture and adjust `src/dota/gsi.ts`; decide on pushing / PR slicing (user).
 
