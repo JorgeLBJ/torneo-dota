@@ -185,7 +185,7 @@ const SideTable: FC<{ side: 'radiant' | 'dire'; players: DotaPlayerLine[]; won: 
       {won ? <span class="pill ok">Ganó</span> : null}
     </h2>
     <div class="scroll-x">
-      <table class="cards">
+      <table class="cards cap-players">
         <thead>
           <tr>
             <th>Jugador</th>

@@ -100,6 +100,9 @@ td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
 .hero.taken{opacity:.3;cursor:not-allowed}
 .cap-hero{display:inline-flex;align-items:center;gap:10px;white-space:nowrap}
 .cap-hero img{width:48px;aspect-ratio:16/9;object-fit:cover;border-radius:4px;flex-shrink:0}
+/* Same column widths for the Radiant and Dire tables, so their columns line up. */
+.cap-players{table-layout:fixed}
+.cap-players th:nth-child(1),.cap-players th:nth-child(2){width:22%}
 
 @media (max-width:760px){
   .shell{grid-template-columns:1fr}
