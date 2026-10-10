@@ -72,6 +72,7 @@ function mapSide(state: Obj, team: 'team2' | 'team3', side: 'radiant' | 'dire'):
       lastHits: num(p.last_hits),
       denies: num(p.denies),
       heroDamage: num(p.hero_damage),
+      ...(typeof p.net_worth === 'number' && Number.isFinite(p.net_worth) ? { netWorth: p.net_worth } : {}),
     };
   });
 }
@@ -97,6 +98,32 @@ function mapBans(draft: unknown): string[] {
     }
   }
   return bans.sort((a, b) => a.index - b.index || a.team - b.team).map((b) => b.slug);
+}
+
+/** What an admin can read from any stored state, final or not: nothing here throws, missing values are null. */
+export interface GsiSummary {
+  radiant: DotaPlayerLine[];
+  dire: DotaPlayerLine[];
+  radiantScore: number | null;
+  direScore: number | null;
+  durationSec: number | null;
+  winner: 'radiant' | 'dire' | null;
+}
+
+const numOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+export function summarizeGsiState(raw: unknown): GsiSummary {
+  const state = isObj(raw) ? raw : {};
+  const map = isObj(state.map) ? state.map : {};
+  const clock = numOrNull(map.clock_time);
+  return {
+    radiant: mapSide(state, 'team2', 'radiant'),
+    dire: mapSide(state, 'team3', 'dire'),
+    radiantScore: numOrNull(map.radiant_score),
+    direScore: numOrNull(map.dire_score),
+    durationSec: clock === null ? null : Math.floor(clock),
+    winner: map.win_team === 'radiant' || map.win_team === 'dire' ? map.win_team : null,
+  };
 }
 
 /**

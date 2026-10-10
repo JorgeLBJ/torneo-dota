@@ -15,6 +15,8 @@ export interface DotaPlayerLine {
   lastHits: number;
   denies: number;
   heroDamage: number;
+  /** Total gold plus items value; only captured (GSI) games carry it. */
+  netWorth?: number;
 }
 
 export interface DotaSnapshot {

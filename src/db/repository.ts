@@ -181,12 +181,32 @@ export interface GsiCapture {
   updatedAt: string;
 }
 
-export interface GsiCaptureSummary {
+/** The saved game that used a capture's Dota match id. */
+export interface GsiCaptureLink {
+  tournamentId: number;
+  tournamentName: string;
+  matchId: number;
+  phase: Phase;
+  round: number;
+  matchNumber: number;
+  team1Name: string | null;
+  team2Name: string | null;
+  gameNumber: number;
+}
+
+/** A capture as the admin list shows it: score and duration are read from the stored JSON without loading it. */
+export interface GsiCaptureRow {
   dotaMatchId: number;
   observerName: string | null;
   gameState: string | null;
   isFinal: boolean;
+  firstReceivedAt: string;
   updatedAt: string;
+  radiantScore: number | null;
+  direScore: number | null;
+  durationSec: number | null;
+  winner: 'radiant' | 'dire' | null;
+  link: GsiCaptureLink | null;
 }
 
 export interface Session {
@@ -210,6 +230,21 @@ const MATCH_FROM = 'FROM matches m JOIN tournaments t ON t.id = m.tournament_id'
 const OBSERVER_COLS = `id, name, token_prefix AS tokenPrefix, created_at AS createdAt, last_seen_at AS lastSeenAt, revoked_at AS revokedAt`;
 const GSI_COLS = `dota_match_id AS dotaMatchId, observer_token_id AS observerTokenId, game_state AS gameState, is_final AS isFinal,
   state_json AS stateJson, first_received_at AS firstReceivedAt, updated_at AS updatedAt`;
+// Score, duration and winner come from json_extract so the list never loads the (large) stored payloads.
+const gsiJson = (path: string) => `CASE WHEN json_valid(c.state_json) THEN json_extract(c.state_json, '${path}') END`;
+const GSI_ROW_SELECT = `SELECT c.dota_match_id AS dotaMatchId, o.name AS observerName, c.game_state AS gameState, c.is_final AS isFinal,
+  c.first_received_at AS firstReceivedAt, c.updated_at AS updatedAt,
+  ${gsiJson('$.map.radiant_score')} AS radiantScore, ${gsiJson('$.map.dire_score')} AS direScore,
+  ${gsiJson('$.map.clock_time')} AS durationSec, ${gsiJson('$.map.win_team')} AS winTeam,
+  g.game_number AS linkGame, m.id AS linkMatchId, m.phase AS linkPhase, m.round AS linkRound, m.match_number AS linkNumber,
+  t.id AS linkTournamentId, t.name AS linkTournamentName, t1.name AS linkTeam1, t2.name AS linkTeam2
+  FROM gsi_captures c
+  LEFT JOIN observer_tokens o ON o.id = c.observer_token_id
+  LEFT JOIN match_games g ON g.dota_match_id = c.dota_match_id
+  LEFT JOIN matches m ON m.id = g.match_id
+  LEFT JOIN tournaments t ON t.id = m.tournament_id
+  LEFT JOIN teams t1 ON t1.id = m.team1_id
+  LEFT JOIN teams t2 ON t2.id = m.team2_id`;
 const ADMIN_COLS = 'id, username, password_hash AS passwordHash, created_at AS createdAt';
 const SESSION_COLS = 'id, admin_id AS adminId, expires_at AS expiresAt';
 
@@ -231,6 +266,60 @@ type ScheduleDayRow = Omit<ScheduleDay, 'startTimes'> & { startTimes: string };
 function toTournament(row: TournamentRow): Tournament {
   const known = row.tiebreakers.split(',').filter((k): k is TiebreakerKey => (TIEBREAKER_KEYS as readonly string[]).includes(k));
   return { ...row, tiebreakers: [...new Set(known)], isActive: row.isActive === 1, showTiebreakBox: row.showTiebreakBox === 1 };
+}
+
+interface RawGsiRow {
+  dotaMatchId: number;
+  observerName: string | null;
+  gameState: string | null;
+  isFinal: number;
+  firstReceivedAt: string;
+  updatedAt: string;
+  radiantScore: unknown;
+  direScore: unknown;
+  durationSec: unknown;
+  winTeam: unknown;
+  linkGame: number | null;
+  linkMatchId: number | null;
+  linkPhase: Phase | null;
+  linkRound: number | null;
+  linkNumber: number | null;
+  linkTournamentId: number | null;
+  linkTournamentName: string | null;
+  linkTeam1: string | null;
+  linkTeam2: string | null;
+}
+
+const finiteOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+function toGsiRow(r: RawGsiRow): GsiCaptureRow {
+  const duration = finiteOrNull(r.durationSec);
+  return {
+    dotaMatchId: r.dotaMatchId,
+    observerName: r.observerName,
+    gameState: r.gameState,
+    isFinal: r.isFinal === 1,
+    firstReceivedAt: r.firstReceivedAt,
+    updatedAt: r.updatedAt,
+    radiantScore: finiteOrNull(r.radiantScore),
+    direScore: finiteOrNull(r.direScore),
+    durationSec: duration === null ? null : Math.floor(duration),
+    winner: r.winTeam === 'radiant' || r.winTeam === 'dire' ? r.winTeam : null,
+    link:
+      r.linkMatchId === null || r.linkTournamentId === null || r.linkPhase === null
+        ? null
+        : {
+            tournamentId: r.linkTournamentId,
+            tournamentName: r.linkTournamentName ?? '',
+            matchId: r.linkMatchId,
+            phase: r.linkPhase,
+            round: r.linkRound ?? 0,
+            matchNumber: r.linkNumber ?? 0,
+            team1Name: r.linkTeam1,
+            team2Name: r.linkTeam2,
+            gameNumber: r.linkGame ?? 1,
+          },
+  };
 }
 
 export function createRepository(db: Database.Database, now: () => Date = () => new Date()) {
@@ -357,9 +446,12 @@ export function createRepository(db: Database.Database, now: () => Date = () => 
         is_final = excluded.is_final, state_json = excluded.state_json, updated_at = datetime('now')
       WHERE gsi_captures.is_final = 0`),
     gsiById: db.prepare(`SELECT ${GSI_COLS} FROM gsi_captures WHERE dota_match_id = ?`),
-    recentGsi: db.prepare(`SELECT c.dota_match_id AS dotaMatchId, o.name AS observerName, c.game_state AS gameState, c.is_final AS isFinal, c.updated_at AS updatedAt
-      FROM gsi_captures c LEFT JOIN observer_tokens o ON o.id = c.observer_token_id
-      ORDER BY c.updated_at DESC, c.dota_match_id DESC LIMIT ?`),
+    gsiRows: db.prepare(`${GSI_ROW_SELECT} GROUP BY c.dota_match_id ORDER BY c.updated_at DESC, c.dota_match_id DESC LIMIT ?`),
+    gsiRowById: db.prepare(`${GSI_ROW_SELECT} WHERE c.dota_match_id = ? GROUP BY c.dota_match_id`),
+    deleteGsi: db.prepare('DELETE FROM gsi_captures WHERE dota_match_id = ?'),
+    gsiCountsByObserver: db.prepare('SELECT observer_token_id AS id, COUNT(*) AS n FROM gsi_captures WHERE observer_token_id IS NOT NULL GROUP BY observer_token_id'),
+    gsiUnlinkedFinal: db.prepare(`SELECT COUNT(*) AS n FROM gsi_captures c
+      WHERE c.is_final = 1 AND NOT EXISTS (SELECT 1 FROM match_games g WHERE g.dota_match_id = c.dota_match_id)`),
     touchObserver: db.prepare("UPDATE observer_tokens SET last_seen_at = datetime('now') WHERE id = ?"),
     deleteOtherSessions: db.prepare('DELETE FROM sessions WHERE admin_id = ? AND id <> ?'),
 
@@ -796,9 +888,19 @@ export function createRepository(db: Database.Database, now: () => Date = () => 
       const row = q.gsiById.get(dotaMatchId) as (Omit<GsiCapture, 'isFinal'> & { isFinal: number }) | undefined;
       return row && { ...row, isFinal: row.isFinal === 1 };
     },
-    listRecentGsiCaptures(limit: number): GsiCaptureSummary[] {
-      return (q.recentGsi.all(limit) as (Omit<GsiCaptureSummary, 'isFinal'> & { isFinal: number })[]).map((r) => ({ ...r, isFinal: r.isFinal === 1 }));
+    /** The most recently updated captures, with their score and the saved game that used them (if any). */
+    listGsiCaptureRows: (limit: number): GsiCaptureRow[] => (q.gsiRows.all(limit) as RawGsiRow[]).map(toGsiRow),
+    getGsiCaptureRow(dotaMatchId: number): GsiCaptureRow | undefined {
+      const row = q.gsiRowById.get(dotaMatchId) as RawGsiRow | undefined;
+      return row && toGsiRow(row);
     },
+    /** Returns whether a capture was deleted. A saved game that used it is not touched. */
+    deleteGsiCapture: (dotaMatchId: number): boolean => q.deleteGsi.run(dotaMatchId).changes > 0,
+    /** Captures per observer token id. */
+    countGsiCapturesByObserver: (): Map<number, number> =>
+      new Map((q.gsiCountsByObserver.all() as { id: number; n: number }[]).map((r) => [r.id, r.n])),
+    /** Final captures whose Dota match id no saved game uses yet. */
+    countUnlinkedFinalGsiCaptures: (): number => (q.gsiUnlinkedFinal.get() as { n: number }).n,
 
     // Sessions
     createSession(id: string, adminId: number, expiresAt: string): void {

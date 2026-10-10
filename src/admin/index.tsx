@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { sameOriginGuard } from '../security.js';
 import type { AdminEnv, Deps } from './context.js';
 import { loginRoutes, logoutRoutes, requireAdmin } from './routes/auth.js';
+import { captureRoutes } from './routes/captures.js';
 import { configRoutes } from './routes/config.js';
 import { dotaRoutes } from './routes/dota.js';
 import { fixtureRoutes } from './routes/fixture.js';
@@ -40,6 +41,7 @@ export function adminApp(deps: Deps) {
   app.use('/t/:tid/*', tournamentScope(deps));
   app.route('/', userRoutes(deps));
   app.route('/', observerRoutes(deps));
+  app.route('/', captureRoutes(deps));
   app.route('/', accountRoutes(deps));
   app.route('/', tournamentListRoutes(deps));
   for (const routes of [configRoutes, streamRoutes, rulesRoutes, teamRoutes, fixtureRoutes, resultRoutes, playoffRoutes, dotaRoutes]) app.route('/t/:tid', routes(deps));

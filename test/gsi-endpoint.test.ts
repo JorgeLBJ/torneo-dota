@@ -152,29 +152,3 @@ describe('POST /gsi capture', () => {
     expect(stored()[0]).toMatchObject({ dota_match_id: 5, observer_token_id: null });
   });
 });
-
-describe('Observadores recent captures', () => {
-  it('lists captures with observer, state and final flag', async () => {
-    await gsi(payload('8123456789', IN_PROGRESS));
-    await gsi(payload('8123456790', POST_GAME));
-    const cookie = await t.login();
-    const html = await (await t.get('/admin/observadores', cookie)).text();
-    expect(html).toContain('Capturas recientes');
-    expect(html).toContain('8123456789');
-    expect(html).toContain('8123456790');
-    expect(html).toContain('Juan');
-    expect(html).toContain(POST_GAME);
-  });
-
-  it('shows an empty state', async () => {
-    const cookie = await t.login();
-    const html = await (await t.get('/admin/observadores', cookie)).text();
-    expect(html).toContain('Aún no hay capturas');
-  });
-
-  it('limits the list to the 30 most recently updated', async () => {
-    for (let i = 1; i <= 35; i++) t.repo.upsertGsiCapture(1000 + i, observerId, IN_PROGRESS, false, '{}');
-    expect(t.repo.listRecentGsiCaptures(30)).toHaveLength(30);
-    expect(t.repo.listRecentGsiCaptures(30)[0]!.dotaMatchId).toBe(1035);
-  });
-});

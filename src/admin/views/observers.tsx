@@ -1,5 +1,5 @@
 import type { FC } from 'hono/jsx';
-import type { GsiCaptureSummary, ObserverToken } from '../../db/repository.js';
+import type { ObserverToken } from '../../db/repository.js';
 import { formatDateTime } from '../../format/datetime.js';
 
 /** The token and cfg of an observer that was created in this very response. */
@@ -38,9 +38,9 @@ const CreatedPanel: FC<{ created: CreatedObserver }> = ({ created }) => (
   </section>
 );
 
-export const ObserversView: FC<{ observers: ObserverToken[]; captures: GsiCaptureSummary[]; created?: CreatedObserver }> = ({
+export const ObserversView: FC<{ observers: ObserverToken[]; captureCounts: Map<number, number>; created?: CreatedObserver }> = ({
   observers,
-  captures,
+  captureCounts,
   created,
 }) => (
   <>
@@ -61,6 +61,7 @@ export const ObserversView: FC<{ observers: ObserverToken[]; captures: GsiCaptur
             <th>Token</th>
             <th>Creado</th>
             <th>Última señal</th>
+            <th>Capturas</th>
             <th>Estado</th>
             <th></th>
           </tr>
@@ -68,7 +69,7 @@ export const ObserversView: FC<{ observers: ObserverToken[]; captures: GsiCaptur
         <tbody>
           {observers.length === 0 ? (
             <tr>
-              <td colspan={6} class="muted">
+              <td colspan={7} class="muted">
                 Aún no hay observadores.
               </td>
             </tr>
@@ -83,6 +84,7 @@ export const ObserversView: FC<{ observers: ObserverToken[]; captures: GsiCaptur
               </td>
               <td class="muted" data-label="Creado">{formatDateTime(o.createdAt)}</td>
               <td class="muted" data-label="Última señal">{o.lastSeenAt ? formatDateTime(o.lastSeenAt) : '—'}</td>
+              <td data-label="Capturas">{captureCounts.get(o.id) ?? 0}</td>
               <td data-label="Estado">
                 {o.revokedAt ? <span class="pill">Revocado</span> : <span class="pill ok">Activo</span>}
               </td>
@@ -107,40 +109,6 @@ export const ObserversView: FC<{ observers: ObserverToken[]; captures: GsiCaptur
                   </form>
                 )}
               </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-    <h2>Capturas recientes</h2>
-    <div class="card scroll-x">
-      <table class="cards">
-        <thead>
-          <tr>
-            <th>Partida (Dota)</th>
-            <th>Observador</th>
-            <th>Estado</th>
-            <th>Final</th>
-            <th>Actualizada</th>
-          </tr>
-        </thead>
-        <tbody>
-          {captures.length === 0 ? (
-            <tr>
-              <td colspan={5} class="muted">
-                Aún no hay capturas.
-              </td>
-            </tr>
-          ) : null}
-          {captures.map((cap) => (
-            <tr>
-              <td data-label="Partida (Dota)">
-                <b>{cap.dotaMatchId}</b>
-              </td>
-              <td data-label="Observador">{cap.observerName ?? '—'}</td>
-              <td class="muted" data-label="Estado">{cap.gameState ?? '—'}</td>
-              <td data-label="Final">{cap.isFinal ? <span class="pill ok">Sí</span> : <span class="pill">No</span>}</td>
-              <td class="muted" data-label="Actualizada">{formatDateTime(cap.updatedAt)}</td>
             </tr>
           ))}
         </tbody>

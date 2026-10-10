@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { generateObserverToken } from '../src/auth/observer-token.js';
 import { CapturedDotaSource } from '../src/dota/captured.js';
-import { mapGsiState } from '../src/dota/gsi.js';
+import { mapGsiState, summarizeGsiState } from '../src/dota/gsi.js';
 import type { DotaSnapshot } from '../src/dota/snapshot.js';
 import { DotaLookupError, type DotaMatchSource } from '../src/dota/source.js';
 import { makeApp, type TestApp } from './helpers/app.js';
@@ -41,6 +41,7 @@ describe('mapGsiState', () => {
       lastHits: 150,
       denies: 5,
       heroDamage: 12000,
+      netWorth: 15000,
     });
     expect(snap.players[5]).toMatchObject({ side: 'dire', nick: 'Beto', heroSlug: 'antimage' });
   });
@@ -104,6 +105,34 @@ describe('mapGsiState', () => {
     const state = sample();
     state.map.matchid = '77';
     expect(mapGsiState(state, { startTime: START }).matchId).toBe(77);
+  });
+});
+
+describe('summarizeGsiState', () => {
+  it('reads a final payload', () => {
+    const s = summarizeGsiState(sample());
+    expect(s).toMatchObject({ radiantScore: 42, direScore: 37, durationSec: 2112, winner: 'radiant' });
+    expect(s.radiant).toHaveLength(5);
+    expect(s.dire).toHaveLength(5);
+  });
+
+  it('is tolerant: an unfinished or odd payload gives what it has and nulls otherwise', () => {
+    expect(summarizeGsiState({ map: { radiant_score: 4, win_team: 'none' } })).toEqual({
+      radiant: [],
+      dire: [],
+      radiantScore: 4,
+      direScore: null,
+      durationSec: null,
+      winner: null,
+    });
+    expect(summarizeGsiState(null).winner).toBeNull();
+    expect(summarizeGsiState('x').radiant).toEqual([]);
+  });
+
+  it('leaves net worth out when the payload does not carry it', () => {
+    const state = sample();
+    delete state.player.team2.player0.net_worth;
+    expect('netWorth' in summarizeGsiState(state).radiant[0]!).toBe(false);
   });
 });
 

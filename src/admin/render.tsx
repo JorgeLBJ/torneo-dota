@@ -14,7 +14,8 @@ export function publicUrlFor(t: Tournament): string {
 export function navFor(deps: Deps, current?: Tournament): NavInfo {
   const { repo } = deps;
   const tournaments = repo.listTournaments();
-  if (!current) return { tournaments, teamCount: 0, played: 0, total: 0 };
+  const unlinkedCaptures = repo.countUnlinkedFinalGsiCaptures();
+  if (!current) return { tournaments, teamCount: 0, played: 0, total: 0, unlinkedCaptures };
   const group = repo.listMatches(current.id, 'group');
   return {
     tournaments,
@@ -23,6 +24,7 @@ export function navFor(deps: Deps, current?: Tournament): NavInfo {
     played: group.filter((m) => m.winnerId !== null).length,
     total: group.length,
     publicUrl: publicUrlFor(current),
+    unlinkedCaptures,
   };
 }
 

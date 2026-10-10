@@ -36,9 +36,11 @@ export interface NavInfo {
   total: number;
   /** Public site URL of the current tournament ("/" when it is the active one). */
   publicUrl?: string;
+  /** Final GSI captures no saved game uses yet (badge of "Capturas GSI"). */
+  unlinkedCaptures?: number;
 }
 
-export type Section = 'torneos' | 'config' | 'reglas' | 'equipos' | 'fixture' | 'resultados' | 'playoffs' | 'usuarios' | 'observadores' | 'cuenta';
+export type Section = 'torneos' | 'config' | 'reglas' | 'equipos' | 'fixture' | 'resultados' | 'playoffs' | 'usuarios' | 'observadores' | 'capturas' | 'cuenta';
 
 interface LayoutProps {
   title: string;
@@ -48,7 +50,7 @@ interface LayoutProps {
   flash?: Flash;
 }
 
-const SECTIONS: { key: Exclude<Section, 'torneos' | 'usuarios' | 'observadores' | 'cuenta'>; path: string; label: string }[] = [
+const SECTIONS: { key: Exclude<Section, 'torneos' | 'usuarios' | 'observadores' | 'capturas' | 'cuenta'>; path: string; label: string }[] = [
   { key: 'config', path: 'config', label: 'Configuración' },
   { key: 'reglas', path: 'reglas', label: 'Reglas' },
   { key: 'equipos', path: 'equipos', label: 'Equipos' },
@@ -123,6 +125,10 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, active, admi
               : null}
             <a href="/admin/observadores" class={active === 'observadores' ? 'on' : ''}>
               Observadores
+            </a>
+            <a href="/admin/capturas" class={active === 'capturas' ? 'on' : ''}>
+              Capturas GSI
+              {nav.unlinkedCaptures ? badge(`${nav.unlinkedCaptures} sin vincular`) : null}
             </a>
             <a href="/admin/usuarios" class={active === 'usuarios' ? 'on' : ''}>
               Usuarios
