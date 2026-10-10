@@ -66,5 +66,7 @@ Tournament games are private lobbies. Valve's `GetMatchDetails` answers `500 {}`
 - Native review T4-T5 (range ded9e38..5f3181c, medium, slice budget reached, consent granted): 1 lens (reliability), approved, acknowledged (lineage review-461eacf8919619b4). Reviewed boundary -> 5f3181c.
 - Advisory follow-ups T4-T5 (non-blocking): overwrite confirmation (`confirmar=1`) is not bound to the specific game slot (src/admin/routes/captures.tsx:182); nav badge window vs list window may differ; GROUP BY link lookup nondeterministic if one match id is linked twice. Screens not checked in a browser yet.
 
+- Visual check 2026-10-10 (local server :3417, scratch DB, synthetic captures via POST /gsi): Observadores (token + cfg + count), Capturas GSI (filters, badge), Detalle, Vincular step form (auto-submit on change) and Resultados card ('Capturado por nuestros observadores') render and work end to end. Nits: the card summary still reads 'Importado de Dota' for GSI games.
+
 ## Next step
 - Capture a real spectator POST_GAME payload, replace the synthetic fixture and adjust `src/dota/gsi.ts`; decide on pushing / PR slicing (user).
