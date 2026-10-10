@@ -81,5 +81,8 @@ Tournament games are private lobbies. Valve's `GetMatchDetails` answers `500 {}`
 - Advisory from that review, fixed in 578844e: manual-install path lost its backslashes in the view (RED test then GREEN). Other advisory: no client-side test for the Blob download. 578844e assess: medium, under_budget (pending in slice).
 - Checks after fixes: vitest 1131 passed / 1 failed (pre-existing 'Siguiente'); typecheck clean.
 
+- REAL capture 2026-10-10 (user, Windows, installer .bat applied, Dota opened from the 'Dota 2 (Torneo)' shortcut, watching a REPLAY of public match 9037383577): GSI posts arrived at local :3417, capture stored and marked final at POST_GAME (state ~57 KB). Real shape matches the assumed one (map.matchid/win_team/radiant_score/dire_score/clock_time, player.team2/team3.playerN with name/kills/deaths/assists/last_hits/denies/gpm/xpm/net_worth/hero_damage, hero.*.playerN with name npc_dota_hero_*/level). mapGsiState on it: radiantWin true, 41-35, 3280 s, 10 players with heroes, nicks, KDA, GPM/XPM, damage, net worth. draft was {} (replay) -> bans []. Conclusion: replays work as an observer fallback.
+- Follow-up: replace the synthetic fixture with a SANITIZED version of this real capture (strip steamid/accountid, rename nicks) and pin the mapper on it.
+
 ## Next step
 - Capture a real spectator POST_GAME payload, replace the synthetic fixture and adjust `src/dota/gsi.ts`; decide on pushing / PR slicing (user).
