@@ -8,7 +8,7 @@ import { readBody, str } from '../form.js';
 import { setFlash } from '../flash.js';
 import { ObserverRevealStore } from '../observer-reveals.js';
 import { adminTimeZone, renderPage } from '../render.js';
-import { ObserversView, type CreatedObserver } from '../views/observers.js';
+import { ObserversView, type CreatedObserver, type ObserverFilter } from '../views/observers.js';
 
 export const MAX_OBSERVER_NAME = 60;
 
@@ -25,6 +25,8 @@ export function observerRoutes(deps: Deps) {
 
   app.get('/observadores', (c) => {
     const revealId = c.req.query('revelar');
+    const all = repo.listObserverTokens();
+    const filter: ObserverFilter = c.req.query('ver') === 'todos' ? 'todos' : 'activos';
     let created: CreatedObserver | undefined;
     let notice: string | undefined;
     if (revealId !== undefined) {
@@ -41,7 +43,7 @@ export function observerRoutes(deps: Deps) {
       c,
       deps,
       { title: 'Observadores', active: 'observadores' },
-      <ObserversView observers={repo.listObserverTokens()} captureCounts={repo.countGsiCapturesByObserver()} created={created} notice={notice} timeZone={adminTimeZone(deps)} />,
+      <ObserversView observers={all} filter={filter} captureCounts={repo.countGsiCapturesByObserver()} created={created} notice={notice} timeZone={adminTimeZone(deps)} />,
     );
   });
 
@@ -67,7 +69,7 @@ export function observerRoutes(deps: Deps) {
       reveals.dropObserver(target.id);
       setFlash(c, 'ok', `Token de «${target.name}» revocado.`);
     }
-    return c.redirect('/admin/observadores', 303);
+    return c.redirect(c.req.query('ver') === 'todos' ? '/admin/observadores?ver=todos' : '/admin/observadores', 303);
   });
 
   return app;

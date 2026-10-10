@@ -84,7 +84,7 @@ describe('Observadores screen', () => {
     expect(res.status).toBe(303);
     expect(await flashText(t, res, cookie)).toContain('Juan');
     expect(t.repo.listObserverTokens()[0]!.revokedAt).toBeTruthy();
-    const html = await (await t.get('/admin/observadores', cookie)).text();
+    const html = await (await t.get('/admin/observadores?ver=todos', cookie)).text();
     expect(html).toContain('Revocado');
   });
 
@@ -201,5 +201,56 @@ describe('admin time zone on global screens', () => {
     expect(html).toContain('09/10/2026 22:01:34');
     const detail = await (await t.get('/admin/capturas/555', cookie)).text();
     expect(detail).toContain('09/10/2026 22:01:34');
+  });
+});
+
+describe('Observadores filter', () => {
+  const add = (name: string, revoked = false) => {
+    const gen = generateObserverToken();
+    const o = t.repo.createObserverToken(name, gen.hash, gen.prefix);
+    if (revoked) t.repo.revokeObserverToken(o.id);
+    return o;
+  };
+  const page = async (path = '/admin/observadores') => (await t.get(path, cookie)).text();
+
+  it('shows only active observers by default, with counts on the chips', async () => {
+    add('Vivo');
+    add('Caido', true);
+    const html = await page();
+    expect(html).toContain('Vivo');
+    expect(html).not.toContain('Caido');
+    expect(html).toContain('Activos · 1');
+    expect(html).toContain('Todos · 2');
+    expect(html).toMatch(/<a class="btn sm on" href="\/admin\/observadores" aria-current="true">Activos/);
+  });
+
+  it('shows revoked observers with ?ver=todos', async () => {
+    add('Vivo');
+    add('Caido', true);
+    const html = await page('/admin/observadores?ver=todos');
+    expect(html).toContain('Vivo');
+    expect(html).toContain('Caido');
+    expect(html).toContain('Revocado');
+    expect(html).toMatch(/<a class="btn sm on" href="\/admin\/observadores\?ver=todos" aria-current="true">Todos/);
+  });
+
+  it('says so when no observer is active', async () => {
+    add('Caido', true);
+    expect(await page()).toContain('No hay observadores activos.');
+  });
+
+  it('keeps the filter after revoking', async () => {
+    const o = add('Vivo');
+    const res = await t.post(`/admin/observadores/${o.id}/revocar?ver=todos`, {}, cookie);
+    expect(res.headers.get('location')).toBe('/admin/observadores?ver=todos');
+    const def = await t.post(`/admin/observadores/${add('Otro').id}/revocar`, {}, cookie);
+    expect(def.headers.get('location')).toBe('/admin/observadores');
+  });
+
+  it('still reveals a new token on the default view', async () => {
+    const res = await t.post('/admin/observadores', { name: 'Nuevo' }, cookie);
+    const html = await (await t.get(res.headers.get('location')!, cookie)).text();
+    expect(html).toContain('id="cfgText"');
+    expect(html).toContain('Activos · 1');
   });
 });

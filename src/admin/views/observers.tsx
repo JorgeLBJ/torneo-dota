@@ -60,13 +60,25 @@ const CreatedPanel: FC<{ created: CreatedObserver }> = ({ created }) => (
   </section>
 );
 
-export const ObserversView: FC<{ observers: ObserverToken[]; captureCounts: Map<number, number>; created?: CreatedObserver; notice?: string; timeZone: string }> = ({
-  observers,
-  captureCounts,
-  created,
-  notice,
-  timeZone,
-}) => (
+export type ObserverFilter = 'activos' | 'todos';
+
+export const ObserversView: FC<{
+  /** Every observer; the view applies the filter. */
+  observers: ObserverToken[];
+  filter: ObserverFilter;
+  captureCounts: Map<number, number>;
+  created?: CreatedObserver;
+  notice?: string;
+  timeZone: string;
+}> = ({ observers: all, filter, captureCounts, created, notice, timeZone }) => {
+  const activeCount = all.filter((o) => !o.revokedAt).length;
+  const observers = filter === 'activos' ? all.filter((o) => !o.revokedAt) : all;
+  const query = filter === 'todos' ? '?ver=todos' : '';
+  const chips: { key: ObserverFilter; label: string; count: number; href: string }[] = [
+    { key: 'activos', label: 'Activos', count: activeCount, href: '/admin/observadores' },
+    { key: 'todos', label: 'Todos', count: all.length, href: '/admin/observadores?ver=todos' },
+  ];
+  return (
   <>
     <div class="head">
       <div>
@@ -78,6 +90,13 @@ export const ObserversView: FC<{ observers: ObserverToken[]; captureCounts: Map<
     </div>
     {notice ? <div class="note" role="status">{notice}</div> : null}
     {created ? <CreatedPanel created={created} /> : null}
+    <div class="chips">
+      {chips.map((chip) => (
+        <a class={`btn sm${chip.key === filter ? ' on' : ''}`} href={chip.href} aria-current={chip.key === filter ? 'true' : undefined}>
+          {chip.label} · {chip.count}
+        </a>
+      ))}
+    </div>
     <div class="card scroll-x">
       <table class="cards">
         <thead>
@@ -95,7 +114,7 @@ export const ObserversView: FC<{ observers: ObserverToken[]; captureCounts: Map<
           {observers.length === 0 ? (
             <tr>
               <td colspan={7} class="muted">
-                Aún no hay observadores.
+                {all.length === 0 ? 'Aún no hay observadores.' : 'No hay observadores activos.'}
               </td>
             </tr>
           ) : null}
@@ -115,7 +134,7 @@ export const ObserversView: FC<{ observers: ObserverToken[]; captureCounts: Map<
               </td>
               <td>
                 {o.revokedAt ? null : (
-                  <form method="post" action={`/admin/observadores/${o.id}/revocar`}>
+                  <form method="post" action={`/admin/observadores/${o.id}/revocar${query}`}>
                     <button class="btn sm danger" type="submit" data-confirm-open={`revokeDialog${o.id}`}>
                       Revocar
                     </button>
@@ -150,4 +169,5 @@ export const ObserversView: FC<{ observers: ObserverToken[]; captureCounts: Map<
       </button>
     </form>
   </>
-);
+  );
+};
