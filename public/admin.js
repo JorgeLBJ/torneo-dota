@@ -1193,7 +1193,7 @@
       var id = idInput.value.trim();
       if (!id) { say('Escribe el Match ID de Dota.', 'error'); return; }
       busy(search, true, 'Buscando…');
-      say('Consultando OpenDota…', 'muted');
+      say('Consultando la partida…', 'muted');
       post('/dota/buscar', { dota_match_id: id }).then(function (res) {
         busy(search, false);
         if (res.ok && res.body.ok) {

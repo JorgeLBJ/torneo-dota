@@ -28,7 +28,7 @@ Tournament games are private lobbies. Valve's `GetMatchDetails` answers `500 {}`
 ## Tasks
 - [x] T1 Migration 013 `observer_tokens` + repository + admin "Observadores" screen (create / list / revoke / one-time `.cfg` download) — route: delegated writer (2+ non-trivial files)
 - [x] T2 Migration 014 `gsi_captures` + `POST /gsi` (token auth, 1 MB limit, rate limit, final-not-overwritten) + recent captures list on Observadores — route: delegated writer
-- [ ] T3 GSI capture → `DotaSnapshot` mapper (tolerant, non-final → `incomplete`) + `CapturedDotaSource` decorator checking captures before OpenDota, wired in `src/app.ts` — route: delegated writer. Revisit mapper with a real payload.
+- [x] T3 GSI capture → `DotaSnapshot` mapper (tolerant, non-final → `incomplete`) + `CapturedDotaSource` decorator checking captures before OpenDota, wired in `src/app.ts` — route: delegated writer. Revisit mapper with a real payload.
 
 ## Acceptance criteria
 - An admin creates an observer "Juan" and downloads a `.cfg` whose `uri` is `<PUBLIC_BASE_URL>/gsi` and whose `auth.token` is the plaintext token; the plaintext is not retrievable later.
@@ -42,6 +42,11 @@ Tournament games are private lobbies. Valve's `GetMatchDetails` answers `500 {}`
 - T2 RED: `npx vitest run test/gsi-endpoint.test.ts` -> file failed to load (`src/gsi/routes.js` missing).
 - T2 GREEN: `npx vitest run` -> 1068 passed, 1 failed (same pre-existing clock-dependent `public-routes` 'Siguiente' failure). `npm run typecheck` -> clean. user_version tests bumped to 14.
 - T2 design: 1 MB `/gsi` body cap is selected in `createApp` next to the 64 KB/30 MB selectors; rate limit 300 posts/min per token id (after auth); final captures protected by `ON CONFLICT ... WHERE is_final = 0`.
+- T2 commit: 332c930.
+- T3 RED: `npx vitest run test/gsi-snapshot.test.ts` -> file failed to load (`src/dota/captured.js` missing).
+- T3 GREEN: `npx vitest run` -> 1084 passed, 1 failed (same pre-existing clock-dependent `public-routes` 'Siguiente' failure). `npm run typecheck` -> clean.
+- T3 design: `createApp` wraps whatever it would use before (`config.dotaSource ?? CachedDotaSource(OpenDotaSource)`) in `CapturedDotaSource`, so the test override still works and captures are checked first. Mapper `src/dota/gsi.ts` is validated only against the SYNTHETIC `test/fixtures/gsi-spectator-sample.json`; replace with a real POST_GAME capture and adjust. startTime approximated by first_received_at; bans order (draft keys) is best effort.
+- Known leftovers: "Ver en OpenDota" links and the "datos de OpenDota" label remain for captured matches (private lobbies are not on OpenDota); would need a source marker in the stored snapshot.
 
 ## Next step
-- T3.
+- Capture a real spectator POST_GAME payload, replace the synthetic fixture and adjust `src/dota/gsi.ts`; decide on pushing / PR slicing (user).

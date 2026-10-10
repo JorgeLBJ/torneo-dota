@@ -14,6 +14,7 @@ import { createEvents } from './events.js';
 import { FAVICON_SVG } from './favicon.js';
 import { GSI_MAX_BODY_BYTES, gsiRoutes } from './gsi/routes.js';
 import { publicApp } from './public/routes.js';
+import { CapturedDotaSource } from './dota/captured.js';
 import { OpenDotaSource } from './dota/opendota.js';
 import { CachedDotaSource } from './dota/source.js';
 import { LocalImageStore } from './storage/local.js';
@@ -40,7 +41,8 @@ export function createApp({ db, config }: CreateAppOptions) {
   const accountLimiter = new LoginRateLimiter();
   const uploadLimiter = new LoginRateLimiter({ maxFailures: 30, windowMs: 60_000 });
   const images = config.imageStore ?? null;
-  const dota = config.dotaSource ?? new CachedDotaSource(new OpenDotaSource());
+  // Matches our observers captured win; anything else goes to the configured source (cached OpenDota by default).
+  const dota = new CapturedDotaSource(repo, config.dotaSource ?? new CachedDotaSource(new OpenDotaSource()));
   const app = new Hono();
 
   const smallBodies = bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (c) => c.text('La solicitud es demasiado grande.', 413) });
