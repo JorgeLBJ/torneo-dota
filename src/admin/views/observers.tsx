@@ -60,10 +60,12 @@ const CreatedPanel: FC<{ created: CreatedObserver }> = ({ created }) => (
   </section>
 );
 
-export const ObserversView: FC<{ observers: ObserverToken[]; captureCounts: Map<number, number>; created?: CreatedObserver }> = ({
+export const ObserversView: FC<{ observers: ObserverToken[]; captureCounts: Map<number, number>; created?: CreatedObserver; notice?: string; timeZone: string }> = ({
   observers,
   captureCounts,
   created,
+  notice,
+  timeZone,
 }) => (
   <>
     <div class="head">
@@ -74,6 +76,7 @@ export const ObserversView: FC<{ observers: ObserverToken[]; captureCounts: Map<
         </p>
       </div>
     </div>
+    {notice ? <div class="note" role="status">{notice}</div> : null}
     {created ? <CreatedPanel created={created} /> : null}
     <div class="card scroll-x">
       <table class="cards">
@@ -104,8 +107,8 @@ export const ObserversView: FC<{ observers: ObserverToken[]; captureCounts: Map<
               <td class="muted" data-label="Token">
                 <code>{o.tokenPrefix}…</code>
               </td>
-              <td class="muted" data-label="Creado">{formatDateTime(o.createdAt)}</td>
-              <td class="muted" data-label="Última señal">{o.lastSeenAt ? formatDateTime(o.lastSeenAt) : '—'}</td>
+              <td class="muted" data-label="Creado">{formatDateTime(o.createdAt, { timeZone })}</td>
+              <td class="muted" data-label="Última señal">{o.lastSeenAt ? formatDateTime(o.lastSeenAt, { timeZone }) : '—'}</td>
               <td data-label="Capturas">{captureCounts.get(o.id) ?? 0}</td>
               <td data-label="Estado">
                 {o.revokedAt ? <span class="pill">Revocado</span> : <span class="pill ok">Activo</span>}

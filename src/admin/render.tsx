@@ -28,6 +28,12 @@ export function navFor(deps: Deps, current?: Tournament): NavInfo {
   };
 }
 
+/** Zone used on the global (not per-tournament) admin screens: the active tournament's, else Lima. */
+export const DEFAULT_ADMIN_TIME_ZONE = 'America/Lima';
+export function adminTimeZone(deps: Deps): string {
+  return deps.repo.getActiveTournament()?.timezone || DEFAULT_ADMIN_TIME_ZONE;
+}
+
 export interface PageOptions {
   title: string;
   active: Section;

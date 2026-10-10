@@ -109,7 +109,7 @@ export const TooManyAttemptsPage: FC = () => (
   </AuthLayout>
 );
 
-export const UsersView: FC<{ admins: Admin[]; currentId: number }> = ({ admins, currentId }) => (
+export const UsersView: FC<{ admins: Admin[]; currentId: number; timeZone: string }> = ({ admins, currentId, timeZone }) => (
   <>
     <div class="head">
       <div>
@@ -133,7 +133,7 @@ export const UsersView: FC<{ admins: Admin[]; currentId: number }> = ({ admins, 
                 <b>{a.username}</b>
                 {a.id === currentId ? <span class="pill next">Tú</span> : null}
               </td>
-              <td class="muted" data-label="Creado">{formatDateTime(a.createdAt)}</td>
+              <td class="muted" data-label="Creado">{formatDateTime(a.createdAt, { timeZone })}</td>
               <td>
                 {a.id === currentId ? null : (
                   <form method="post" action={`/admin/usuarios/${a.id}/eliminar`}>

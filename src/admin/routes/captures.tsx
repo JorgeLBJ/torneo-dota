@@ -4,7 +4,7 @@ import { summarizeGsiState } from '../../dota/gsi.js';
 import { captureStateOf } from '../../gsi/state.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { setFlash } from '../flash.js';
-import { renderPage } from '../render.js';
+import { adminTimeZone, renderPage } from '../render.js';
 import { CaptureDetailView, CapturesView, FILTERS, PAGE_SIZE, type CaptureFilter, type CaptureItem } from '../views/captures.js';
 
 const SSE_RETRY_MS = 3000;
@@ -42,7 +42,7 @@ export function captureRoutes(deps: Deps) {
       c,
       deps,
       { title: 'Capturas GSI', active: 'capturas' },
-      <CapturesView items={shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)} counts={counts} filter={filter} query={query} page={page} pages={pages} />,
+      <CapturesView items={shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)} counts={counts} filter={filter} query={query} page={page} pages={pages} timeZone={adminTimeZone(deps)} />,
     );
   });
 
@@ -116,7 +116,7 @@ export function captureRoutes(deps: Deps) {
       c,
       deps,
       { title: `Captura ${id}`, active: 'capturas' },
-      <CaptureDetailView item={{ row, state }} summary={summarizeGsiState(parsed)} rawJson={rawJson} />,
+      <CaptureDetailView item={{ row, state }} summary={summarizeGsiState(parsed)} rawJson={rawJson} timeZone={adminTimeZone(deps)} />,
     );
   });
 

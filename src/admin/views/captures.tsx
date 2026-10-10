@@ -69,7 +69,8 @@ export const CapturesView: FC<{
   query: string;
   page: number;
   pages: number;
-}> = ({ items, counts, filter, query, page, pages }) => {
+  timeZone: string;
+}> = ({ items, counts, filter, query, page, pages, timeZone }) => {
   const href = (f: CaptureFilter, p = 1) => {
     const params = new URLSearchParams();
     if (f !== 'todas') params.set('estado', f);
@@ -136,7 +137,7 @@ export const CapturesView: FC<{
                 <td data-label="Duración">{duration(row.durationSec)}</td>
                 <td data-label="Observador">{row.observerName ?? '—'}</td>
                 <td class="muted" data-label="Última actualización">
-                  {formatDateTime(row.updatedAt)}
+                  {formatDateTime(row.updatedAt, { timeZone })}
                 </td>
                 <td data-label="Vinculada a">
                   {row.link || state === 'final' ? <LinkedTo link={row.link} /> : <span class="muted">—</span>}
@@ -233,7 +234,7 @@ const SideTable: FC<{ side: 'radiant' | 'dire'; players: DotaPlayerLine[]; won: 
   </section>
 );
 
-export const CaptureDetailView: FC<{ item: CaptureItem; summary: GsiSummary; rawJson: string }> = ({ item, summary, rawJson }) => {
+export const CaptureDetailView: FC<{ item: CaptureItem; summary: GsiSummary; rawJson: string; timeZone: string }> = ({ item, summary, rawJson, timeZone }) => {
   const { row, state } = item;
   const id = row.dotaMatchId;
   return (
@@ -245,7 +246,7 @@ export const CaptureDetailView: FC<{ item: CaptureItem; summary: GsiSummary; raw
         <div>
           <h1>Match {id}</h1>
           <p class="sub">
-            Capturada por {row.observerName ?? 'un observador desconocido'} · {formatDateTime(row.firstReceivedAt)} → {formatDateTime(row.updatedAt)} · <StatePill state={state} />
+            Capturada por {row.observerName ?? 'un observador desconocido'} · {formatDateTime(row.firstReceivedAt, { timeZone })} → {formatDateTime(row.updatedAt, { timeZone })} · <StatePill state={state} />
           </p>
         </div>
         <div class="scorebox" aria-label="Marcador">

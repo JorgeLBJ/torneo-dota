@@ -3,7 +3,7 @@ import { hashPassword } from '../../auth/password.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { readBody, str } from '../form.js';
 import { setFlash } from '../flash.js';
-import { renderPage } from '../render.js';
+import { adminTimeZone, renderPage } from '../render.js';
 import { checkNewPassword, checkUsername } from '../validate.js';
 import { UsersView } from '../views/auth.js';
 
@@ -16,7 +16,7 @@ export function userRoutes(deps: Deps) {
       c,
       deps,
       { title: 'Usuarios', active: 'usuarios', tournament: repo.getActiveTournament() },
-      <UsersView admins={repo.listAdmins()} currentId={c.get('admin').id} />,
+      <UsersView admins={repo.listAdmins()} currentId={c.get('admin').id} timeZone={adminTimeZone(deps)} />,
     ),
   );
 
