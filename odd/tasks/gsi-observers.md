@@ -77,5 +77,11 @@ Tournament games are private lobbies. Valve's `GetMatchDetails` answers `500 {}`
 
 - T6 parent spot check: typecheck clean; vitest 1126 passed / 1 failed (pre-existing 'Siguiente'); generated installer read back (ASCII batch prologue, UTF-8 PS body, cfg embedded verbatim). Review assess (base 5f3181c, committed-only): medium, review_due=false, under_budget -> pending in the slice until a later commit reaches the budget.
 
+- T6 native review (base 5f3181c, medium, granted): reliability lens found a BLOCKER — public/admin.js had raw CR/LF inside a regex/string (writer escaping slip), so the whole admin script failed to parse; vitest never loaded it. One bounded correction d7d9efa: escaped `/?
+/g` -> `'
+'` + new test/client-scripts-syntax.test.ts compiling every public/*.js (RED observed on admin.js). Targeted validation approved, acknowledged (lineage review-2f2055b565ee11fd).
+- Advisory from that review, fixed in 578844e: manual-install path lost its backslashes in the view (RED test then GREEN). Other advisory: no client-side test for the Blob download. 578844e assess: medium, under_budget (pending in slice).
+- Checks after fixes: vitest 1131 passed / 1 failed (pre-existing 'Siguiente'); typecheck clean.
+
 ## Next step
 - Capture a real spectator POST_GAME payload, replace the synthetic fixture and adjust `src/dota/gsi.ts`; decide on pushing / PR slicing (user).
