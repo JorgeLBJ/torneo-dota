@@ -35,6 +35,8 @@ Tournament games are private lobbies. Valve's `GetMatchDetails` answers `500 {}`
 
 - [x] T6 One-click observer installer: "Descargar instalador (.bat)" as the primary action on the one-time token panel (client-side Blob, like the .cfg; .cfg + manual steps stay as fallback). The .bat (CRLF, embedded PowerShell) finds Steam via registry, Dota 2 (app 570) via `steamapps/libraryfolders.vdf` across libraries, creates `game/dota/cfg/gamestate_integration/`, writes `gamestate_integration_torneo.cfg` (replacing a previous one), creates a Desktop shortcut "Dota 2 (Torneo)" running `steam.exe -applaunch 570 -gamestateintegration`, optionally launches it; never edits Steam's localconfig.vdf. Instructions mention the SmartScreen prompt. User-approved 2026-10-10 — route: delegated writer
 
+- [x] T7 Remove "Vincular a un juego del torneo" from the Capturas GSI detail (user decision 2026-10-10: linking stays in Resultados via Match ID + Buscar, which checks our captures then OpenDota). The detail only shows match data. Keep: read-only "Vinculada a" info, filters/badge (derived from match_games.dota_match_id), the snapshot source marker, delete capture. Remove the link route/view/service/tests that only served the linking UI; list action reads "Ver" — route: delegated writer
+
 ## Acceptance criteria
 - An admin creates an observer "Juan" and downloads a `.cfg` whose `uri` is `<PUBLIC_BASE_URL>/gsi` and whose `auth.token` is the plaintext token; the plaintext is not retrievable later.
 - `POST /gsi` with a valid token and `map.matchid` stores/updates the capture; missing/invalid/revoked token → 401; matchid absent or `"0"` → 200 without storing; after POST_GAME later posts do not overwrite.
@@ -86,3 +88,6 @@ Tournament games are private lobbies. Valve's `GetMatchDetails` answers `500 {}`
 
 ## Next step
 - Capture a real spectator POST_GAME payload, replace the synthetic fixture and adjust `src/dota/gsi.ts`; decide on pushing / PR slicing (user).
+
+- T7 RED: `npx vitest run test/admin-captures.test.ts` -> 2 failed (list still "Ver y vincular"; detail still had the link form, no Resultados hint). GREEN: `npx vitest run` -> 1123 passed, 1 failed (same pre-existing clock-dependent `public-routes` 'Siguiente'); `npm run typecheck` clean; `node --check public/admin.js` ok. Commit 85cdc13.
+- T7 removed: `src/admin/views/capture-link.tsx`, `test/admin-capture-link.test.ts`, POST `/capturas/:matchId/vincular`, tournament/match query handling, `linkSnapshotToGame`. No repository method was link-only; `public/admin.js` had no link JS. Source-marker tests moved to `test/admin-captures.test.ts`; added a test that the Resultados flow (dota buscar/autocompletar + save) stores a game with source 'gsi' and the capture then shows as Vinculada. Detail now shows "Para cargarla en un juego, escribe este Match ID en Resultados y pulsa «Buscar»." for unlinked final captures.
