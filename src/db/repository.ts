@@ -169,6 +169,26 @@ export interface ObserverToken {
   revokedAt: string | null;
 }
 
+export interface GsiCapture {
+  dotaMatchId: number;
+  observerTokenId: number | null;
+  gameState: string | null;
+  isFinal: boolean;
+  /** The payload as the Dota client sent it, minus the auth block. */
+  stateJson: string;
+  /** UTC, 'YYYY-MM-DD HH:MM:SS'. */
+  firstReceivedAt: string;
+  updatedAt: string;
+}
+
+export interface GsiCaptureSummary {
+  dotaMatchId: number;
+  observerName: string | null;
+  gameState: string | null;
+  isFinal: boolean;
+  updatedAt: string;
+}
+
 export interface Session {
   id: string;
   adminId: number;
@@ -188,6 +208,8 @@ const MATCH_COLS = `m.id, m.tournament_id AS tournamentId, m.phase, m.round, m.m
   m.team1_kills AS team1Kills, m.team1_deaths AS team1Deaths, m.team2_kills AS team2Kills, m.team2_deaths AS team2Deaths`;
 const MATCH_FROM = 'FROM matches m JOIN tournaments t ON t.id = m.tournament_id';
 const OBSERVER_COLS = `id, name, token_prefix AS tokenPrefix, created_at AS createdAt, last_seen_at AS lastSeenAt, revoked_at AS revokedAt`;
+const GSI_COLS = `dota_match_id AS dotaMatchId, observer_token_id AS observerTokenId, game_state AS gameState, is_final AS isFinal,
+  state_json AS stateJson, first_received_at AS firstReceivedAt, updated_at AS updatedAt`;
 const ADMIN_COLS = 'id, username, password_hash AS passwordHash, created_at AS createdAt';
 const SESSION_COLS = 'id, admin_id AS adminId, expires_at AS expiresAt';
 
@@ -329,6 +351,15 @@ export function createRepository(db: Database.Database, now: () => Date = () => 
     listObservers: db.prepare(`SELECT ${OBSERVER_COLS} FROM observer_tokens ORDER BY id DESC`),
     activeObserverByHash: db.prepare(`SELECT ${OBSERVER_COLS} FROM observer_tokens WHERE token_hash = ? AND revoked_at IS NULL`),
     revokeObserver: db.prepare("UPDATE observer_tokens SET revoked_at = datetime('now') WHERE id = ? AND revoked_at IS NULL"),
+    // The WHERE on the conflict branch is what keeps a final capture immutable.
+    upsertGsi: db.prepare(`INSERT INTO gsi_captures (dota_match_id, observer_token_id, game_state, is_final, state_json) VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT (dota_match_id) DO UPDATE SET observer_token_id = excluded.observer_token_id, game_state = excluded.game_state,
+        is_final = excluded.is_final, state_json = excluded.state_json, updated_at = datetime('now')
+      WHERE gsi_captures.is_final = 0`),
+    gsiById: db.prepare(`SELECT ${GSI_COLS} FROM gsi_captures WHERE dota_match_id = ?`),
+    recentGsi: db.prepare(`SELECT c.dota_match_id AS dotaMatchId, o.name AS observerName, c.game_state AS gameState, c.is_final AS isFinal, c.updated_at AS updatedAt
+      FROM gsi_captures c LEFT JOIN observer_tokens o ON o.id = c.observer_token_id
+      ORDER BY c.updated_at DESC, c.dota_match_id DESC LIMIT ?`),
     touchObserver: db.prepare("UPDATE observer_tokens SET last_seen_at = datetime('now') WHERE id = ?"),
     deleteOtherSessions: db.prepare('DELETE FROM sessions WHERE admin_id = ? AND id <> ?'),
 
@@ -754,6 +785,19 @@ export function createRepository(db: Database.Database, now: () => Date = () => 
     },
     touchObserverLastSeen(id: number): void {
       q.touchObserver.run(id);
+    },
+
+    // Game State Integration captures
+    /** Stores the latest state of a match; a capture that is already final is left untouched. Returns whether it wrote. */
+    upsertGsiCapture(dotaMatchId: number, observerTokenId: number | null, gameState: string | null, isFinal: boolean, stateJson: string): boolean {
+      return q.upsertGsi.run(dotaMatchId, observerTokenId, gameState, isFinal ? 1 : 0, stateJson).changes > 0;
+    },
+    getGsiCapture(dotaMatchId: number): GsiCapture | undefined {
+      const row = q.gsiById.get(dotaMatchId) as (Omit<GsiCapture, 'isFinal'> & { isFinal: number }) | undefined;
+      return row && { ...row, isFinal: row.isFinal === 1 };
+    },
+    listRecentGsiCaptures(limit: number): GsiCaptureSummary[] {
+      return (q.recentGsi.all(limit) as (Omit<GsiCaptureSummary, 'isFinal'> & { isFinal: number })[]).map((r) => ({ ...r, isFinal: r.isFinal === 1 }));
     },
 
     // Sessions

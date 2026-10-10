@@ -27,7 +27,7 @@ Tournament games are private lobbies. Valve's `GetMatchDetails` answers `500 {}`
 
 ## Tasks
 - [x] T1 Migration 013 `observer_tokens` + repository + admin "Observadores" screen (create / list / revoke / one-time `.cfg` download) — route: delegated writer (2+ non-trivial files)
-- [ ] T2 Migration 014 `gsi_captures` + `POST /gsi` (token auth, 1 MB limit, rate limit, final-not-overwritten) + recent captures list on Observadores — route: delegated writer
+- [x] T2 Migration 014 `gsi_captures` + `POST /gsi` (token auth, 1 MB limit, rate limit, final-not-overwritten) + recent captures list on Observadores — route: delegated writer
 - [ ] T3 GSI capture → `DotaSnapshot` mapper (tolerant, non-final → `incomplete`) + `CapturedDotaSource` decorator checking captures before OpenDota, wired in `src/app.ts` — route: delegated writer. Revisit mapper with a real payload.
 
 ## Acceptance criteria
@@ -36,9 +36,12 @@ Tournament games are private lobbies. Valve's `GetMatchDetails` answers `500 {}`
 - The Observadores screen lists observers (name, prefix, created, last seen, revoked) and recent captures.
 
 ## Progress / evidence
-- T1 RED: `npx vitest run test/gsi-cfg.test.ts test/observer-tokens-repo.test.ts test/admin-observers.test.ts` -> 3 files / 6 failed files-level (modules and routes missing).
+- T1 RED: `npx vitest run test/gsi-cfg.test.ts test/observer-tokens-repo.test.ts test/admin-observers.test.ts` -> 3 test files failed (6 tests; modules, repository methods and routes missing). Commit f0912ee.
 - T1 GREEN: `npx vitest run` -> 1042 passed, 1 failed. The failure `public-routes.test.ts > matches tab > ... the next round ...` ('Siguiente') is clock-dependent (system date is after the fixture's 2026-10-03) and fails identically on the base without my changes (verified by stashing). `npm run typecheck` -> clean.
 - T1 design: one-time reveal rendered straight from the POST response (no redirect/flash/DB copy, Cache-Control: no-store); the .cfg download is a client-side Blob built from the text on the page (public/admin.js), so no server URL can serve the plaintext again.
+- T2 RED: `npx vitest run test/gsi-endpoint.test.ts` -> file failed to load (`src/gsi/routes.js` missing).
+- T2 GREEN: `npx vitest run` -> 1068 passed, 1 failed (same pre-existing clock-dependent `public-routes` 'Siguiente' failure). `npm run typecheck` -> clean. user_version tests bumped to 14.
+- T2 design: 1 MB `/gsi` body cap is selected in `createApp` next to the 64 KB/30 MB selectors; rate limit 300 posts/min per token id (after auth); final captures protected by `ON CONFLICT ... WHERE is_final = 0`.
 
 ## Next step
-- T2.
+- T3.

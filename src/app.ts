@@ -12,6 +12,7 @@ import { clockOf } from './clock.js';
 import { createRepository } from './db/repository.js';
 import { createEvents } from './events.js';
 import { FAVICON_SVG } from './favicon.js';
+import { GSI_MAX_BODY_BYTES, gsiRoutes } from './gsi/routes.js';
 import { publicApp } from './public/routes.js';
 import { OpenDotaSource } from './dota/opendota.js';
 import { CachedDotaSource } from './dota/source.js';
@@ -28,6 +29,7 @@ export interface CreateAppOptions {
 export const MAX_BODY_BYTES = 64 * 1024;
 /** One save of the Equipos screen: several 5 MB pictures plus the multipart envelope. */
 export const MAX_UPLOAD_BYTES = 30 * 1024 * 1024;
+const GSI_PATH = '/gsi'; // Game State Integration payloads from the observers' Dota clients
 const IMAGE_UPLOAD_PATH = /^\/admin\/t\/\d+\/equipos\/lote$/; // the Equipos batch save, which may carry cropped images
 
 export function createApp({ db, config }: CreateAppOptions) {
@@ -46,8 +48,12 @@ export function createApp({ db, config }: CreateAppOptions) {
     maxSize: MAX_UPLOAD_BYTES,
     onError: (c) => c.json({ error: 'Los cambios son demasiado grandes (máximo 30 MB en total, 5 MB por imagen).' }, 413),
   });
-  // Only the image upload route may carry a large body; everything else keeps the small cap.
-  app.use('*', (c, next) => (IMAGE_UPLOAD_PATH.test(c.req.path) ? imageBodies(c, next) : smallBodies(c, next)));
+  const gsiBodies = bodyLimit({ maxSize: GSI_MAX_BODY_BYTES, onError: (c) => c.json({ error: 'too_large' }, 413) });
+  // Only the image upload and GSI routes may carry a large body; everything else keeps the small cap.
+  app.use('*', (c, next) => {
+    if (c.req.path === GSI_PATH) return gsiBodies(c, next);
+    return IMAGE_UPLOAD_PATH.test(c.req.path) ? imageBodies(c, next) : smallBodies(c, next);
+  });
 
   // Static files (CSS, JS, self-hosted hero portraits) are served from ./public under /assets.
   // Only URLs carrying the file's current fingerprint (see assetUrl) are immutable; portraits and the
@@ -85,6 +91,7 @@ export function createApp({ db, config }: CreateAppOptions) {
   app.get('/favicon.svg', (c) => c.body(FAVICON_SVG, 200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' }));
   app.get('/favicon.ico', (c) => c.body(null, 204));
   app.route('/admin', adminApp({ repo, events, config, limiter, accountLimiter, now, images, uploadLimiter, dota }));
+  app.route('/', gsiRoutes({ repo }));
   app.route('/', publicApp({ repo, events, config, now, images }));
 
   return { app, repo, events };

@@ -1,5 +1,5 @@
 import type { FC } from 'hono/jsx';
-import type { ObserverToken } from '../../db/repository.js';
+import type { GsiCaptureSummary, ObserverToken } from '../../db/repository.js';
 import { formatDateTime } from '../../format/datetime.js';
 
 /** The token and cfg of an observer that was created in this very response. */
@@ -38,7 +38,11 @@ const CreatedPanel: FC<{ created: CreatedObserver }> = ({ created }) => (
   </section>
 );
 
-export const ObserversView: FC<{ observers: ObserverToken[]; created?: CreatedObserver }> = ({ observers, created }) => (
+export const ObserversView: FC<{ observers: ObserverToken[]; captures: GsiCaptureSummary[]; created?: CreatedObserver }> = ({
+  observers,
+  captures,
+  created,
+}) => (
   <>
     <div class="head">
       <div>
@@ -103,6 +107,40 @@ export const ObserversView: FC<{ observers: ObserverToken[]; created?: CreatedOb
                   </form>
                 )}
               </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <h2>Capturas recientes</h2>
+    <div class="card scroll-x">
+      <table class="cards">
+        <thead>
+          <tr>
+            <th>Partida (Dota)</th>
+            <th>Observador</th>
+            <th>Estado</th>
+            <th>Final</th>
+            <th>Actualizada</th>
+          </tr>
+        </thead>
+        <tbody>
+          {captures.length === 0 ? (
+            <tr>
+              <td colspan={5} class="muted">
+                Aún no hay capturas.
+              </td>
+            </tr>
+          ) : null}
+          {captures.map((cap) => (
+            <tr>
+              <td data-label="Partida (Dota)">
+                <b>{cap.dotaMatchId}</b>
+              </td>
+              <td data-label="Observador">{cap.observerName ?? '—'}</td>
+              <td class="muted" data-label="Estado">{cap.gameState ?? '—'}</td>
+              <td data-label="Final">{cap.isFinal ? <span class="pill ok">Sí</span> : <span class="pill">No</span>}</td>
+              <td class="muted" data-label="Actualizada">{formatDateTime(cap.updatedAt)}</td>
             </tr>
           ))}
         </tbody>

@@ -9,13 +9,14 @@ import { renderPage } from '../render.js';
 import { ObserversView } from '../views/observers.js';
 
 export const MAX_OBSERVER_NAME = 60;
+const RECENT_CAPTURES = 30;
 
 export function observerRoutes(deps: Deps) {
   const app = new Hono<AdminEnv>();
   const { repo } = deps;
 
   app.get('/observadores', (c) =>
-    renderPage(c, deps, { title: 'Observadores', active: 'observadores' }, <ObserversView observers={repo.listObserverTokens()} />),
+    renderPage(c, deps, { title: 'Observadores', active: 'observadores' }, <ObserversView observers={repo.listObserverTokens()} captures={repo.listRecentGsiCaptures(RECENT_CAPTURES)} />),
   );
 
   app.post('/observadores', async (c) => {
@@ -35,7 +36,7 @@ export function observerRoutes(deps: Deps) {
       c,
       deps,
       { title: 'Observadores', active: 'observadores' },
-      <ObserversView observers={repo.listObserverTokens()} created={{ name, token, cfg, filename: GSI_CFG_FILENAME }} />,
+      <ObserversView observers={repo.listObserverTokens()} captures={repo.listRecentGsiCaptures(RECENT_CAPTURES)} created={{ name, token, cfg, filename: GSI_CFG_FILENAME }} />,
     );
   });
 
