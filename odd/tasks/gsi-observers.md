@@ -75,5 +75,7 @@ Tournament games are private lobbies. Valve's `GetMatchDetails` answers `500 {}`
 - T6 real-script check (scratch fake Steam: root + 2nd library holding Dota, env overrides, no prompt): found Steam, found Dota in the 2nd library, cfg written there (no BOM), .lnk created (target steam.exe, args `-applaunch 570 -gamestateintegration`), exit 0; second run reported "se reemplazó la anterior"; fake root without Dota -> clear Spanish error, exit 1. Real Steam, Desktop and Dota were never touched.
 - Risks T6: SmartScreen / antivirus may flag a downloaded .bat that runs PowerShell (documented in panel copy); libraryfolders.vdf variants beyond "path" entries are not parsed (Steam root is always tried too); the installer is not tested on a real observer machine yet.
 
+- T6 parent spot check: typecheck clean; vitest 1126 passed / 1 failed (pre-existing 'Siguiente'); generated installer read back (ASCII batch prologue, UTF-8 PS body, cfg embedded verbatim). Review assess (base 5f3181c, committed-only): medium, review_due=false, under_budget -> pending in the slice until a later commit reaches the budget.
+
 ## Next step
 - Capture a real spectator POST_GAME payload, replace the synthetic fixture and adjust `src/dota/gsi.ts`; decide on pushing / PR slicing (user).
