@@ -48,5 +48,10 @@ Tournament games are private lobbies. Valve's `GetMatchDetails` answers `500 {}`
 - T3 design: `createApp` wraps whatever it would use before (`config.dotaSource ?? CachedDotaSource(OpenDotaSource)`) in `CapturedDotaSource`, so the test override still works and captures are checked first. Mapper `src/dota/gsi.ts` is validated only against the SYNTHETIC `test/fixtures/gsi-spectator-sample.json`; replace with a real POST_GAME capture and adjust. startTime approximated by first_received_at; bans order (draft keys) is best effort.
 - Known leftovers: "Ver en OpenDota" links and the "datos de OpenDota" label remain for captured matches (private lobbies are not on OpenDota); would need a source marker in the stored snapshot.
 
+- Parent spot check: `npm run typecheck` clean; `npx vitest run` 1084 passed / 1 failed (same clock-dependent `public-routes` 'Siguiente', pre-existing).
+- Native review (range b10c500..ded9e38, risk high, consent granted): 4 lenses, approved, acknowledged (lineage review-f7f29dcfba68d4cf, authority burned). Reviewed boundary -> ded9e38.
+- Advisory follow-ups (non-blocking): any active observer can lock a match id by posting a POST_GAME state first and finals are never overwritable (capture poisoning, no fix-forward) -> admin needs delete/reset of a capture; a non-final capture blocks the OpenDota fallback; JSON is parsed before auth (up to 1 MB unauthenticated); login limiter reused for throughput; observer name limit duplicated in view; garbled comment src/app.ts:44.
+- Mockup (local, outside repo): `Desktop/mockup-gsi-observadores.html` (Observadores, Capturas GSI, Detalle + Vincular, Resultados). Screens 2-3 pending user approval as T4.
+
 ## Next step
 - Capture a real spectator POST_GAME payload, replace the synthetic fixture and adjust `src/dota/gsi.ts`; decide on pushing / PR slicing (user).
