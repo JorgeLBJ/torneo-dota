@@ -1,4 +1,4 @@
-import type { Child, FC } from 'hono/jsx';
+import type { FC } from 'hono/jsx';
 import type { GsiCaptureLink, GsiCaptureRow } from '../../db/repository.js';
 import type { GsiSummary } from '../../dota/gsi.js';
 import type { DotaPlayerLine } from '../../dota/snapshot.js';
@@ -82,7 +82,7 @@ export const CapturesView: FC<{
       <div class="head">
         <div>
           <h1>Capturas GSI</h1>
-          <p class="sub">Partidas que nuestros observadores enviaron. Las finalizadas se pueden vincular a un juego del torneo.</p>
+          <p class="sub">Partidas que nuestros observadores enviaron. Para cargar una finalizada en un juego, escribe su Match ID en Resultados.</p>
         </div>
       </div>
       <form class="toolbar" method="get" action="/admin/capturas">
@@ -142,7 +142,7 @@ export const CapturesView: FC<{
                 </td>
                 <td>
                   <a class="btn sm" href={`/admin/capturas/${row.dotaMatchId}`}>
-                    {state === 'final' && !row.link ? 'Ver y vincular' : 'Ver'}
+                    Ver
                   </a>
                 </td>
               </tr>
@@ -227,7 +227,7 @@ const SideTable: FC<{ side: 'radiant' | 'dire'; players: DotaPlayerLine[]; won: 
   </section>
 );
 
-export const CaptureDetailView: FC<{ item: CaptureItem; summary: GsiSummary; rawJson: string; children?: Child }> = ({ item, summary, rawJson, children }) => {
+export const CaptureDetailView: FC<{ item: CaptureItem; summary: GsiSummary; rawJson: string }> = ({ item, summary, rawJson }) => {
   const { row, state } = item;
   const id = row.dotaMatchId;
   return (
@@ -260,7 +260,11 @@ export const CaptureDetailView: FC<{ item: CaptureItem; summary: GsiSummary; raw
           <LinkedTo link={row.link} />
         </p>
       ) : null}
-      {children}
+      {state === 'final' && row.link === null ? (
+        <p class="note" role="status">
+          Para cargarla en un juego, escribe este Match ID en Resultados y pulsa «Buscar».
+        </p>
+      ) : null}
       <SideTable side="radiant" players={summary.radiant} won={summary.winner === 'radiant'} />
       <SideTable side="dire" players={summary.dire} won={summary.winner === 'dire'} />
       <details class="card">

@@ -1,7 +1,6 @@
 import { fail, ok, type Checked } from '../checked.js';
 import type { Game, Match, Repository, Tournament } from '../db/repository.js';
 import { gameFromSnapshot, lookupDotaMatch, radiantTeamFor } from '../dota/import.js';
-import type { DotaSnapshot } from '../dota/snapshot.js';
 import type { DotaMatchSource } from '../dota/source.js';
 import { seriesLengthFor, validateSeries, type GameScore } from '../domain/series.js';
 import { validateResult, type RawResult } from './results.js';
@@ -76,33 +75,6 @@ export function saveGameResult(
     importedAt: dota ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null,
   });
   return ok(saved);
-}
-
-/**
- * Saves a game from a captured Dota match, the way the import does: the winner follows from who played Radiant,
- * kills are the side scores and deaths the sum of each side's players. Same validation as any other save.
- */
-export function linkSnapshotToGame(
-  repo: Repository,
-  tournament: Tournament,
-  match: Match,
-  gameNumber: number,
-  snapshot: DotaSnapshot,
-  radiantTeamId: number,
-): Checked<Match> {
-  const team1 = match.team1Id;
-  const team2 = match.team2Id;
-  if (team1 === null || team2 === null) return fail('El partido todavía no tiene los dos equipos definidos.');
-  if (radiantTeamId !== team1 && radiantTeamId !== team2) return fail('El equipo Radiant debe ser uno de los dos equipos del partido.');
-  const result = gameFromSnapshot(snapshot, radiantTeamId, team1, team2);
-  const raw = {
-    winner: String(result.winnerId),
-    t1Kills: String(result.team1Kills),
-    t1Deaths: String(result.team1Deaths),
-    t2Kills: String(result.team2Kills),
-    t2Deaths: String(result.team2Deaths),
-  };
-  return saveGameResult(repo, tournament, match, gameNumber, raw, { radiantTeamId, dotaMatchId: snapshot.matchId, snapshot: JSON.stringify(snapshot) });
 }
 
 /** Removes one game. A game that has later games cannot go first. */

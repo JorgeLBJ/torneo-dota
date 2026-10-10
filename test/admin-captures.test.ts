@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { generateObserverToken } from '../src/auth/observer-token.js';
+import { CapturedDotaSource } from '../src/dota/captured.js';
+import { mapGsiState } from '../src/dota/gsi.js';
 import { INCOMPLETE_AFTER_MS, captureStateOf } from '../src/gsi/state.js';
 import { flashText, makeApp, type TestApp } from './helpers/app.js';
 
@@ -225,5 +227,156 @@ describe('Observadores screen after the move', () => {
     expect(html).not.toContain('Capturas recientes');
     expect(html).toContain('<th>Capturas</th>');
     expect(html).toMatch(/data-label="Capturas">2</);
+  });
+});
+
+describe('Linking lives in Resultados, not in the capture screens', () => {
+  const MATCH = 8123456789; // map.matchid of the fixture
+
+  it('the list only offers "Ver", also for a final unlinked capture', async () => {
+    capture(MATCH, { final: true });
+    const html = await (await t.get('/admin/capturas', cookie)).text();
+    expect(html).toContain('>Ver<');
+    expect(html).not.toContain('Ver y vincular');
+    expect(html).not.toContain('se pueden vincular');
+  });
+
+  it('the detail has no link form and no link route, and points to Resultados for an unlinked final capture', async () => {
+    t.repo.createTournament({ name: 'Copa Octubre', slug: 'copa' });
+    capture(MATCH, { final: true });
+    const html = await (await t.get(`/admin/capturas/${MATCH}?torneo=1&partido=1`, cookie)).text();
+    expect(html).not.toContain('Vincular a un juego del torneo');
+    expect(html).not.toContain('/vincular');
+    expect(html).toContain('Para cargarla en un juego, escribe este Match ID en Resultados y pulsa «Buscar».');
+    const post = await t.post(`/admin/capturas/${MATCH}/vincular`, { torneo: '1' }, cookie);
+    expect(post.status).toBe(404);
+  });
+
+  it('no hint for a live or an already linked capture', async () => {
+    capture(MATCH + 1, { final: false });
+    expect(await (await t.get(`/admin/capturas/${MATCH + 1}`, cookie)).text()).not.toContain('escribe este Match ID');
+    linkGame(MATCH);
+    capture(MATCH, { final: true });
+    const html = await (await t.get(`/admin/capturas/${MATCH}`, cookie)).text();
+    expect(html).not.toContain('escribe este Match ID');
+    expect(html).toContain('Vinculada a');
+  });
+
+  it('entering the Match ID in the Resultados game form stores the captured game (source gsi) and the capture shows as linked', async () => {
+    capture(MATCH, { final: true });
+    const tournament = t.repo.createTournament({ name: 'Copa Octubre', slug: 'copa' });
+    t.repo.setActiveTournament(tournament.id);
+    const a = t.repo.createTeam(tournament.id, { code: 'A', name: 'Equipo A' });
+    const b = t.repo.createTeam(tournament.id, { code: 'B', name: 'Equipo B' });
+    const m = t.repo.createMatch({ tournamentId: tournament.id, phase: 'group', round: 2, matchNumber: 1, team1Id: a.id, team2Id: b.id });
+    const base = `/admin/t/${tournament.id}`;
+
+    const found = await t.send('POST', `${base}/dota/buscar`, { form: { dota_match_id: String(MATCH) }, cookie, headers: { accept: 'application/json' } });
+    expect(((await found.json()) as { ok: boolean }).ok).toBe(true);
+    const auto = await t.send('POST', `${base}/dota/autocompletar`, {
+      form: { dota_match_id: String(MATCH), winner: String(a.id), team1_id: String(a.id), team2_id: String(b.id) },
+      cookie,
+      headers: { accept: 'application/json' },
+    });
+    const filled = (await auto.json()) as { ok: boolean; team1Kills: number; team1Deaths: number; team2Kills: number; team2Deaths: number };
+    expect(filled.ok).toBe(true);
+
+    const res = await t.post(
+      `${base}/resultados/${m.id}/juego/1`,
+      {
+        winner: String(a.id),
+        t1_kills: String(filled.team1Kills),
+        t1_deaths: String(filled.team1Deaths),
+        t2_kills: String(filled.team2Kills),
+        t2_deaths: String(filled.team2Deaths),
+        dota_match_id: String(MATCH),
+        dota_winner: String(a.id),
+      },
+      cookie,
+    );
+    expect(res.status).toBe(303);
+    const game = t.repo.listGames(m.id)[0]!;
+    expect(game).toMatchObject({ dotaMatchId: MATCH, radiantTeamId: a.id, winnerId: a.id, dotaSource: 'gsi' });
+
+    const list = await (await t.get('/admin/capturas?estado=vinculadas', cookie)).text();
+    expect(list).toContain('Copa Octubre');
+    expect(list).toContain('Equipo A vs Equipo B');
+    const detail = await (await t.get(`/admin/capturas/${MATCH}`, cookie)).text();
+    expect(detail).toContain('Vinculada a');
+    expect(detail).not.toContain('escribe este Match ID');
+  });
+});
+
+// Helpers for the source-marker tests (moved here with the capture-link tests removal).
+const MATCH_ID = 8123456789;
+const snapshot = () => mapGsiState(sample(), { startTime: 0 });
+function setup() {
+  const tournament = t.repo.createTournament({ name: 'Copa Octubre', slug: 'copa' });
+  const a = t.repo.createTeam(tournament.id, { code: 'A', name: 'Equipo A' });
+  const b = t.repo.createTeam(tournament.id, { code: 'B', name: 'Equipo B' });
+  const match = t.repo.createMatch({ tournamentId: tournament.id, phase: 'group', round: 2, matchNumber: 1, team1Id: a.id, team2Id: b.id });
+  return { tournament, a, b, match };
+}
+
+describe('source marker', () => {
+  it('reads the source of a stored game: old snapshots are OpenDota, none for a manual game', () => {
+    const { match, a } = setup();
+    const game = (n: number, snapshot: string | null) => ({ gameNumber: n, winnerId: a.id, team1Kills: 1, team1Deaths: 1, team2Kills: 1, team2Deaths: 1, dotaMatchId: snapshot ? 100 + n : null, radiantTeamId: snapshot ? a.id : null, dotaSnapshot: snapshot });
+    const m2 = t.repo.createMatch({ tournamentId: match.tournamentId, phase: 'semifinal', round: 1, matchNumber: 2, team1Id: match.team1Id, team2Id: match.team2Id });
+    t.repo.saveGame(m2.id, game(1, null));
+    t.repo.saveGame(m2.id, game(2, '{"matchId":1}'));
+    t.repo.saveGame(m2.id, game(3, '{"matchId":1,"source":"gsi"}'));
+    const bySource = (games: { gameNumber: number; dotaSource: string | null }[]) => games.map((g) => g.dotaSource);
+    expect(bySource(t.repo.listGames(m2.id))).toEqual([null, 'opendota', 'gsi']);
+    expect(bySource(t.repo.listTournamentGames(match.tournamentId).filter((g) => g.matchId === m2.id))).toEqual([null, 'opendota', 'gsi']);
+  });
+
+  it('is set by the captured source', async () => {
+    capture(MATCH_ID, { final: true });
+    const snap = await new CapturedDotaSource(t.repo, { fetch: async () => { throw new Error('unused'); } }).fetch(MATCH_ID);
+    expect(snap.source).toBe('gsi');
+  });
+
+  const savedGame = (source?: 'gsi' | 'opendota') => {
+    const { tournament, match, a } = setup();
+    const { source: _mapped, ...base } = snapshot();
+    const snap = { ...base, matchId: 9023462170, ...(source ? { source } : {}) };
+    t.repo.saveGame(match.id, {
+      gameNumber: 1,
+      winnerId: a.id,
+      team1Kills: 42,
+      team1Deaths: 37,
+      team2Kills: 37,
+      team2Deaths: 42,
+      radiantTeamId: a.id,
+      dotaMatchId: 9023462170,
+      dotaSnapshot: JSON.stringify(snap),
+    });
+    return { tournament, match };
+  };
+
+  it('the admin results card links old games to OpenDota and captured games to nothing', async () => {
+    const old = savedGame();
+    const oldHtml = await (await t.get(`/admin/t/${old.tournament.id}/resultados?fecha=todos`, cookie)).text();
+    expect(oldHtml).toContain('Ver en OpenDota');
+
+    t.db.prepare('DELETE FROM match_games').run();
+    t.db.prepare("UPDATE tournaments SET slug = 'copa-vieja'").run();
+    const gsi = savedGame('gsi');
+    const html = await (await t.get(`/admin/t/${gsi.tournament.id}/resultados?fecha=todos`, cookie)).text();
+    expect(html).not.toContain('opendota.com');
+    expect(html).toContain('Capturado por nuestros observadores');
+  });
+
+  it('the public detail JSON carries the source and the page script labels captured games', async () => {
+    const { match } = savedGame('gsi');
+    const res = await t.get(`/t/copa/partido/${match.id}/detalle`);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.games[0].dota.source).toBe('gsi');
+
+    const script = readFileSync(new URL('../public/match-detail.js', import.meta.url), 'utf8');
+    expect(script).toContain("dota.source === 'gsi'");
+    expect(script).toContain('Datos capturados por nuestros observadores');
   });
 });
