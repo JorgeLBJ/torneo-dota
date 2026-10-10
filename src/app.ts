@@ -93,7 +93,7 @@ export function createApp({ db, config }: CreateAppOptions) {
   app.get('/favicon.svg', (c) => c.body(FAVICON_SVG, 200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' }));
   app.get('/favicon.ico', (c) => c.body(null, 204));
   app.route('/admin', adminApp({ repo, events, config, limiter, accountLimiter, now, images, uploadLimiter, dota }));
-  app.route('/', gsiRoutes({ repo }));
+  app.route('/', gsiRoutes({ repo, events }));
   app.route('/', publicApp({ repo, events, config, now, images }));
 
   return { app, repo, events };

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { hashObserverToken } from '../auth/observer-token.js';
 import { LoginRateLimiter } from '../auth/rate-limit.js';
 import type { Repository } from '../db/repository.js';
+import type { Events } from '../events.js';
 
 /** A full spectator payload with every data block enabled is tens of KB; 1 MB leaves a wide margin. */
 export const GSI_MAX_BODY_BYTES = 1024 * 1024;
@@ -18,7 +19,7 @@ export function parseMatchId(value: unknown): number | null {
 }
 
 /** Public endpoint the Dota client posts to; authenticated only by the observer token inside the body. */
-export function gsiRoutes({ repo }: { repo: Repository }) {
+export function gsiRoutes({ repo, events }: { repo: Repository; events: Events }) {
   const app = new Hono();
   const limiter = new LoginRateLimiter({ maxFailures: GSI_RATE_LIMIT, windowMs: 60_000 });
 
@@ -46,7 +47,8 @@ export function gsiRoutes({ repo }: { repo: Repository }) {
       const matchId = parseMatchId(map.matchid);
       if (matchId !== null) {
         const gameState = typeof map.game_state === 'string' ? map.game_state : null;
-        repo.upsertGsiCapture(matchId, observer.id, gameState, gameState === GSI_FINAL_STATE, JSON.stringify(state));
+        const wrote = repo.upsertGsiCapture(matchId, observer.id, gameState, gameState === GSI_FINAL_STATE, JSON.stringify(state));
+        if (wrote) events.capturesChanged();
       }
       return c.json({ ok: true });
     },

@@ -79,6 +79,7 @@ export function resultRoutes(deps: Deps) {
       const removed = deleteGameResult(repo, tournament, match, gameNumber);
       if (!removed.ok) return refuse(removed.error);
       deps.events.tournamentChanged(tournament.id);
+      deps.events.capturesChanged();
       setFlash(c, 'ok', multi ? `Juego ${gameNumber} borrado.` : 'Resultado borrado.');
       return c.redirect(back, 303);
     }
@@ -88,6 +89,7 @@ export function resultRoutes(deps: Deps) {
     const saved = saveGameResult(repo, tournament, match, gameNumber, input.value.raw, input.value.imported);
     if (!saved.ok) return refuse(saved.error);
     deps.events.tournamentChanged(tournament.id);
+    deps.events.capturesChanged();
     setFlash(c, 'ok', multi ? `Juego ${gameNumber} del partido ${match.matchNumber} guardado.` : `Resultado del partido ${match.matchNumber} guardado.`);
     return c.redirect(back, 303);
   };

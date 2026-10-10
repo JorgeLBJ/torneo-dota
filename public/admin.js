@@ -1260,3 +1260,148 @@
     });
   });
 })();
+
+// Live Capturas GSI (list and detail): follow /admin/capturas/eventos and swap the page content in place.
+(function () {
+  var region = document.querySelector('[data-live-page][data-live-region]');
+  var core = window.AdminLiveCore;
+  if (!region || !core || !window.EventSource || !window.fetch || !window.DOMParser) return;
+
+  var REFRESH_MS = 3000;
+  var source = null;
+  var inFlight = false;
+  var stopped = false;
+
+  function rowKeys(root) {
+    return Array.prototype.map.call(root.querySelectorAll('[data-capture-key]'), function (row) {
+      return row.getAttribute('data-capture-key');
+    });
+  }
+
+  function openDetails(root) {
+    var all = root.querySelectorAll('details');
+    var open = [];
+    for (var i = 0; i < all.length; i++) if (all[i].open) open.push(i);
+    return open;
+  }
+
+  function restoreDetails(root, open) {
+    var all = root.querySelectorAll('details');
+    open.forEach(function (i) {
+      if (all[i]) all[i].open = true;
+    });
+  }
+
+  function calm() {
+    return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
+  function highlight(root, keys) {
+    if (calm()) return;
+    root.querySelectorAll('[data-capture-key]').forEach(function (row) {
+      if (keys.indexOf(row.getAttribute('data-capture-key')) === -1) return;
+      row.classList.add('cap-new');
+      row.addEventListener('animationend', function () {
+        row.classList.remove('cap-new');
+      });
+    });
+  }
+
+  /** Whether the user is typing in (or has a dialog open inside) the region. */
+  function busy() {
+    return !!region.querySelector('dialog[open]');
+  }
+
+  function swapChildren(fresh) {
+    var current = Array.prototype.slice.call(region.children);
+    var next = Array.prototype.slice.call(fresh.children);
+    var active = document.activeElement;
+    var typing = active && region.contains(active) && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName);
+    if (typing && current.length !== next.length) return false;
+    var before = rowKeys(region);
+    var open = openDetails(region);
+    if (current.length === next.length) {
+      current.forEach(function (node, i) {
+        // The part holding the focused field stays as it is, so typing is never interrupted.
+        if (typing && node.contains(active)) return;
+        region.replaceChild(document.importNode(next[i], true), node);
+      });
+    } else {
+      region.textContent = '';
+      next.forEach(function (node) {
+        region.appendChild(document.importNode(node, true));
+      });
+    }
+    restoreDetails(region, open);
+    highlight(region, core.newKeys(before, rowKeys(region)));
+    return true;
+  }
+
+  function apply(html) {
+    var doc = new DOMParser().parseFromString(html, 'text/html');
+    var badge = doc.querySelector('[data-live-nav="capturas"]');
+    var nav = document.querySelector('[data-live-nav="capturas"]');
+    if (badge && nav) nav.innerHTML = badge.innerHTML;
+    var fresh = doc.querySelector('[data-live-page][data-live-region]');
+    if (fresh) return swapChildren(fresh);
+    // The capture is gone (detail page now answers 404): show that page's content and stop listening.
+    var main = doc.querySelector('main');
+    if (main) {
+      region.textContent = '';
+      Array.prototype.forEach.call(main.children, function (node) {
+        region.appendChild(document.importNode(node, true));
+      });
+    }
+    stop();
+    return true;
+  }
+
+  function refresh() {
+    if (inFlight || stopped) return;
+    if (busy()) {
+      // A dialog is open: try again later instead of destroying it.
+      window.setTimeout(function () {
+        throttle.trigger();
+      }, REFRESH_MS);
+      return;
+    }
+    inFlight = true;
+    fetch(window.location.pathname + window.location.search, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'text/html' } })
+      .then(function (res) {
+        if (res.redirected && res.url.indexOf('/admin/login') !== -1) {
+          window.location.reload();
+          return null;
+        }
+        return res.status === 200 || res.status === 404 ? res.text() : null;
+      })
+      .then(function (html) {
+        if (html && !apply(html)) throttle.trigger();
+      })
+      .catch(function () {})
+      .then(function () {
+        inFlight = false;
+      });
+  }
+
+  var throttle = core.createThrottle(refresh, REFRESH_MS, {
+    setTimeout: function (fn, ms) {
+      return window.setTimeout(fn, ms);
+    },
+    clearTimeout: function (id) {
+      window.clearTimeout(id);
+    },
+  });
+
+  function stop() {
+    stopped = true;
+    throttle.cancel();
+    if (source) source.close();
+    source = null;
+  }
+
+  source = new EventSource('/admin/capturas/eventos');
+  source.addEventListener('change', function () {
+    throttle.trigger();
+  });
+  window.addEventListener('pagehide', stop);
+})();

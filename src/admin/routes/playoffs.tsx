@@ -88,6 +88,7 @@ export function playoffRoutes(deps: Deps) {
       const removed = deletePlayoffGame(repo, tournament, kind, number, gameNumber);
       if (!removed.ok) return refuse(removed.error);
       deps.events.tournamentChanged(tournament.id);
+      deps.events.capturesChanged();
       setFlash(c, 'ok', multi ? `Juego ${gameNumber} borrado.` : 'Resultado borrado.');
       return c.redirect(back, 303);
     }
@@ -101,6 +102,7 @@ export function playoffRoutes(deps: Deps) {
     const checked = recordPlayoffResult(repo, tournament, state, kind, number, input.value.raw, { gameNumber, imported: input.value.imported });
     if (!checked.ok) return refuse(checked.error);
     deps.events.tournamentChanged(tournament.id);
+    deps.events.capturesChanged();
     setFlash(c, 'ok', multi ? `Juego ${gameNumber} guardado.` : 'Resultado guardado.');
     return c.redirect(back, 303);
   };

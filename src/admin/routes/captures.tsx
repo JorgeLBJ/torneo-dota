@@ -1,10 +1,14 @@
 import { Hono, type Context } from 'hono';
+import { streamSSE } from 'hono/streaming';
 import { summarizeGsiState } from '../../dota/gsi.js';
 import { captureStateOf } from '../../gsi/state.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { setFlash } from '../flash.js';
 import { renderPage } from '../render.js';
 import { CaptureDetailView, CapturesView, FILTERS, PAGE_SIZE, type CaptureFilter, type CaptureItem } from '../views/captures.js';
+
+const SSE_RETRY_MS = 3000;
+const HEARTBEAT_MS = 25_000;
 
 /** How many of the most recently updated captures the list works on. */
 const MAX_LISTED = 1000;
@@ -56,6 +60,44 @@ export function captureRoutes(deps: Deps) {
       </>,
     );
 
+  /**
+   * Server-sent events for the capture screens: `hello` on connect, `change` whenever a capture or its
+   * link changed (the page then re-fetches itself; throttling is the client's job) and `ping` as heartbeat.
+   */
+  app.get('/capturas/eventos', (c) => {
+    c.header('X-Accel-Buffering', 'no');
+    return streamSSE(c, async (stream) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let wake: (() => void) | undefined;
+      let unsubscribe: (() => void) | undefined;
+      const cleanup = () => {
+        unsubscribe?.();
+        unsubscribe = undefined;
+        clearTimeout(timer);
+        wake?.();
+      };
+      stream.onAbort(cleanup);
+      try {
+        unsubscribe = deps.events.onCapturesChanged(() => {
+          stream.writeSSE({ event: 'change', data: '{}' }).catch(() => undefined);
+        });
+        await stream.writeSSE({ event: 'hello', data: '{}', retry: SSE_RETRY_MS });
+        while (!stream.aborted) {
+          await new Promise<void>((resolve) => {
+            wake = resolve;
+            timer = setTimeout(resolve, deps.config.heartbeatMs ?? HEARTBEAT_MS);
+          });
+          if (stream.aborted) break;
+          await stream.writeSSE({ event: 'ping', data: '{}' });
+        }
+      } catch {
+        // The client went away mid-write; nothing to report.
+      } finally {
+        cleanup();
+      }
+    });
+  });
+
   app.get('/capturas/:matchId', (c) => {
     const id = parseMatchId(c.req.param('matchId'));
     const row = id === null ? undefined : repo.getGsiCaptureRow(id);
@@ -81,7 +123,10 @@ export function captureRoutes(deps: Deps) {
   app.post('/capturas/:matchId/borrar', (c) => {
     const id = parseMatchId(c.req.param('matchId'));
     if (id === null || !repo.deleteGsiCapture(id)) setFlash(c, 'error', 'La captura no existe.');
-    else setFlash(c, 'ok', `Captura ${id} borrada. El observador puede volver a enviar la partida.`);
+    else {
+      deps.events.capturesChanged();
+      setFlash(c, 'ok', `Captura ${id} borrada. El observador puede volver a enviar la partida.`);
+    }
     return c.redirect('/admin/capturas', 303);
   });
 

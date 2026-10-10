@@ -76,6 +76,7 @@ const Document: FC<PropsWithChildren<{ title: string }>> = ({ title, children })
       </head>
       <body>
         {children}
+        <script src={assetUrl('admin-live-core.js')} defer></script>
         <script src={assetUrl('admin.js')} defer></script>
         <script src={assetUrl('rulebook-editor.js')} defer></script>
       </body>
@@ -126,7 +127,7 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, active, admi
             <a href="/admin/observadores" class={active === 'observadores' ? 'on' : ''}>
               Observadores
             </a>
-            <a href="/admin/capturas" class={active === 'capturas' ? 'on' : ''}>
+            <a href="/admin/capturas" class={active === 'capturas' ? 'on' : ''} data-live-nav="capturas">
               Capturas GSI
               {nav.unlinkedCaptures ? badge(`${nav.unlinkedCaptures} sin vincular`) : null}
             </a>

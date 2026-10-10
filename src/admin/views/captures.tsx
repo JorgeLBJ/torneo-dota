@@ -79,7 +79,7 @@ export const CapturesView: FC<{
     return `/admin/capturas${text ? `?${text}` : ''}`;
   };
   return (
-    <>
+    <div data-live-page="capturas-list" data-live-region>
       <div class="head">
         <div>
           <h1>Capturas GSI</h1>
@@ -123,7 +123,7 @@ export const CapturesView: FC<{
               </tr>
             ) : null}
             {items.map(({ row, state }) => (
-              <tr>
+              <tr data-capture-key={String(row.dotaMatchId)}>
                 <td data-label="Match ID">
                   <b>{row.dotaMatchId}</b>
                 </td>
@@ -172,7 +172,7 @@ export const CapturesView: FC<{
         <b>En curso</b>: el observador sigue enviando datos. <b>Finalizada</b>: llegó el estado final; ya no se sobrescribe. <b>Incompleta</b>: dejaron de llegar datos antes del final
         (el observador se fue o se cayó).
       </p>
-    </>
+    </div>
   );
 };
 
@@ -237,7 +237,7 @@ export const CaptureDetailView: FC<{ item: CaptureItem; summary: GsiSummary; raw
   const { row, state } = item;
   const id = row.dotaMatchId;
   return (
-    <>
+    <div data-live-page="capturas-detail" data-live-region>
       <p>
         <a href="/admin/capturas">← Capturas GSI</a>
       </p>
@@ -301,6 +301,6 @@ export const CaptureDetailView: FC<{ item: CaptureItem; summary: GsiSummary; raw
           </div>
         </dialog>
       </form>
-    </>
+    </div>
   );
 };
