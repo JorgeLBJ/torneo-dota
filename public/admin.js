@@ -127,9 +127,7 @@
     if (!button || !source) return;
     button.addEventListener('click', function () {
       var text = source.textContent;
-      if (crlf) text = text.replace(/?
-/g, '
-');
+      if (crlf) text = text.replace(/\r?\n/g, '\r\n');
       var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
       var url = URL.createObjectURL(blob);
       var link = document.createElement('a');
