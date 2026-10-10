@@ -101,6 +101,9 @@ Tournament games are private lobbies. Valve's `GetMatchDetails` answers `500 {}`
 - DELIVERED 2026-10-10: feat/gsi-observers fast-forwarded into main (b10c500..521d034), branch deleted, pushed. VPS: pre-deploy backup ~/backups/torneos-2026-10-10-0256-pre-gsi.db; `docker compose build --pull && up -d`; container healthy, user_version 12 -> 14, 21 matches intact, on mbd_edge. Public checks: /healthz 200, POST /gsi without token 401, /admin/capturas 303 (login), / 200.
 - Still unverified in prod: a Dota client posting to the https uri (first observer test with a prod token). e238953 (live-refresh fix) stays under the review budget, pending.
 
+- T9 parent check: vitest 1158 passed / 1 pre-existing fail; typecheck clean; node --check admin.js ok.
+- Native review T9 + e238953 (base 193709f, high, granted, 4 lenses): approved, acknowledged (lineage review-bfedf77b8d5b8fd8). Advisories only: filter query literal duplicated, shadowed prop, TTL restated in a comment, client 'hello' reconnect path untested.
+
 ## Next step
 - Capture a real spectator POST_GAME payload, replace the synthetic fixture and adjust `src/dota/gsi.ts`; decide on pushing / PR slicing (user).
 
