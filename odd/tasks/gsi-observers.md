@@ -104,6 +104,9 @@ Tournament games are private lobbies. Valve's `GetMatchDetails` answers `500 {}`
 - T9 parent check: vitest 1158 passed / 1 pre-existing fail; typecheck clean; node --check admin.js ok.
 - Native review T9 + e238953 (base 193709f, high, granted, 4 lenses): approved, acknowledged (lineage review-bfedf77b8d5b8fd8). Advisories only: filter query literal duplicated, shadowed prop, TTL restated in a comment, client 'hello' reconnect path untested.
 
+- DELIVERED T9 2026-10-10: fix branch fast-forwarded into main (7bdb492..b67f1d4), deleted, pushed. VPS backup ~/backups/torneos-2026-10-10-0318-pre-t9.db; build --pull + up -d; healthy, user_version 14, on mbd_edge; /healthz 200, POST /gsi without token 401, admin 303, / 200.
+- PROD VERIFIED: a real Dota client posted to https://torneo-dota.jpsolutions.app/gsi (observer 'kendeclise', replay of match 9036861125, 03:07-03:08 UTC, final). Dota accepts the https uri. Open item closed.
+
 ## Next step
 - Capture a real spectator POST_GAME payload, replace the synthetic fixture and adjust `src/dota/gsi.ts`; decide on pushing / PR slicing (user).
 
