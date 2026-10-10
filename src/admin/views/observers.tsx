@@ -39,7 +39,7 @@ const CreatedPanel: FC<{ created: CreatedObserver }> = ({ created }) => (
       <ol>
         <li>
           Descarga <b>{created.filename}</b> y cópialo en la carpeta{' '}
-          <code>…steamappscommondota 2 betagamedotacfggamestate_integration</code> (créala si no existe).
+          <code>{'…\\steamapps\\common\\dota 2 beta\\game\\dota\\cfg\\gamestate_integration\\'}</code> (créala si no existe).
         </li>
         <li>
           En Steam, abre las propiedades de Dota 2 y agrega la opción de lanzamiento <code>-gamestateintegration</code>.

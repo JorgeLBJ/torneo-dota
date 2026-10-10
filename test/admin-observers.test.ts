@@ -33,6 +33,7 @@ describe('Observadores screen', () => {
     expect(html).toContain('&quot;uri&quot;       &quot;https://torneo.example.com/gsi&quot;');
     expect(html).toContain(token!);
     expect(html).toContain('gamestate_integration_torneo.cfg');
+    expect(html).toContain('…\\steamapps\\common\\dota 2 beta\\game\\dota\\cfg\\gamestate_integration\\');
     expect(html).toContain('-gamestateintegration');
     expect(html).toContain('Descargar .cfg');
     expect(html).toContain('Descargar instalador (.bat)');
