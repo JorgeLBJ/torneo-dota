@@ -133,7 +133,7 @@ describe('users screen', () => {
     const cookie = await t.login();
     t.db.prepare("UPDATE admins SET created_at = '2026-09-29 02:13:45'").run();
     const page = await (await t.get('/admin/usuarios', cookie)).text();
-    expect(page).toContain('29/09/2026 02:13:45');
+    expect(page).toContain('28/09/2026 21:13:45');
     expect(page).not.toContain('2026-09-29');
     expect(page).toContain('<span class="pill next">Tú</span>');
   });

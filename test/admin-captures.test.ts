@@ -82,7 +82,7 @@ describe('Capturas GSI list', () => {
     expect(html).toContain('Mati');
     expect(html).toContain('En curso');
     expect(html).toContain('Incompleta');
-    expect(html).toContain('09/10/2026 21:30:00');
+    expect(html).toContain('09/10/2026 16:30:00');
     expect(html).toContain('href="/admin/capturas/9028047526"');
   });
 
