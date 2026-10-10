@@ -42,7 +42,7 @@ export function observerRoutes(deps: Deps) {
     return renderPage(
       c,
       deps,
-      { title: 'Observadores', active: 'observadores' },
+      { title: 'Observadores', active: 'observadores', tournament: repo.getActiveTournament() },
       <ObserversView observers={all} filter={filter} captureCounts={repo.countGsiCapturesByObserver()} created={created} notice={notice} timeZone={adminTimeZone(deps)} />,
     );
   });

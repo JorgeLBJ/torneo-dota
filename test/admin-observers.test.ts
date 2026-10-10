@@ -187,6 +187,16 @@ describe('admin time zone on global screens', () => {
     expect(await (await t.get('/admin/observadores', cookie)).text()).toContain('10/10/2026 12:01:34');
   });
 
+  it('keeps the full sidebar (the active tournament sections) on Observadores and Capturas GSI, like Usuarios', async () => {
+    const tour = t.repo.createTournament({ name: 'Copa', slug: 'copa' });
+    t.repo.setActiveTournament(tour.id);
+    for (const path of ['/admin/observadores', '/admin/capturas', '/admin/usuarios']) {
+      const html = await (await t.get(path, cookie)).text();
+      expect(html, path).toContain(`/admin/t/${tour.id}/config`);
+      expect(html, path).toContain(`/admin/t/${tour.id}/resultados`);
+    }
+  });
+
   it('applies to Usuarios', async () => {
     t.db.prepare("UPDATE admins SET created_at = '2026-10-10 03:01:34'").run();
     expect(await (await t.get('/admin/usuarios', cookie)).text()).toContain('09/10/2026 22:01:34');

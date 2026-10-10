@@ -41,7 +41,7 @@ export function captureRoutes(deps: Deps) {
     return renderPage(
       c,
       deps,
-      { title: 'Capturas GSI', active: 'capturas' },
+      { title: 'Capturas GSI', active: 'capturas', tournament: repo.getActiveTournament() },
       <CapturesView items={shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)} counts={counts} filter={filter} query={query} page={page} pages={pages} timeZone={adminTimeZone(deps)} />,
     );
   });
@@ -50,7 +50,7 @@ export function captureRoutes(deps: Deps) {
     renderPage(
       c,
       deps,
-      { title: 'Capturas GSI', active: 'capturas', status: 404 },
+      { title: 'Capturas GSI', active: 'capturas', status: 404, tournament: repo.getActiveTournament() },
       <>
         <p>
           <a href="/admin/capturas">← Capturas GSI</a>
@@ -115,7 +115,7 @@ export function captureRoutes(deps: Deps) {
     return renderPage(
       c,
       deps,
-      { title: `Captura ${id}`, active: 'capturas' },
+      { title: `Captura ${id}`, active: 'capturas', tournament: repo.getActiveTournament() },
       <CaptureDetailView item={{ row, state }} summary={summarizeGsiState(parsed)} rawJson={rawJson} timeZone={adminTimeZone(deps)} />,
     );
   });
