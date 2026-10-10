@@ -132,6 +132,8 @@ export interface Game {
   radiantTeamId: number | null;
   dotaMatchId: number | null;
   dotaSnapshot: string | null;
+  /** Where the imported detail came from (read from the snapshot without loading it); null for a manual game. */
+  dotaSource: 'opendota' | 'gsi' | null;
   importedAt: string | null;
 }
 
@@ -150,7 +152,8 @@ export interface GameInput {
 
 const gameCols = (p: string, snapshot = true) => `${p}id, ${p}match_id AS matchId, ${p}game_number AS gameNumber, ${p}winner_id AS winnerId,
   ${p}team1_kills AS team1Kills, ${p}team1_deaths AS team1Deaths, ${p}team2_kills AS team2Kills, ${p}team2_deaths AS team2Deaths,
-  ${p}radiant_team_id AS radiantTeamId, ${p}dota_match_id AS dotaMatchId, ${snapshot ? `${p}dota_snapshot` : 'NULL'} AS dotaSnapshot, ${p}imported_at AS importedAt`;
+  ${p}radiant_team_id AS radiantTeamId, ${p}dota_match_id AS dotaMatchId, ${snapshot ? `${p}dota_snapshot` : 'NULL'} AS dotaSnapshot, ${p}imported_at AS importedAt,
+  CASE WHEN ${p}dota_snapshot IS NULL THEN NULL WHEN json_valid(${p}dota_snapshot) AND json_extract(${p}dota_snapshot, '$.source') = 'gsi' THEN 'gsi' ELSE 'opendota' END AS dotaSource`;
 
 export interface Admin {
   id: number;

@@ -36,6 +36,7 @@ export interface ResultCardProps {
 }
 
 const dotaLink = (id: number) => `https://www.opendota.com/matches/${id}`;
+const captured = (game: Game | undefined): boolean => game?.dotaSource === 'gsi';
 
 interface GameFormProps {
   action: string;
@@ -112,9 +113,13 @@ const GameForm: FC<GameFormProps> = ({ action, number, multi, team1, team2, pref
             {imported ? (
               <>
                 Detalle guardado ·{' '}
-                <a href={dotaLink(game!.dotaMatchId!)} target="_blank" rel="noopener">
-                  Ver en OpenDota ↗
-                </a>
+                {captured(game) ? (
+                  'Capturado por nuestros observadores'
+                ) : (
+                  <a href={dotaLink(game!.dotaMatchId!)} target="_blank" rel="noopener">
+                    Ver en OpenDota ↗
+                  </a>
+                )}
               </>
             ) : null}
           </p>

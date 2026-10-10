@@ -254,9 +254,12 @@ export const CaptureDetailView: FC<{ item: CaptureItem; summary: GsiSummary; raw
           </div>
         </div>
       </div>
-      <p>
-        <LinkedTo link={row.link} />
-      </p>
+      {row.link || state === 'final' ? (
+        <p>
+          {row.link ? 'Vinculada a ' : null}
+          <LinkedTo link={row.link} />
+        </p>
+      ) : null}
       {children}
       <SideTable side="radiant" players={summary.radiant} won={summary.winner === 'radiant'} />
       <SideTable side="dire" players={summary.dire} won={summary.winner === 'dire'} />

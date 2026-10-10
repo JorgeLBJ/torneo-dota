@@ -20,6 +20,8 @@ export interface DotaPlayerLine {
 }
 
 export interface DotaSnapshot {
+  /** Where the data came from; absent in snapshots saved before the marker existed, which are OpenDota's. */
+  source?: 'opendota' | 'gsi';
   matchId: number;
   durationSec: number;
   radiantWin: boolean;

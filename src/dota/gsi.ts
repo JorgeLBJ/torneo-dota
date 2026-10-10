@@ -142,6 +142,7 @@ export function mapGsiState(raw: unknown, meta: { startTime: number }): DotaSnap
   const matchId = typeof map.matchid === 'string' ? Number(map.matchid) : num(map.matchid);
 
   return {
+    source: 'gsi',
     matchId: Number.isSafeInteger(matchId) && matchId > 0 ? matchId : 0,
     durationSec: Math.max(0, Math.floor(num(map.clock_time))),
     radiantWin: map.win_team === 'radiant',

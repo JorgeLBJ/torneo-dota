@@ -441,3 +441,5 @@ tr.row-msg .flash{margin:0}
 .scorebox b{font-family:var(--fd);font-size:34px;line-height:1}
 .scorebox .win small,.scorebox .win b{color:var(--win)}
 .raw-json{max-height:420px;overflow:auto;margin:10px 0 0;padding:12px;border-radius:9px;background:var(--panel-2);font-size:12px}
+.link-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;align-items:end;margin-bottom:12px}
+.link-grid .note{grid-column:1 / -1}

@@ -137,13 +137,19 @@
     var id = el('span');
     id.appendChild(document.createTextNode('Match ID '));
     id.appendChild(el('b', null, dota.matchId));
-    id.appendChild(document.createTextNode(' · datos de OpenDota'));
-    foot.appendChild(id);
-    var link = el('a', null, 'Ver en OpenDota ↗');
-    link.href = 'https://www.opendota.com/matches/' + dota.matchId;
-    link.target = '_blank';
-    link.rel = 'noopener';
-    foot.appendChild(link);
+    if (dota.source === 'gsi') {
+      // Private lobbies are not on OpenDota: these numbers come from our own observers.
+      id.appendChild(document.createTextNode(' · Datos capturados por nuestros observadores'));
+      foot.appendChild(id);
+    } else {
+      id.appendChild(document.createTextNode(' · datos de OpenDota'));
+      foot.appendChild(id);
+      var link = el('a', null, 'Ver en OpenDota ↗');
+      link.href = 'https://www.opendota.com/matches/' + dota.matchId;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      foot.appendChild(link);
+    }
     body.appendChild(foot);
     return body;
   }

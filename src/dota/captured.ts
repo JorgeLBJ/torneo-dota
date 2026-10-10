@@ -1,4 +1,4 @@
-import type { Repository } from '../db/repository.js';
+import type { GsiCapture, Repository } from '../db/repository.js';
 import { NOT_FINISHED_MESSAGE, mapGsiState } from './gsi.js';
 import type { DotaSnapshot } from './snapshot.js';
 import { DotaLookupError, type DotaMatchSource } from './source.js';
@@ -17,16 +17,20 @@ export class CapturedDotaSource implements DotaMatchSource {
   async fetch(matchId: number): Promise<DotaSnapshot> {
     const capture = this.repo.getGsiCapture(matchId);
     if (!capture) return this.inner.fetch(matchId);
-    if (!capture.isFinal) throw new DotaLookupError('incomplete', NOT_FINISHED_MESSAGE);
-    let state: unknown;
-    try {
-      state = JSON.parse(capture.stateJson);
-    } catch {
-      throw new DotaLookupError('incomplete', 'La captura guardada de la partida no se pudo leer.');
-    }
-    // first_received_at is UTC 'YYYY-MM-DD HH:MM:SS'; the start of the match is approximated by it.
-    const startTime = Math.floor(Date.parse(`${capture.firstReceivedAt.replace(' ', 'T')}Z`) / 1000) || 0;
-    const snapshot = mapGsiState(state, { startTime });
-    return { ...snapshot, matchId };
+    return snapshotFromCapture(capture);
   }
+}
+
+/** The snapshot of a final capture; throws a DotaLookupError (Spanish message) when it is not final or cannot be read. */
+export function snapshotFromCapture(capture: GsiCapture): DotaSnapshot {
+  if (!capture.isFinal) throw new DotaLookupError('incomplete', NOT_FINISHED_MESSAGE);
+  let state: unknown;
+  try {
+    state = JSON.parse(capture.stateJson);
+  } catch {
+    throw new DotaLookupError('incomplete', 'La captura guardada de la partida no se pudo leer.');
+  }
+  // first_received_at is UTC 'YYYY-MM-DD HH:MM:SS'; the start of the match is approximated by it.
+  const startTime = Math.floor(Date.parse(`${capture.firstReceivedAt.replace(' ', 'T')}Z`) / 1000) || 0;
+  return { ...mapGsiState(state, { startTime }), matchId: capture.dotaMatchId };
 }
