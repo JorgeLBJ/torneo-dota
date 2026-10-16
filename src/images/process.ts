@@ -1,4 +1,4 @@
-import sharp from 'sharp';
+import sharp, { type Sharp } from 'sharp';
 import { fail, ok, type Checked } from '../checked.js';
 
 // Turns an uploaded picture into the two WebP files the site serves for a team emblem.
@@ -15,6 +15,11 @@ const ALLOWED = new Set(['jpeg', 'png', 'webp']);
 
 /** The avatar slot is 16:9: one file for normal screens, one at twice the size for dense ones. */
 const SIZES = { x1: { width: 512, height: 288 }, x2: { width: 1024, height: 576 } } as const;
+
+/** Welcome banners are full-width pictures, so they may be bigger than an emblem. */
+export const MAX_BANNER_BYTES = 10 * 1024 * 1024;
+const BANNER_WIDTHS = { large: 1920, small: 1280 } as const;
+const BANNER_INVALID = 'La imagen debe ser JPG, PNG o WebP de hasta 10 MB.';
 
 const INVALID = 'La imagen debe ser JPG, PNG o WebP de hasta 5 MB.';
 const TOO_BIG = `La imagen es demasiado grande: el máximo es ${MAX_IMAGE_SIDE} px por lado y 25 megapíxeles.`;
@@ -51,5 +56,50 @@ export async function processTeamImage(input: Uint8Array): Promise<Checked<Proce
   } catch (error) {
     // Pixel-limit errors are the bomb guard; anything else means the bytes did not decode as an image.
     return fail(/pixel limit/i.test((error as Error).message) ? TOO_BIG : INVALID);
+  }
+}
+
+export interface BannerVariant {
+  bytes: Buffer;
+  width: number;
+  height: number;
+}
+
+export interface ProcessedBanner {
+  /** At most 1920 px wide. */
+  large: BannerVariant;
+  /** At most 1280 px wide (the same file size class as `large` when the upload was smaller: never enlarged). */
+  small: BannerVariant;
+}
+
+/**
+ * Same safety as `processTeamImage` (decode to validate, pixel and side guards, orientation, no metadata) but for
+ * a banner: no crop, the aspect ratio is kept, and the two WebP files are at most 1920 and 1280 px wide.
+ */
+export async function processBannerImage(input: Uint8Array): Promise<Checked<ProcessedBanner>> {
+  if (input.byteLength === 0 || input.byteLength > MAX_BANNER_BYTES) return fail(BANNER_INVALID);
+  const open = () => sharp(input, { limitInputPixels: MAX_IMAGE_PIXELS, failOn: 'error' });
+  try {
+    const meta = await open().metadata();
+    if (!meta.format || !ALLOWED.has(meta.format)) return fail(BANNER_INVALID);
+    if ((meta.width ?? 0) > MAX_IMAGE_SIDE || (meta.height ?? 0) > MAX_IMAGE_SIDE) return fail(TOO_BIG);
+    if (meta.pages && meta.pages > 1) return fail(BANNER_INVALID); // animated
+
+    // Decode once, orient and shrink to the larger size, keep that lossless, and encode both widths from it.
+    const master = await open()
+      .rotate()
+      .resize({ width: BANNER_WIDTHS.large, withoutEnlargement: true })
+      .png({ compressionLevel: 0 })
+      .toBuffer();
+    const webp = { quality: 82, alphaQuality: 90, effort: 5 } as const;
+    const encode = async (pipeline: Sharp): Promise<BannerVariant> => {
+      const { data, info } = await pipeline.webp(webp).toBuffer({ resolveWithObject: true });
+      return { bytes: data, width: info.width, height: info.height };
+    };
+    const large = await encode(sharp(master));
+    const small = await encode(sharp(master).resize({ width: BANNER_WIDTHS.small, withoutEnlargement: true }));
+    return ok({ large, small });
+  } catch (error) {
+    return fail(/pixel limit/i.test((error as Error).message) ? TOO_BIG : BANNER_INVALID);
   }
 }

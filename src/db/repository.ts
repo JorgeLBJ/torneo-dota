@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import { isHeroSlug } from '../data/heroes.js';
+import { bannerState, type BannerTab } from '../domain/banners.js';
 import { liveEligibility, type LiveMark } from '../domain/live.js';
 import { resolveSeries, seriesLengthFor, type GameScore, type SeriesLength } from '../domain/series.js';
 import { isValidTimeZone, utcToZoned, zonedToUtc } from '../format/timezone.js';
@@ -171,6 +172,53 @@ export interface ObserverToken {
   lastSeenAt: string | null;
   revokedAt: string | null;
 }
+
+/** A welcome banner of a tournament (see migration 015). Instants are ISO UTC strings. */
+export interface Banner {
+  id: number;
+  tournamentId: number;
+  /** Only the admin sees the name. */
+  name: string;
+  altText: string;
+  /** The 1920 px WebP; width and height are its real size. */
+  imageKey: string;
+  imageWidth: number;
+  imageHeight: number;
+  /** The 1280 px WebP (or the same size when the upload was smaller: never enlarged). */
+  imageKeySmall: string;
+  imageWidthSmall: number;
+  ctaText: string | null;
+  ctaTab: BannerTab | null;
+  active: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
+  /** Grows with every change; the browser keys "already shown" on id + version. */
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type NewBanner = Omit<Banner, 'id' | 'tournamentId' | 'version' | 'createdAt' | 'updatedAt'>;
+
+export interface BannerUpdate {
+  name: string;
+  altText: string;
+  ctaText: string | null;
+  ctaTab: BannerTab | null;
+  active: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
+  /** Undefined keeps the stored image. */
+  image?: { key: string; width: number; height: number; keySmall: string; widthSmall: number };
+}
+
+const BANNER_COLS = `id, tournament_id AS tournamentId, name, alt_text AS altText, image_key AS imageKey, image_width AS imageWidth,
+  image_height AS imageHeight, image_key_sm AS imageKeySmall, image_width_sm AS imageWidthSmall, cta_text AS ctaText, cta_tab AS ctaTab,
+  active, starts_at AS startsAt, ends_at AS endsAt, version, created_at AS createdAt, updated_at AS updatedAt`;
+
+type BannerRow = Omit<Banner, 'active'> & { active: number };
+
+const toBanner = (row: BannerRow): Banner => ({ ...row, active: row.active === 1 });
 
 export interface GsiCapture {
   dotaMatchId: number;
@@ -456,12 +504,29 @@ export function createRepository(db: Database.Database, now: () => Date = () => 
     gsiUnlinkedFinal: db.prepare(`SELECT COUNT(*) AS n FROM gsi_captures c
       WHERE c.is_final = 1 AND NOT EXISTS (SELECT 1 FROM match_games g WHERE g.dota_match_id = c.dota_match_id)`),
     touchObserver: db.prepare("UPDATE observer_tokens SET last_seen_at = datetime('now') WHERE id = ?"),
+    insertBanner: db.prepare(`INSERT INTO promo_banners (tournament_id, name, alt_text, image_key, image_width, image_height, image_key_sm,
+      image_width_sm, cta_text, cta_tab, active, starts_at, ends_at)
+      VALUES (@tournamentId, @name, @altText, @imageKey, @imageWidth, @imageHeight, @imageKeySmall, @imageWidthSmall, @ctaText, @ctaTab, @active, @startsAt, @endsAt)`),
+    bannerById: db.prepare(`SELECT ${BANNER_COLS} FROM promo_banners WHERE id = ?`),
+    listBanners: db.prepare(`SELECT ${BANNER_COLS} FROM promo_banners WHERE tournament_id = ? ORDER BY id DESC`),
+    activeBanners: db.prepare(`SELECT ${BANNER_COLS} FROM promo_banners WHERE tournament_id = ? AND active = 1 ORDER BY id DESC`),
+    updateBanner: db.prepare(`UPDATE promo_banners SET name = @name, alt_text = @altText, cta_text = @ctaText, cta_tab = @ctaTab, active = @active,
+      starts_at = @startsAt, ends_at = @endsAt, version = version + 1, updated_at = datetime('now') WHERE id = @id`),
+    updateBannerImage: db.prepare(`UPDATE promo_banners SET image_key = @key, image_width = @width, image_height = @height,
+      image_key_sm = @keySmall, image_width_sm = @widthSmall WHERE id = @id`),
+    setBannerActive: db.prepare("UPDATE promo_banners SET active = ?, version = version + 1, updated_at = datetime('now') WHERE id = ?"),
+    deleteBanner: db.prepare('DELETE FROM promo_banners WHERE id = ?'),
     deleteOtherSessions: db.prepare('DELETE FROM sessions WHERE admin_id = ? AND id <> ?'),
 
     insertSession: db.prepare('INSERT INTO sessions (id, admin_id, expires_at) VALUES (?, ?, ?)'),
     validSession: db.prepare(`SELECT ${SESSION_COLS} FROM sessions WHERE id = ? AND expires_at > ?`),
     deleteSession: db.prepare('DELETE FROM sessions WHERE id = ?'),
     deleteExpiredSessions: db.prepare('DELETE FROM sessions WHERE expires_at <= ?'),
+  };
+
+  const bannerById = (id: number): Banner | undefined => {
+    const row = q.bannerById.get(id) as BannerRow | undefined;
+    return row && toBanner(row);
   };
 
   const tournamentById = (id: number): Tournament | undefined => {
@@ -904,6 +969,34 @@ export function createRepository(db: Database.Database, now: () => Date = () => 
       new Map((q.gsiCountsByObserver.all() as { id: number; n: number }[]).map((r) => [r.id, r.n])),
     /** Final captures whose Dota match id no saved game uses yet. */
     countUnlinkedFinalGsiCaptures: (): number => (q.gsiUnlinkedFinal.get() as { n: number }).n,
+
+    // Welcome banners
+    createBanner(tournamentId: number, input: NewBanner): Banner {
+      const info = q.insertBanner.run({ ...input, tournamentId, active: input.active ? 1 : 0 });
+      return requireRow(bannerById(Number(info.lastInsertRowid)), 'Banner');
+    },
+    getBanner: (id: number): Banner | undefined => bannerById(id),
+    listBanners: (tournamentId: number): Banner[] => (q.listBanners.all(tournamentId) as BannerRow[]).map(toBanner),
+    /** Saves the fields (and the image, when given) in one step and bumps the version. Undefined when the banner is gone. */
+    updateBanner(id: number, update: BannerUpdate): Banner | undefined {
+      return inTransaction(() => {
+        const { image, ...fields } = update;
+        if (q.updateBanner.run({ ...fields, active: fields.active ? 1 : 0, id }).changes === 0) return undefined;
+        if (image) q.updateBannerImage.run({ ...image, id });
+        return bannerById(id);
+      });
+    },
+    setBannerActive(id: number, active: boolean): Banner | undefined {
+      q.setBannerActive.run(active ? 1 : 0, id);
+      return bannerById(id);
+    },
+    deleteBanner(id: number): void {
+      q.deleteBanner.run(id);
+    },
+    /** The banner the public page opens right now: active and inside its window. */
+    findShowingBanner(tournamentId: number, at: Date): Banner | undefined {
+      return (q.activeBanners.all(tournamentId) as BannerRow[]).map(toBanner).find((b) => bannerState(b, at) === 'showing');
+    },
 
     // Sessions
     createSession(id: string, adminId: number, expiresAt: string): void {
