@@ -14,6 +14,9 @@ interface Core {
   elapsedText(startIso: unknown, nowMs: number): string;
   canPatchRegions(oldPage: PageShape | null, nextPage: PageShape | null): boolean;
   streamPatchMode(oldPanel: PanelShape | null, nextPanel: PanelShape | null): 'keep' | 'replace';
+  bannerKey(id: unknown, version: unknown): string | null;
+  bannerSeen(storage: unknown, key: string, memory: Record<string, boolean>): boolean;
+  markBannerSeen(storage: unknown, key: string, memory: Record<string, boolean>): void;
 }
 interface PageShape {
   main: boolean;
@@ -202,5 +205,79 @@ describe('canPatchRegions: patch region by region only when both pages have the 
   it('refuses when either page is missing entirely (for example "Próximamente")', () => {
     expect(core.canPatchRegions(null, page())).toBe(false);
     expect(core.canPatchRegions(page(), null)).toBe(false);
+  });
+});
+
+describe('welcome banner, once per visit', () => {
+  const key = core.bannerKey(7, 3);
+
+  /** A sessionStorage stand-in. */
+  const storage = (initial: Record<string, string> = {}) => {
+    const data = { ...initial };
+    return {
+      data,
+      getItem: (k: string) => (k in data ? data[k]! : null),
+      setItem: (k: string, v: string) => {
+        data[k] = v;
+      },
+    };
+  };
+  const broken = {
+    getItem: () => {
+      throw new Error('blocked');
+    },
+    setItem: () => {
+      throw new Error('blocked');
+    },
+  };
+
+  it('builds the key from the banner id and version', () => {
+    expect(key).toBe('promo-banner:7:3');
+    expect(core.bannerKey(7, 4)).not.toBe(key);
+  });
+
+  it('accepts ids and versions written as digits (they come from data attributes)', () => {
+    expect(core.bannerKey('7', '3')).toBe(key);
+  });
+
+  it('refuses ids and versions that are not whole numbers', () => {
+    expect(core.bannerKey('7x', 1)).toBeNull();
+    expect(core.bannerKey(7, NaN)).toBeNull();
+    expect(core.bannerKey(null, 1)).toBeNull();
+    expect(core.bannerKey('', 1)).toBeNull();
+  });
+
+  it('is unseen until marked, then seen in the same storage', () => {
+    const s = storage();
+    const memory = {};
+    expect(core.bannerSeen(s, key!, memory)).toBe(false);
+    core.markBannerSeen(s, key!, memory);
+    expect(core.bannerSeen(s, key!, memory)).toBe(true);
+    expect(s.data[key!]).toBe('1');
+  });
+
+  it('shows an updated banner (new version) again', () => {
+    const s = storage();
+    const memory = {};
+    core.markBannerSeen(s, key!, memory);
+    expect(core.bannerSeen(s, core.bannerKey(7, 4)!, memory)).toBe(false);
+  });
+
+  it('counts a banner stored by an earlier page of the visit as seen', () => {
+    expect(core.bannerSeen(storage({ [key!]: '1' }), key!, {})).toBe(true);
+  });
+
+  it('still shows it only once per page load when storage is blocked', () => {
+    const memory = {};
+    expect(core.bannerSeen(broken, key!, memory)).toBe(false);
+    core.markBannerSeen(broken, key!, memory);
+    expect(core.bannerSeen(broken, key!, memory)).toBe(true);
+  });
+
+  it('works without any storage object at all', () => {
+    const memory = {};
+    expect(core.bannerSeen(null, key!, memory)).toBe(false);
+    core.markBannerSeen(null, key!, memory);
+    expect(core.bannerSeen(null, key!, memory)).toBe(true);
   });
 });

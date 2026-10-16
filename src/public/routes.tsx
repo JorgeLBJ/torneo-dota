@@ -13,7 +13,7 @@ import { NO_TOURNAMENT_SHARE, buildShare, type Share } from './share.js';
 import type { Events } from '../events.js';
 import { loadState } from '../services/state.js';
 import { buildMatchDetail } from './detail.js';
-import { buildPublicModel } from './model.js';
+import { buildPublicBanner, buildPublicModel } from './model.js';
 import {
   ComingSoonContent,
   NotFoundContent,
@@ -83,8 +83,11 @@ export function publicApp({ repo, events, config, now, images = null }: PublicDe
       );
     }
     const { model, node } = content(tournament, parentHosts(c));
+    // The welcome banner only exists on the full page (never in the live fragment) and needs the image store for its URLs.
+    const showing = images ? repo.findShowingBanner(tournament.id, now()) : undefined;
+    const banner = showing && images ? buildPublicBanner(showing, (key) => images.publicUrl(key)) : null;
     return c.html(
-      <PublicDocument meta={metaFor(c, buildShare(model))} links={links}>
+      <PublicDocument meta={metaFor(c, buildShare(model))} links={links} banner={banner}>
         {node}
       </PublicDocument>,
     );

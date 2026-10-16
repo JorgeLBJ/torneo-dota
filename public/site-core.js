@@ -159,6 +159,38 @@
    *   reopened by hand with capped exponential backoff. While the browser is still retrying, it is left alone.
    * - A reconnect refreshes once, in case changes were missed while disconnected.
    */
+  // ---- Welcome banner: shown once per visit ------------------------------------------------------
+  // "Seen" lives in sessionStorage under a key made of the banner id and version, so an updated banner shows
+  // again. Storage can be missing or blocked (private windows, embedded frames): then a plain object that lives
+  // as long as the page keeps it to once per page load. The object is always consulted, so it also guards the
+  // case where the storage accepted nothing.
+
+  /** The storage key of a banner, or null when the id or version is not a whole number (they come from attributes). */
+  function bannerKey(id, version) {
+    var digits = /^\d+$/;
+    if (!digits.test(String(id === null || id === undefined ? '' : id))) return null;
+    if (!digits.test(String(version === null || version === undefined ? '' : version))) return null;
+    return 'promo-banner:' + id + ':' + version;
+  }
+
+  function bannerSeen(storage, key, memory) {
+    if (memory && memory[key]) return true;
+    try {
+      return !!storage && storage.getItem(key) === '1';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function markBannerSeen(storage, key, memory) {
+    if (memory) memory[key] = true;
+    try {
+      if (storage) storage.setItem(key, '1');
+    } catch (error) {
+      /* the in-memory mark above still holds for this page load */
+    }
+  }
+
   function createLive(deps) {
     var source = null;
     var attempt = 0;
@@ -249,5 +281,8 @@
     streamPatchMode: streamPatchMode,
     backoffDelay: backoffDelay,
     createLive: createLive,
+    bannerKey: bannerKey,
+    bannerSeen: bannerSeen,
+    markBannerSeen: markBannerSeen,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

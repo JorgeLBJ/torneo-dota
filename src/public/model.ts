@@ -1,4 +1,5 @@
-import type { Game, Match, ScheduleDay, Team, TiebreakerKey } from '../db/repository.js';
+import type { Banner, Game, Match, ScheduleDay, Team, TiebreakerKey } from '../db/repository.js';
+import type { BannerTab } from '../domain/banners.js';
 import type { LiveMark } from '../domain/live.js';
 import { resolveSeries, seriesLengthFor, type SeriesLength } from '../domain/series.js';
 import { describeStream, type StreamView } from '../domain/stream.js';
@@ -554,5 +555,35 @@ export function buildPublicModel(state: TournamentState, scheduleDays: ScheduleD
     standingsSub: `${played} de ${groupMatches.length} partidos jugados`,
     bracket: buildBracket(state, scheduleDays),
     rules: buildRules(state),
+  };
+}
+
+/** The welcome banner as the page needs it: URLs resolved, and a srcset only when the two files differ in width. */
+export interface PublicBanner {
+  id: number;
+  version: number;
+  alt: string;
+  src: string;
+  srcset: string | null;
+  width: number;
+  height: number;
+  ctaText: string | null;
+  /** Public tab key the button jumps to; null = the button only closes the dialog. */
+  ctaTab: BannerTab | null;
+}
+
+export function buildPublicBanner(banner: Banner, imageUrl: (key: string) => string): PublicBanner {
+  const src = imageUrl(banner.imageKey);
+  const small = imageUrl(banner.imageKeySmall);
+  return {
+    id: banner.id,
+    version: banner.version,
+    alt: banner.altText,
+    src,
+    srcset: banner.imageWidthSmall < banner.imageWidth ? `${small} ${banner.imageWidthSmall}w, ${src} ${banner.imageWidth}w` : null,
+    width: banner.imageWidth,
+    height: banner.imageHeight,
+    ctaText: banner.ctaText,
+    ctaTab: banner.ctaText ? banner.ctaTab : null,
   };
 }

@@ -9,6 +9,7 @@ import { emblemSourcesFor } from '../emblem-sources.js';
 import type {
   BracketMatchView,
   BracketSlotView,
+  PublicBanner,
   PublicDay,
   PublicLive,
   PublicMatch,
@@ -54,7 +55,37 @@ export interface PageMeta {
 const SITE_NAME = 'torneo-dota · jpsolutions';
 const IMAGE_ALT = 'Torneo de Dota 2: Radiant vs Dire';
 
-export const PublicDocument: FC<PropsWithChildren<{ meta: PageMeta; links?: PageLinks }>> = ({ meta, links, children }) => (
+/**
+ * The welcome banner. It sits outside #app on purpose: the live refresh only rewrites what is inside #app, so the
+ * dialog is never re-created or reopened by it. public/site.js opens it once per visit; without script it stays hidden.
+ */
+const PromoBanner: FC<{ banner: PublicBanner }> = ({ banner }) => (
+  <dialog id="promoBanner" class="promo" aria-label="Aviso del torneo" data-banner-id={banner.id} data-banner-version={banner.version}>
+    <div class="promo-body">
+      <button type="button" class="promo-close" data-promo-close aria-label="Cerrar">
+        ×
+      </button>
+      <img
+        class="promo-img"
+        src={banner.src}
+        srcset={banner.srcset ?? undefined}
+        sizes={banner.srcset ? 'min(1100px, calc(100vw - 32px))' : undefined}
+        width={banner.width}
+        height={banner.height}
+        alt={banner.alt}
+        loading="lazy"
+        decoding="async"
+      />
+      {banner.ctaText ? (
+        <button type="button" class="promo-cta" data-promo-cta data-cta-tab={banner.ctaTab ?? undefined}>
+          {banner.ctaText}
+        </button>
+      ) : null}
+    </div>
+  </dialog>
+);
+
+export const PublicDocument: FC<PropsWithChildren<{ meta: PageMeta; links?: PageLinks; banner?: PublicBanner | null }>> = ({ meta, links, banner, children }) => (
   <>
     {raw('<!doctype html>')}
     <html lang="es">
@@ -109,6 +140,7 @@ export const PublicDocument: FC<PropsWithChildren<{ meta: PageMeta; links?: Page
           </button>
           <div id="mdContent" class="d-content"></div>
         </dialog>
+        {banner ? <PromoBanner banner={banner} /> : null}
         <script src={assetUrl('site-core.js')} defer></script>
         <script src={assetUrl('match-detail.js')} defer></script>
         <script src={assetUrl('site.js')} defer></script>

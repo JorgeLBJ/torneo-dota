@@ -455,3 +455,21 @@ strong.fit.one { display: block; white-space: nowrap; text-overflow: ellipsis; o
 
 /* The rich rulebook below the summary: the shared rulebook.css styles it; here only its place in the page. */
 main div.rules { max-width: none; margin-top: 12px; }
+
+/* Welcome banner: a modal picture with an optional button; opened once per visit by site.js. */
+dialog.promo { position: fixed; inset: 0; margin: auto; box-sizing: border-box; width: fit-content; height: fit-content; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); padding: 0; overflow: visible; border: 0; background: transparent; color: var(--fg); }
+dialog.promo::backdrop { background: rgba(5,6,10,.82); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+.promo-body { position: relative; display: grid; justify-items: center; gap: 16px; }
+.promo-img { display: block; width: auto; height: auto; max-width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 110px); max-height: calc(100dvh - 110px); border-radius: 14px; box-shadow: 0 0 0 1px var(--line-2), 0 24px 70px rgba(0,0,0,.65); }
+.promo-close { position: absolute; top: 10px; right: 10px; z-index: 2; width: 36px; height: 36px; padding: 0; border: 1px solid var(--line-2); border-radius: 50%; background: rgba(7,8,10,.72); color: var(--fg); font-size: 22px; line-height: 1; cursor: pointer; }
+.promo-close:hover { border-color: var(--gold); color: var(--gold); }
+.promo-cta { padding: 12px 28px; border: 1px solid var(--gold); border-radius: 99px; background: var(--gold); color: #1a1405; font: 700 15px/1.2 var(--fl); letter-spacing: .12em; text-transform: uppercase; cursor: pointer; box-shadow: 0 8px 28px rgba(200,170,110,.25); }
+.promo-cta:hover { background: var(--gold-hi); border-color: var(--gold-hi); }
+.promo-close:focus-visible, .promo-cta:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 2px; }
+dialog.promo[open] { animation: promo-in .28s ease-out; }
+dialog.promo[open]::backdrop { animation: promo-fade .28s ease-out; }
+@keyframes promo-in { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes promo-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  dialog.promo[open], dialog.promo[open]::backdrop { animation: none; }
+}

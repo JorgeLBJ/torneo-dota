@@ -287,4 +287,57 @@
     live.open();
     scheduleBoundary();
   }
+
+  // ---- Welcome banner -----------------------------------------------------------------------
+  // The <dialog> is rendered by the server outside #app, so the live refresh never touches it. It opens once per
+  // visit (sessionStorage, keyed by banner id + version) after the page has loaded, and never blocks first render.
+  (function welcomeBanner() {
+    var dialog = document.getElementById('promoBanner');
+    var core = window.SiteCore;
+    if (!dialog || !core || typeof dialog.showModal !== 'function') return;
+    var key = core.bannerKey(dialog.getAttribute('data-banner-id'), dialog.getAttribute('data-banner-version'));
+    if (!key) return;
+    var storage = null;
+    try {
+      storage = window.sessionStorage;
+    } catch (error) {
+      storage = null; // blocked (private window, embedded frame): once per page load instead
+    }
+    var memory = (window.__promoSeen = window.__promoSeen || {});
+    if (core.bannerSeen(storage, key, memory)) return;
+
+    var image = dialog.querySelector('.promo-img');
+    var opened = false;
+    function open() {
+      if (opened || dialog.open) return;
+      opened = true;
+      core.markBannerSeen(storage, key, memory);
+      dialog.showModal();
+    }
+
+    // The picture is lazy, so it does not load while the dialog is hidden: ask for it now and open when it is there.
+    function openWhenReady() {
+      if (!image) return open();
+      image.loading = 'eager';
+      if (image.complete && image.naturalWidth > 0) return open();
+      image.addEventListener('load', open);
+      // A picture that fails to load would only show an empty box: leave the page as it is.
+    }
+    if (document.readyState === 'complete') openWhenReady();
+    else window.addEventListener('load', openWhenReady);
+
+    dialog.addEventListener('click', function (event) {
+      var target = event.target;
+      // A click on the dim backdrop lands on the dialog element itself (the content fills the rest of its box).
+      if (target === dialog) return dialog.close();
+      var closer = target.closest && target.closest('[data-promo-close]');
+      if (closer) return dialog.close();
+      var cta = target.closest && target.closest('[data-promo-cta]');
+      if (!cta) return;
+      dialog.close();
+      var tabKey = cta.getAttribute('data-cta-tab');
+      var tab = tabKey && TABS.indexOf(tabKey) >= 0 ? app.querySelector('.tab[data-tab="' + tabKey + '"]') : null;
+      if (tab) tab.click(); // the page's own tab handler: state, URL hash and panels
+    });
+  })();
 })();
