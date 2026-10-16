@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BANNER_TABS, bannerState, findBannerConflict, windowsOverlap, type WindowedBanner } from '../src/domain/banners.js';
+import { BANNER_TABS, bannerState, findBannerConflict, formatBannerWindow, windowsOverlap, type WindowedBanner } from '../src/domain/banners.js';
 
 const banner = (over: Partial<WindowedBanner> & { id: number }): WindowedBanner => ({
   active: true,
@@ -120,5 +120,22 @@ describe('bannerState', () => {
 describe('tabs', () => {
   it('uses the identifiers of the public page tabs', () => {
     expect(BANNER_TABS.map((t) => t.key)).toEqual(['partidos', 'envivo', 'posiciones', 'playoffs', 'reglas']);
+  });
+});
+
+describe('formatBannerWindow', () => {
+  const lima = 'America/Lima';
+
+  it('writes both ends in the tournament zone', () => {
+    expect(formatBannerWindow({ startsAt: '2026-10-16T23:00:00Z', endsAt: '2026-10-18T04:59:00Z' }, lima)).toBe('16/10 18:00 → 17/10 23:59');
+  });
+
+  it('names an open start or end', () => {
+    expect(formatBannerWindow({ startsAt: '2026-10-16T23:00:00Z', endsAt: null }, lima)).toBe('Desde 16/10 18:00');
+    expect(formatBannerWindow({ startsAt: null, endsAt: '2026-10-18T04:59:00Z' }, lima)).toBe('Hasta 17/10 23:59');
+  });
+
+  it('says "Sin fechas" for an open window', () => {
+    expect(formatBannerWindow({ startsAt: null, endsAt: null }, lima)).toBe('Sin fechas');
   });
 });

@@ -30,8 +30,11 @@ export interface CreateAppOptions {
 export const MAX_BODY_BYTES = 64 * 1024;
 /** One save of the Equipos screen: several 5 MB pictures plus the multipart envelope. */
 export const MAX_UPLOAD_BYTES = 30 * 1024 * 1024;
+/** One banner form: a picture of up to 10 MB plus the multipart envelope. */
+export const MAX_BANNER_UPLOAD_BYTES = 11 * 1024 * 1024;
 const GSI_PATH = '/gsi'; // Game State Integration payloads from the observers' Dota clients
 const IMAGE_UPLOAD_PATH = /^\/admin\/t\/\d+\/equipos\/lote$/; // the Equipos batch save, which may carry cropped images
+const BANNER_UPLOAD_PATH = /^\/admin\/t\/\d+\/banners(\/\d+)?$/; // create/update of a banner, which carries its picture
 
 export function createApp({ db, config }: CreateAppOptions) {
   const now = clockOf(config);
@@ -50,10 +53,15 @@ export function createApp({ db, config }: CreateAppOptions) {
     maxSize: MAX_UPLOAD_BYTES,
     onError: (c) => c.json({ error: 'Los cambios son demasiado grandes (máximo 30 MB en total, 5 MB por imagen).' }, 413),
   });
+  const bannerBodies = bodyLimit({
+    maxSize: MAX_BANNER_UPLOAD_BYTES,
+    onError: (c) => c.text('La imagen es demasiado grande: el máximo es 10 MB.', 413),
+  });
   const gsiBodies = bodyLimit({ maxSize: GSI_MAX_BODY_BYTES, onError: (c) => c.json({ error: 'too_large' }, 413) });
   // Only the image upload and GSI routes may carry a large body; everything else keeps the small cap.
   app.use('*', (c, next) => {
     if (c.req.path === GSI_PATH) return gsiBodies(c, next);
+    if (BANNER_UPLOAD_PATH.test(c.req.path)) return bannerBodies(c, next);
     return IMAGE_UPLOAD_PATH.test(c.req.path) ? imageBodies(c, next) : smallBodies(c, next);
   });
 

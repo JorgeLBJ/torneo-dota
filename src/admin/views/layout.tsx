@@ -40,7 +40,7 @@ export interface NavInfo {
   unlinkedCaptures?: number;
 }
 
-export type Section = 'torneos' | 'config' | 'reglas' | 'equipos' | 'fixture' | 'resultados' | 'playoffs' | 'usuarios' | 'observadores' | 'capturas' | 'cuenta';
+export type Section = 'torneos' | 'config' | 'reglas' | 'banners' | 'equipos' | 'fixture' | 'resultados' | 'playoffs' | 'usuarios' | 'observadores' | 'capturas' | 'cuenta';
 
 interface LayoutProps {
   title: string;
@@ -53,6 +53,7 @@ interface LayoutProps {
 const SECTIONS: { key: Exclude<Section, 'torneos' | 'usuarios' | 'observadores' | 'capturas' | 'cuenta'>; path: string; label: string }[] = [
   { key: 'config', path: 'config', label: 'Configuración' },
   { key: 'reglas', path: 'reglas', label: 'Reglas' },
+  { key: 'banners', path: 'banners', label: 'Banners' },
   { key: 'equipos', path: 'equipos', label: 'Equipos' },
   { key: 'fixture', path: 'fixture', label: 'Fixture' },
   { key: 'resultados', path: 'resultados', label: 'Resultados' },

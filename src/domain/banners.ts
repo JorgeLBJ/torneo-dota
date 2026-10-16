@@ -1,3 +1,5 @@
+import { utcToZoned } from '../format/timezone.js';
+
 // Welcome banners: which one is on the air, and whether two of them fight for the same moment.
 // Windows are half-open, [startsAt, endsAt): the end instant already belongs to whatever comes next, so a banner
 // that ends at 18/10 00:00 and one that starts at 18/10 00:00 do not conflict. A missing start is -infinity and a
@@ -60,4 +62,18 @@ export function bannerState(banner: WindowedBanner, now: Date): BannerState {
   if (banner.startsAt !== null && t < at(banner.startsAt)) return 'scheduled';
   if (banner.endsAt !== null && t >= at(banner.endsAt)) return 'ended';
   return 'showing';
+}
+
+const dayMonth = (iso: string, timeZone: string): string => {
+  const { date, time } = utcToZoned(iso, timeZone);
+  return `${date.slice(8, 10)}/${date.slice(5, 7)} ${time}`;
+};
+
+/** "16/10 18:00 → 17/10 23:59" in the tournament's zone; "Desde …", "Hasta …" or "Sin fechas" when a side is open. */
+export function formatBannerWindow(window: BannerWindow, timeZone: string): string {
+  const { startsAt, endsAt } = window;
+  if (startsAt && endsAt) return `${dayMonth(startsAt, timeZone)} → ${dayMonth(endsAt, timeZone)}`;
+  if (startsAt) return `Desde ${dayMonth(startsAt, timeZone)}`;
+  if (endsAt) return `Hasta ${dayMonth(endsAt, timeZone)}`;
+  return 'Sin fechas';
 }

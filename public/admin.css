@@ -453,3 +453,24 @@ tr.row-msg .flash{margin:0}
 @keyframes cap-new-row{from{opacity:0;transform:translateY(-8px);background:var(--gold-soft);box-shadow:inset 3px 0 0 var(--gold)}35%{opacity:1;transform:none;background:var(--gold-soft);box-shadow:inset 3px 0 0 var(--gold)}to{opacity:1;transform:none;background:transparent;box-shadow:inset 3px 0 0 transparent}}
 tr.cap-new{animation:cap-new-row .85s ease-out}
 @media (prefers-reduced-motion:reduce){tr.cap-new{animation:none}}
+
+/* Banners: list thumbnail, the two-column form, the live preview and the footer actions. */
+.banner-thumb{width:128px;aspect-ratio:16/9;object-fit:cover;border-radius:8px;display:block;border:1px solid var(--line)}
+.banner-thumb.ph{display:grid;place-items:center;background:var(--panel-2);color:var(--muted);font-size:12px}
+tr.row-live>td{background:rgba(95,211,162,.05)}
+.banner-actions{justify-content:flex-end}
+.banner-actions form{margin:0}
+.banner-grid{display:grid;gap:24px;align-items:start}
+.banner-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.drop{border:1px dashed #3a4166;border-radius:12px;padding:12px;display:grid;gap:10px}
+.drop img{width:100%;height:auto;border-radius:8px;display:block}
+.drop input[type=file]{padding:6px 12px;height:auto;min-height:var(--control-h)}
+.mini-preview{border:1px solid var(--line);border-radius:12px;background:#07080a;padding:16px;display:grid;justify-items:center;gap:10px}
+.mini-preview img{width:100%;max-width:420px;height:auto;border-radius:10px;box-shadow:0 0 0 1px rgba(230,182,95,.35)}
+.cta-preview{padding:7px 18px;border-radius:99px;border:1px solid rgba(230,182,95,.6);background:var(--gold-soft);color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.cta-preview[hidden]{display:none}
+label.f.check{display:flex;align-items:center;gap:10px;min-height:var(--control-h);font-size:14px;color:var(--fg)}
+.banner-foot{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between}
+.card .legend{display:flex;flex-wrap:wrap;gap:6px 16px}
+@media (min-width:1024px){.banner-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+@media (max-width:560px){.banner-two{grid-template-columns:1fr}}

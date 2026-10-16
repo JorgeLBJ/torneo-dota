@@ -1422,3 +1422,42 @@
   });
   window.addEventListener('pagehide', stop);
 })();
+
+// Banners: the form previews the chosen picture and the button text before anything is uploaded.
+(function () {
+  var form = document.querySelector('[data-banner-form]');
+  if (!form) return;
+  var file = form.querySelector('[data-banner-file]');
+  var text = form.querySelector('[data-banner-cta-text]');
+  var cta = document.querySelector('[data-banner-cta-preview]');
+  var objectUrl = null;
+
+  function show(src) {
+    document.querySelectorAll('[data-banner-preview-img], [data-banner-preview-img-2]').forEach(function (img) {
+      img.src = src;
+    });
+    document.querySelectorAll('[data-banner-preview-empty], [data-banner-preview-empty-2]').forEach(function (empty) {
+      var img = document.createElement('img');
+      img.src = src;
+      img.alt = '';
+      img.setAttribute(empty.hasAttribute('data-banner-preview-empty') ? 'data-banner-preview-img' : 'data-banner-preview-img-2', '');
+      empty.parentNode.replaceChild(img, empty);
+    });
+  }
+
+  if (file) {
+    file.addEventListener('change', function () {
+      var chosen = file.files && file.files[0];
+      if (!chosen || !window.URL || !URL.createObjectURL) return;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      objectUrl = URL.createObjectURL(chosen);
+      show(objectUrl);
+    });
+  }
+  if (text && cta) {
+    text.addEventListener('input', function () {
+      cta.textContent = text.value;
+      cta.hidden = text.value.trim() === '';
+    });
+  }
+})();
