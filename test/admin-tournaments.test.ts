@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { FORMAT_INFO, TOURNAMENT_FORMATS } from '../src/domain/formats.js';
 import { flashText, makeApp, type TestApp } from './helpers/app.js';
 
 let t: TestApp;
@@ -81,6 +82,58 @@ describe('tournaments screen', () => {
     t.repo.createTournament({ name: 'Cup', slug: 'cup' });
     const html = await (await t.get('/admin/torneos', cookie)).text();
     expect(html).toContain('<th>Página pública</th>');
+  });
+
+  it('offers each format as a card with its name and description, Liga + Playoffs by default', async () => {
+    const html = await (await t.get('/admin/torneos', cookie)).text();
+    for (const info of Object.values(FORMAT_INFO)) {
+      expect(html).toContain(info.name);
+      expect(html).toContain(info.description);
+      expect(html).toMatch(new RegExp(`<input[^>]*type="radio"[^>]*name="format"[^>]*value="${info.key}"`));
+    }
+    expect(html).toMatch(/<input[^>]*value="league_playoffs"[^>]*checked/);
+    expect(html).not.toMatch(/<input[^>]*value="double_elimination"[^>]*checked/);
+  });
+
+  it('creates a tournament with each format', async () => {
+    for (const format of TOURNAMENT_FORMATS) {
+      const slug = `cup-${format.replace('_', '-')}`;
+      const res = await t.post('/admin/torneos', { name: `Cup ${format}`, slug, format }, cookie);
+      expect(res.status).toBe(303);
+      expect(t.repo.getTournamentBySlug(slug)!.format).toBe(format);
+    }
+    expect(t.repo.getTournamentBySlug('cup-double-elimination')).toMatchObject({ semifinalGames: 1, finalGames: 3 });
+  });
+
+  it('creates a Liga + Playoffs tournament when no format is sent', async () => {
+    await t.post('/admin/torneos', { name: 'Cup', slug: 'cup' }, cookie);
+    expect(t.repo.getTournamentBySlug('cup')).toMatchObject({ format: 'league_playoffs', semifinalGames: 3, finalGames: 5 });
+  });
+
+  it('rejects an unknown format with a Spanish message', async () => {
+    const res = await t.post('/admin/torneos', { name: 'Cup', slug: 'cup', format: 'swiss' }, cookie);
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toBe('/admin/torneos');
+    expect(await flashText(t, res, cookie)).toContain('Elige un formato de torneo válido');
+    expect(t.repo.listTournaments()).toHaveLength(0);
+  });
+
+  it('shows each tournament format name in the list', async () => {
+    t.repo.createTournament({ name: 'Liga Cup', slug: 'liga' });
+    t.repo.createTournament({ name: 'Flash Cup', slug: 'flash', format: 'double_elimination' });
+    const html = await (await t.get('/admin/torneos', cookie)).text();
+    const table = html.slice(html.indexOf('<table'), html.indexOf('</table>'));
+    expect(table).toContain('<th>Formato</th>');
+    expect(table).toContain('Liga + Playoffs');
+    expect(table).toContain('Doble eliminación');
+  });
+
+  it('keeps the "+ Nuevo torneo" selector entry pointing at the creation form', async () => {
+    const tournament = t.repo.createTournament({ name: 'Cup', slug: 'cup' });
+    const html = await (await t.get(`/admin/t/${tournament.id}/config`, cookie)).text();
+    expect(html).toContain('<option value="/admin/torneos">+ Nuevo torneo…</option>');
+    const page = await (await t.get('/admin/torneos', cookie)).text();
+    expect(page).toContain('action="/admin/torneos"');
   });
 
   it('does not announce a change twice when re-activating the active tournament', async () => {

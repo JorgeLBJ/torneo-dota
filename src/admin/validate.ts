@@ -5,6 +5,7 @@ const RESERVED_SLUGS = new Set(['admin', 'assets', 'api', 't', 'static']);
 
 export { fail, ok, type Checked } from '../checked.js';
 import { fail, ok, type Checked } from '../checked.js';
+import { isTournamentFormat, type TournamentFormat } from '../domain/formats.js';
 
 export function checkName(name: string): Checked<string> {
   return name.length >= 1 && name.length <= 80 ? ok(name) : fail('Escribe un nombre de hasta 80 caracteres.');
@@ -20,6 +21,17 @@ export function checkSlug(repo: Repository, slug: string, ownId?: number): Check
   const existing = repo.getTournamentBySlug(value);
   if (existing && existing.id !== ownId) return fail(`Ya existe un torneo con la URL "${value}".`);
   return ok(value);
+}
+
+/** A tournament format key; an absent one (older forms, scripts) means the original Liga + Playoffs. */
+export function checkFormat(raw: string): Checked<TournamentFormat> {
+  if (raw === '') return ok('league_playoffs');
+  return isTournamentFormat(raw) ? ok(raw) : fail('Elige un formato de torneo válido.');
+}
+
+/** Deleting a tournament is confirmed by typing its exact name. */
+export function checkDeleteConfirmation(typed: string, name: string): Checked<string> {
+  return typed === name ? ok(typed) : fail(`Escribe el nombre exacto del torneo ("${name}") para eliminarlo.`);
 }
 
 const USERNAME = /^[a-z0-9._-]{3,32}$/;

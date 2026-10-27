@@ -38,7 +38,7 @@ describe('016_tournament_format', () => {
     migrate(db, dir);
     db.exec("INSERT INTO tournaments (name, slug, semifinal_games, final_games) VALUES ('Old', 'old', 3, 5)");
     migrate(db, MIGRATIONS_DIR);
-    expect(db.pragma('user_version', { simple: true })).toBe(16);
+    expect(db.pragma('user_version', { simple: true })).toBe(17);
     const repo = createRepository(db);
     expect(repo.getTournamentBySlug('old')).toMatchObject({ format: 'league_playoffs', semifinalGames: 3, finalGames: 5 });
   });

@@ -474,3 +474,19 @@ label.f.check{display:flex;align-items:center;gap:10px;min-height:var(--control-
 .card .legend{display:flex;flex-wrap:wrap;gap:6px 16px}
 @media (min-width:1024px){.banner-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 @media (max-width:560px){.banner-two{grid-template-columns:1fr}}
+
+/* Tournaments: format cards and archive */
+.format-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:0;padding:0;border:0;min-width:0}
+.format-cards legend{padding:0;margin-bottom:8px;font-size:12px;color:var(--muted)}
+.format-card{display:flex;align-items:flex-start;gap:12px;padding:14px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);cursor:pointer}
+.format-card input{margin-top:3px;flex:none;accent-color:var(--gold)}
+.format-card span{display:grid;gap:4px}
+.format-card small{color:var(--muted);font-size:13px;line-height:1.4}
+.format-card:has(input:checked){border-color:var(--gold);background:var(--gold-soft)}
+.format-card:has(input:focus-visible){outline:2px solid var(--gold);outline-offset:2px}
+.tour-delete{position:relative}
+.tour-delete summary{list-style:none}
+.tour-delete summary::-webkit-details-marker{display:none}
+.tour-delete[open] summary{border-color:var(--loss);color:var(--loss)}
+.tour-delete form{margin-top:8px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);min-width:min(280px,100%)}
+.tour-delete .err-text{margin:0}

@@ -13,7 +13,8 @@ export function publicUrlFor(t: Tournament): string {
 
 export function navFor(deps: Deps, current?: Tournament): NavInfo {
   const { repo } = deps;
-  const tournaments = repo.listTournaments();
+  // Archived tournaments leave the selector, except the one being viewed (so its own pages stay navigable).
+  const tournaments = repo.listTournaments().filter((t) => !t.archivedAt || t.id === current?.id);
   const unlinkedCaptures = repo.countUnlinkedFinalGsiCaptures();
   if (!current) return { tournaments, teamCount: 0, played: 0, total: 0, unlinkedCaptures };
   const group = repo.listMatches(current.id, 'group');

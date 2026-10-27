@@ -40,10 +40,14 @@ export interface Tournament {
   isActive: boolean;
   /** The live match whose game is on the stream, or null (optional; always one of the tournament's live matches). */
   streamMatchId: number | null;
+  /** ISO 8601 UTC instant it was archived (hidden from the admin selector), or null. */
+  archivedAt: string | null;
   createdAt: string;
 }
 
-export type TournamentPatch = Partial<Omit<Tournament, 'id' | 'createdAt' | 'isActive' | 'streamMatchId' | 'format'>>;
+export type TournamentPatch = Partial<
+  Omit<Tournament, 'id' | 'createdAt' | 'isActive' | 'streamMatchId' | 'format' | 'archivedAt'>
+>;
 
 export interface ScheduleDay {
   /** YYYY-MM-DD */
@@ -274,7 +278,8 @@ export const TIEBREAKER_KEYS = ['kd', 'kills', 'h2h', 'extra'] as const;
 const TOURNAMENT_COLS = `id, name, slug, format, qualifiers, game, points_win AS pointsWin, points_loss AS pointsLoss,
   tiebreakers, group_legs AS groupLegs, group_games AS groupGames, semifinal_games AS semifinalGames, final_games AS finalGames,
   stream_match_id AS streamMatchId,
-  rules_text AS rulesText, rules_html AS rulesHtml, show_tiebreak_box AS showTiebreakBox, timezone, stream_url AS streamUrl, is_active AS isActive, created_at AS createdAt`;
+  rules_text AS rulesText, rules_html AS rulesHtml, show_tiebreak_box AS showTiebreakBox, timezone, stream_url AS streamUrl, is_active AS isActive,
+  archived_at AS archivedAt, created_at AS createdAt`;
 const TEAM_COLS = 'id, tournament_id AS tournamentId, code, name, captain, hero, image_key AS imageKey';
 const MATCH_COLS = `m.id, m.tournament_id AS tournamentId, m.phase, m.round, m.match_number AS matchNumber, m.is_tiebreak AS isTiebreak,
   m.starts_at AS startsAt, m.ends_at AS endsAt, t.timezone AS timezone,
@@ -411,6 +416,7 @@ export function createRepository(db: Database.Database, now: () => Date = () => 
     clearActive: db.prepare('UPDATE tournaments SET is_active = 0 WHERE is_active = 1'),
     markActive: db.prepare('UPDATE tournaments SET is_active = 1 WHERE id = ?'),
     deleteTournament: db.prepare('DELETE FROM tournaments WHERE id = ?'),
+    setArchivedAt: db.prepare('UPDATE tournaments SET archived_at = ? WHERE id = ?'),
 
     deleteScheduleDays: db.prepare('DELETE FROM schedule_days WHERE tournament_id = ?'),
     insertScheduleDay: db.prepare(
@@ -771,6 +777,15 @@ export function createRepository(db: Database.Database, now: () => Date = () => 
     },
     deleteTournament(id: number): void {
       q.deleteTournament.run(id);
+    },
+    /** Hides the tournament from the admin selector (the caller keeps the active one out). */
+    archiveTournament(id: number): Tournament {
+      if (q.setArchivedAt.run(now().toISOString(), id).changes === 0) throw new Error('Tournament not found');
+      return requireRow(tournamentById(id), 'Tournament');
+    },
+    restoreTournament(id: number): Tournament {
+      if (q.setArchivedAt.run(null, id).changes === 0) throw new Error('Tournament not found');
+      return requireRow(tournamentById(id), 'Tournament');
     },
 
     // Calendar days

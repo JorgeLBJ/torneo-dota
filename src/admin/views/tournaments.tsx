@@ -1,5 +1,7 @@
 import type { FC } from 'hono/jsx';
 import type { Tournament } from '../../db/repository.js';
+import { FORMAT_INFO, TOURNAMENT_FORMATS } from '../../domain/formats.js';
+import { formatDateTime } from '../../format/datetime.js';
 import { publicUrlFor } from '../render.js';
 
 export interface TournamentRow {
@@ -9,79 +11,174 @@ export interface TournamentRow {
   statusClass: 'ok' | 'next' | '';
 }
 
-export const TournamentsView: FC<{ rows: TournamentRow[] }> = ({ rows }) => (
-  <>
-    <div class="head">
-      <div>
-        <h1>Torneos</h1>
-        <p class="sub">Cada torneo tiene su propia URL pública. El torneo activo se muestra en la portada.</p>
-      </div>
-    </div>
-    <div class="card scroll-x">
-      <table class="cards">
-        <thead>
+const PublicLink: FC<{ t: Tournament }> = ({ t }) => (
+  <td data-label="Página pública" class="muted">
+    <a href={publicUrlFor(t)} target="_blank" rel="noopener">
+      /t/{t.slug}
+    </a>
+  </td>
+);
+
+const ActiveTable: FC<{ rows: TournamentRow[] }> = ({ rows }) => (
+  <div class="card scroll-x">
+    <table class="cards">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Formato</th>
+          <th>Página pública</th>
+          <th>Equipos</th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.length === 0 ? (
           <tr>
-            <th>Nombre</th>
-            <th>Página pública</th>
-            <th>Equipos</th>
-            <th>Estado</th>
-            <th></th>
+            <td colspan={6} class="muted">
+              Todavía no hay torneos. Crea el primero abajo.
+            </td>
           </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr>
-              <td colspan={5} class="muted">
-                Todavía no hay torneos. Crea el primero abajo.
-              </td>
-            </tr>
-          ) : null}
-          {rows.map(({ tournament: t, teamCount, status, statusClass }) => (
-            <tr>
-              <td data-label="Nombre">
-                <b>{t.name}</b> {t.isActive ? <span class="pill next">Activo</span> : null}
-              </td>
-              <td data-label="Página pública" class="muted">
-                <a href={publicUrlFor(t)} target="_blank" rel="noopener">
-                  /t/{t.slug}
+        ) : null}
+        {rows.map(({ tournament: t, teamCount, status, statusClass }) => (
+          <tr>
+            <td data-label="Nombre">
+              <b>{t.name}</b> {t.isActive ? <span class="pill next">Activo</span> : null}
+            </td>
+            <td data-label="Formato">{FORMAT_INFO[t.format].name}</td>
+            <PublicLink t={t} />
+            <td data-label="Equipos">{teamCount}</td>
+            <td data-label="Estado">
+              <span class={`pill ${statusClass}`}>{status}</span>
+            </td>
+            <td>
+              <div class="actions">
+                <a class="btn sm" href={`/admin/t/${t.id}/resultados`}>
+                  Abrir
                 </a>
-              </td>
-              <td data-label="Equipos">{teamCount}</td>
-              <td data-label="Estado">
-                <span class={`pill ${statusClass}`}>{status}</span>
-              </td>
-              <td>
-                <div class="actions">
-                  <a class="btn sm" href={`/admin/t/${t.id}/resultados`}>
-                    Abrir
-                  </a>
-                  {t.isActive ? null : (
+                {t.isActive ? null : (
+                  <>
                     <form method="post" action={`/admin/t/${t.id}/activar`}>
                       <button class="btn sm" type="submit">
                         Marcar como activo
                       </button>
                     </form>
-                  )}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-    <form class="card stack narrow" method="post" action="/admin/torneos">
-      <h2>Nuevo torneo</h2>
-      <label class="f">
-        Nombre
-        <input name="name" required maxlength={80} placeholder="Torneo All vs All · Oct 2026" />
-      </label>
-      <label class="f">
-        URL pública (slug)
-        <input name="slug" required maxlength={60} pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="torneo-oct-2026" />
-      </label>
-      <button class="btn pri" type="submit">
-        + Crear torneo
-      </button>
-    </form>
-  </>
+                    <form method="post" action={`/admin/t/${t.id}/archivar`}>
+                      <button class="btn sm" type="submit">
+                        Archivar
+                      </button>
+                    </form>
+                  </>
+                )}
+              </div>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
 );
+
+const ArchivedTable: FC<{ rows: TournamentRow[]; timeZone: string }> = ({ rows, timeZone }) => (
+  <section class="card scroll-x" aria-labelledby="archived-title">
+    <h2 id="archived-title">Archivados</h2>
+    <p class="sub">No aparecen en el selector de torneos. Su página pública sigue funcionando.</p>
+    <table class="cards">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Formato</th>
+          <th>Página pública</th>
+          <th>Equipos</th>
+          <th>Archivado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(({ tournament: t, teamCount }) => (
+          <tr>
+            <td data-label="Nombre">
+              <b>{t.name}</b>
+            </td>
+            <td data-label="Formato">{FORMAT_INFO[t.format].name}</td>
+            <PublicLink t={t} />
+            <td data-label="Equipos">{teamCount}</td>
+            <td data-label="Archivado" class="muted">
+              {t.archivedAt ? formatDateTime(t.archivedAt, { timeZone }) : ''}
+            </td>
+            <td>
+              <div class="actions">
+                <a class="btn sm" href={`/admin/t/${t.id}/resultados`}>
+                  Abrir
+                </a>
+                <form method="post" action={`/admin/t/${t.id}/restaurar`}>
+                  <button class="btn sm" type="submit">
+                    Restaurar
+                  </button>
+                </form>
+                <details class="tour-delete">
+                  <summary class="btn sm danger">Eliminar…</summary>
+                  <form class="stack" method="post" action={`/admin/t/${t.id}/eliminar`}>
+                    <p class="err-text">Se borran sus equipos, partidos, banners e imágenes. No se puede deshacer.</p>
+                    <label class="f">
+                      Escribe «{t.name}» para confirmar
+                      <input name="confirm_name" required autocomplete="off" />
+                    </label>
+                    <button class="btn sm danger" type="submit">
+                      Eliminar definitivamente
+                    </button>
+                  </form>
+                </details>
+              </div>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </section>
+);
+
+export const TournamentsView: FC<{ rows: TournamentRow[]; timeZone: string }> = ({ rows, timeZone }) => {
+  const current = rows.filter((row) => !row.tournament.archivedAt);
+  const archived = rows.filter((row) => row.tournament.archivedAt);
+  return (
+    <>
+      <div class="head">
+        <div>
+          <h1>Torneos</h1>
+          <p class="sub">Cada torneo tiene su propia URL pública. El torneo activo se muestra en la portada.</p>
+        </div>
+      </div>
+      <ActiveTable rows={current} />
+      {archived.length > 0 ? <ArchivedTable rows={archived} timeZone={timeZone} /> : null}
+      <form class="card stack" method="post" action="/admin/torneos">
+        <h2>Nuevo torneo</h2>
+        <div class="grid2">
+          <label class="f">
+            Nombre
+            <input name="name" required maxlength={80} placeholder="Torneo All vs All · Oct 2026" />
+          </label>
+          <label class="f">
+            URL pública (slug)
+            <input name="slug" required maxlength={60} pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="torneo-oct-2026" />
+          </label>
+        </div>
+        <fieldset class="format-cards">
+          <legend>Formato (no se puede cambiar después)</legend>
+          {TOURNAMENT_FORMATS.map((key) => (
+            <label class="format-card">
+              <input type="radio" name="format" value={key} checked={key === 'league_playoffs'} />
+              <span>
+                <b>{FORMAT_INFO[key].name}</b>
+                <small>{FORMAT_INFO[key].description}</small>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        <button class="btn pri" type="submit">
+          + Crear torneo
+        </button>
+      </form>
+    </>
+  );
+};
