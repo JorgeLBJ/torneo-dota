@@ -62,6 +62,11 @@ const SECTIONS: TournamentSection[] = [
   { key: 'playoffs', path: 'playoffs', label: 'Playoffs' },
 ];
 
+/** Where a tournament opens in the admin: Resultados, or Llaves for double elimination (it has no group stage). */
+export function tournamentHomePath(tournament: Pick<Tournament, 'id' | 'format'>): string {
+  return `/admin/t/${tournament.id}/${tournament.format === 'double_elimination' ? 'playoffs' : 'resultados'}`;
+}
+
 /** A double-elimination tournament has no group stage: no Fixture or Resultados, and its playoffs are "Llaves". */
 export function sectionsFor(tournament: Pick<Tournament, 'format'> | undefined): TournamentSection[] {
   if (tournament?.format !== 'double_elimination') return SECTIONS;

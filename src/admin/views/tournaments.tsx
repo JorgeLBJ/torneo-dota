@@ -3,6 +3,7 @@ import type { Tournament } from '../../db/repository.js';
 import { FORMAT_INFO, TOURNAMENT_FORMATS } from '../../domain/formats.js';
 import { formatDateTime } from '../../format/datetime.js';
 import { publicUrlFor } from '../render.js';
+import { tournamentHomePath } from './layout.js';
 
 export interface TournamentRow {
   tournament: Tournament;
@@ -53,7 +54,7 @@ const ActiveTable: FC<{ rows: TournamentRow[] }> = ({ rows }) => (
             </td>
             <td>
               <div class="actions">
-                <a class="btn sm" href={`/admin/t/${t.id}/resultados`}>
+                <a class="btn sm" href={tournamentHomePath(t)}>
                   Abrir
                 </a>
                 {t.isActive ? null : (
@@ -108,7 +109,7 @@ const ArchivedTable: FC<{ rows: TournamentRow[]; timeZone: string }> = ({ rows, 
             </td>
             <td>
               <div class="actions">
-                <a class="btn sm" href={`/admin/t/${t.id}/resultados`}>
+                <a class="btn sm" href={tournamentHomePath(t)}>
                   Abrir
                 </a>
                 <form method="post" action={`/admin/t/${t.id}/restaurar`}>

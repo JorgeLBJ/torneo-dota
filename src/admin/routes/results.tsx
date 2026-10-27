@@ -8,6 +8,7 @@ import { parseGameNumber, readGameForm } from '../game-form.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { isDate, readBody, str } from '../form.js';
 import { setFlash } from '../flash.js';
+import { leagueOnly } from '../league-only.js';
 import { renderPage } from '../render.js';
 import { ResultsView } from '../views/results.js';
 
@@ -18,6 +19,8 @@ const parseFilter = (value: string | undefined): string | undefined =>
 export function resultRoutes(deps: Deps) {
   const app = new Hono<AdminEnv>();
   const { repo } = deps;
+  app.use('/resultados', leagueOnly);
+  app.use('/resultados/*', leagueOnly);
 
   app.get('/resultados', (c) => {
     const tournament = c.get('tournament');

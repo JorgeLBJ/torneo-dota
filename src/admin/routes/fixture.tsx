@@ -13,6 +13,7 @@ import { loadState } from '../../services/state.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { isDate, positiveInt, readBody, str } from '../form.js';
 import { setFlash } from '../flash.js';
+import { leagueOnly } from '../league-only.js';
 import { renderPage } from '../render.js';
 import { FixtureView, MatchEditView } from '../views/fixture.js';
 
@@ -22,6 +23,8 @@ const MAX_ROUND = 999;
 export function fixtureRoutes(deps: Deps) {
   const app = new Hono<AdminEnv>();
   const { repo } = deps;
+  app.use('/fixture', leagueOnly);
+  app.use('/fixture/*', leagueOnly);
 
   const ownGroupMatch = (tournamentId: number, raw: string | undefined): Match | undefined => {
     const id = Number(raw);

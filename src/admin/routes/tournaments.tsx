@@ -8,6 +8,7 @@ import type { Repository } from '../../db/repository.js';
 import { describeStatus, loadState } from '../../services/state.js';
 import { imageKeys } from '../../services/team-image.js';
 import { discardImages } from '../../storage/banner-images.js';
+import { tournamentHomePath } from '../views/layout.js';
 import { TournamentsView } from '../views/tournaments.js';
 
 /** Every image-store object a tournament owns: team images (both sizes) and banner images (both sizes). */
@@ -23,7 +24,7 @@ export function tournamentListRoutes(deps: Deps) {
 
   app.get('/', (c) => {
     const active = repo.getActiveTournament();
-    return c.redirect(active ? `/admin/t/${active.id}/resultados` : '/admin/torneos', 303);
+    return c.redirect(active ? tournamentHomePath(active) : '/admin/torneos', 303);
   });
 
   app.get('/torneos', (c) => {

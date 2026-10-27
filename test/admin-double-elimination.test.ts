@@ -303,3 +303,44 @@ describe('league regression', () => {
     expect(html).toContain('Fase de grupos: faltan');
   });
 });
+
+describe('league-only screens on a double elimination tournament', () => {
+  it('lands the admin root and the Torneos "Abrir" link on Llaves', async () => {
+    t.repo.setActiveTournament(tournament.id);
+    const res = await t.get('/admin', cookie);
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toBe(`/admin/t/${tournament.id}/playoffs`);
+    const list = await page('/admin/torneos');
+    expect(list).toContain(`href="/admin/t/${tournament.id}/playoffs"`);
+    expect(list).toContain(`href="/admin/t/${league.id}/resultados"`);
+  });
+
+  it('keeps the league landing on Resultados', async () => {
+    t.repo.setActiveTournament(league.id);
+    const res = await t.get('/admin', cookie);
+    expect(res.headers.get('location')).toBe(`/admin/t/${league.id}/resultados`);
+  });
+
+  it('redirects the Fixture and Resultados pages to Llaves', async () => {
+    for (const path of ['fixture', 'resultados']) {
+      const res = await t.get(`/admin/t/${tournament.id}/${path}`, cookie);
+      expect(res.status).toBe(303);
+      expect(res.headers.get('location')).toBe(base);
+    }
+  });
+
+  it('refuses fixture and result commands without creating matches', async () => {
+    const before = t.repo.listMatches(tournament.id).length;
+    const regenerate = await t.post(`/admin/t/${tournament.id}/fixture/regenerar`, { confirm: 'on' }, cookie);
+    expect(regenerate.status).toBe(404);
+    const round = await t.post(`/admin/t/${tournament.id}/fixture/rondas`, {}, cookie);
+    expect(round.status).toBe(404);
+    expect(t.repo.listMatches(tournament.id)).toHaveLength(before);
+    expect(t.repo.listMatches(tournament.id, 'group')).toHaveLength(0);
+  });
+
+  it('keeps Fixture and Resultados available for a league tournament', async () => {
+    expect((await t.get(`/admin/t/${league.id}/fixture`, cookie)).status).toBe(200);
+    expect((await t.get(`/admin/t/${league.id}/resultados`, cookie)).status).toBe(200);
+  });
+});
