@@ -1,5 +1,8 @@
+import type { Team } from '../db/repository.js';
+import { DE_SLOTS, type DeSlotKey } from '../domain/double-elimination.js';
+import { FORMAT_INFO } from '../domain/formats.js';
 import { utcToZoned } from '../format/timezone.js';
-import { shortDate, type PublicModel } from './model.js';
+import { deSeriesTitle, shortDate, type BracketMatchView, type PublicDoubleElimination, type PublicModel } from './model.js';
 
 // The text shown when a public link is shared (WhatsApp, Telegram, Discord, ...): a title and a description
 // derived from the tournament's current state. Dates are the tournament's own (its time zone).
@@ -27,18 +30,56 @@ function dayOf(iso: string | null | undefined, timeZone: string): string | null 
 
 const join = (parts: (string | null | false | undefined)[]): string => parts.filter(Boolean).join(' · ');
 
+const versusOf = (m: BracketMatchView): string | null =>
+  m.slots[0].team && m.slots[1].team ? `${m.slots[0].team.name} vs ${m.slots[1].team.name}` : null;
+
+/** The champion and the team that lost the grand final, whatever the format. */
+function championOf(model: PublicModel): { champion: Team; runnerUp: Team | null } | null {
+  const de = model.doubleElimination;
+  const champion = de ? de.champion : model.bracket.champion;
+  if (!champion) return null;
+  const final = de ? de.grandFinal : model.bracket.final;
+  return { champion, runnerUp: final.slots.map((s) => s.team).find((t) => t && t.id !== champion.id) ?? null };
+}
+
+/** Double elimination: the grand final once both teams are known, otherwise the progress and the next series. */
+function doubleEliminationText(name: string, de: PublicDoubleElimination, timezone: string): Share {
+  const finalists = versusOf(de.grandFinal);
+  if (finalists) {
+    return { title: `${name} · Gran final`, description: join([finalists, dayOf(de.grandFinal.startsAt, timezone)]) };
+  }
+  // Upper then lower, round by round (the bracket's own order): the first series with both teams and no winner.
+  const next = [...de.upper, ...de.lower].flat().find((m) => versusOf(m) && !m.slots.some((s) => s.isWinner));
+  return {
+    title: `${name} · Torneo de Dota 2`,
+    description: join([
+      FORMAT_INFO.double_elimination.name,
+      de.decided > 0 && `${de.decided}/${de.total} series`,
+      next && `Siguiente: ${deSeriesTitleOf(next.key)}: ${versusOf(next)}`,
+    ]),
+  };
+}
+
+const deSeriesTitleOf = (key: DeSlotKey): string => {
+  const slot = DE_SLOTS.find((s) => s.key === key)!;
+  return deSeriesTitle(slot.phase, slot.matchNumber)!;
+};
+
 function stateText(model: PublicModel): Share {
   const name = oneLine(model.name);
   const { bracket, timezone } = model;
+  const crowned = championOf(model);
 
-  if (bracket.champion) {
-    const champion = bracket.champion.name;
-    const runnerUp = bracket.final.slots.map((s) => s.team).find((t) => t && t.id !== bracket.champion!.id);
+  if (crowned) {
+    const champion = crowned.champion.name;
+    const runnerUp = crowned.runnerUp;
     return {
       title: `${name} · 🏆 Campeón: ${champion}`,
       description: runnerUp ? `${champion} venció a ${runnerUp.name} en la gran final` : `${champion} es el campeón`,
     };
   }
+
+  if (model.doubleElimination) return doubleEliminationText(name, model.doubleElimination, timezone);
 
   if (!bracket.projection) {
     const [sf1, sf2] = bracket.semifinals;
@@ -73,7 +114,7 @@ function stateText(model: PublicModel): Share {
 export function buildShare(model: PublicModel | null): Share {
   if (!model) return NO_TOURNAMENT_SHARE;
   const state = stateText(model);
-  const finished = model.bracket.champion !== null;
+  const finished = championOf(model) !== null;
   const liveRound = finished ? undefined : model.days.flatMap((d) => d.rounds).find((r) => r.status === 'live');
 
   // The admin marked a game as being played: say who is playing, before anything derived from the schedule.

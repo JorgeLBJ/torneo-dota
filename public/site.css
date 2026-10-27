@@ -473,3 +473,22 @@ dialog.promo[open]::backdrop { animation: promo-fade .28s ease-out; }
 @media (prefers-reduced-motion: reduce) {
   dialog.promo[open], dialog.promo[open]::backdrop { animation: none; }
 }
+
+/* ---------- Double elimination bracket ---------- */
+/* Tabs a format does not show keep an empty, hidden panel (even with the no-script "show every panel" rule). */
+.panel[hidden] { display: none !important; }
+.de { display: grid; gap: 26px; min-width: 0; }
+.de-side { display: grid; gap: 12px; min-width: 0; }
+.de-side h3 { display: flex; align-items: center; gap: 12px; margin: 0; font: 800 18px/1 var(--fd); letter-spacing: .1em; text-transform: uppercase; color: var(--gold-hi); }
+.de-side h3::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line-2), transparent); }
+.de-side.lower h3 { color: var(--fg); }
+/* The rounds keep a readable width and scroll sideways inside their own box on narrow screens, never the page. */
+.de-scroll { min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; padding-top: 12px; }
+.de-cols { display: grid; grid-template-columns: repeat(3, minmax(230px, 1fr)); gap: 18px; }
+.de-col { display: grid; grid-template-rows: auto 1fr; gap: 12px; min-width: 0; }
+.de-col h4 { margin: 0; font: 600 12px/1 var(--fl); letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
+.de-col-body { display: grid; gap: 18px; align-content: space-around; }
+.de-final { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 280px); gap: 18px; align-items: center; padding-top: 12px; }
+@media (max-width: 760px) {
+  .de-final { grid-template-columns: minmax(0, 1fr); }
+}

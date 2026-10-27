@@ -1,5 +1,7 @@
 import type { Banner, Game, Match, ScheduleDay, Team, TiebreakerKey } from '../db/repository.js';
 import type { BannerTab } from '../domain/banners.js';
+import { deSlotFor, type DeSeries, type DeSlotKey } from '../domain/double-elimination.js';
+import { FORMAT_INFO, type TournamentFormat } from '../domain/formats.js';
 import type { LiveMark } from '../domain/live.js';
 import { resolveSeries, seriesLengthFor, type SeriesLength } from '../domain/series.js';
 import { describeStream, type StreamView } from '../domain/stream.js';
@@ -177,8 +179,28 @@ export interface BracketMatchView {
   slots: [BracketSlotView, BracketSlotView];
 }
 
+/** A series of the double elimination bracket: a bracket card plus where it sits. */
+export interface DeMatchView extends BracketMatchView {
+  key: DeSlotKey;
+  /** Games of the series (shown even before its teams are known). */
+  bestOf: SeriesLength;
+}
+
+export interface PublicDoubleElimination {
+  note: string;
+  /** Rounds 1-3 of the upper bracket, each with its series in play order. */
+  upper: DeMatchView[][];
+  /** Rounds 1-3 of the lower bracket. */
+  lower: DeMatchView[][];
+  grandFinal: DeMatchView;
+  champion: Team | null;
+  /** Series with a result, out of `total`. */
+  decided: number;
+  total: number;
+}
+
 export interface PublicPhase {
-  key: 'group' | 'semifinal' | 'final';
+  key: 'group' | 'semifinal' | 'final' | 'upper' | 'lower';
   label: string;
   dates: string;
   current: boolean;
@@ -187,6 +209,7 @@ export interface PublicPhase {
 export interface PublicModel {
   name: string;
   slug: string;
+  format: TournamentFormat;
   /** Where the JSON of a match's Dota detail lives: `${detailBase}/${matchId}/detalle`. */
   detailBase: string;
   /** IANA zone the server-rendered times are shown in (visitors' browsers re-render in their own). */
@@ -212,6 +235,8 @@ export interface PublicModel {
     final: BracketMatchView;
     champion: Team | null;
   };
+  /** The upper/lower brackets and grand final of a double elimination tournament; null for any other format. */
+  doubleElimination: PublicDoubleElimination | null;
   rules: {
     summary: { label: string; value: string }[];
     tiebreakers: string[];
@@ -443,12 +468,85 @@ function buildBracket(state: TournamentState, days: ScheduleDay[]): PublicModel[
   };
 }
 
+/** "07 Nov · 11:00" from a match's own schedule, or null while it has none. */
+const storedWhen = (match: Match | undefined): string | null =>
+  !match?.scheduledDate ? null : match.startTime ? `${shortDate(match.scheduledDate)} · ${match.startTime}` : shortDate(match.scheduledDate);
+
+function buildDoubleEliminationView(state: TournamentState): PublicDoubleElimination | null {
+  const de = state.doubleElimination;
+  if (!de) return null;
+  const { teamsById, playoffMatches, tournament } = state;
+  const team = (id: number | null) => (id === null ? null : (teamsById.get(id) ?? null));
+
+  const toView = (s: DeSeries): DeMatchView => {
+    const stored = s.matchId === null ? undefined : playoffMatches.find((m) => m.id === s.matchId);
+    // Games count only while the stored teams are the seats the results give (otherwise they are about to be cleared).
+    const seated = stored && !s.stale && stored.team1Id === s.team1Id && stored.team2Id === s.team2Id ? stored : undefined;
+    const series = seated ? buildSeries(state, seated) : null;
+    const ids: [number | null, number | null] = [s.team1Id, s.team2Id];
+    const view = (index: 0 | 1): BracketSlotView => {
+      const id = ids[index]!;
+      return {
+        team: team(id),
+        seedLabel: s.sources[index],
+        isWinner: id !== null && s.winnerId === id,
+        wins: series && series.games.length > 0 && id !== null ? series.wins[index] : null,
+      };
+    };
+    return {
+      key: s.key,
+      title: s.key === 'GF' ? s.label : s.code,
+      bestOf: seriesLengthFor(tournament, s.phase, false),
+      matchId: stored?.id ?? null,
+      series,
+      hasDetail: stored ? hasDetail(state, stored.id) : false,
+      liveGame: stored ? liveGameOf(state, stored.id) : null,
+      inStream: stored ? inStreamOf(state, stored.id) : false,
+      startsAt: stored?.startsAt ?? null,
+      when: storedWhen(stored),
+      slots: [view(0), view(1)],
+    };
+  };
+
+  const rounds = (side: 'upper' | 'lower') =>
+    [1, 2, 3].map((round) => de.series.filter((s) => s.side === side && s.round === round).map(toView));
+  const decided = de.series.filter((s) => s.winnerId !== null).length;
+  const total = de.series.length;
+  const placed = Object.values(de.positions).some((id) => id !== null);
+  const champion = team(de.championId);
+  const note = champion
+    ? `Torneo finalizado · Campeón ${champion.name}`
+    : !placed
+      ? 'Las posiciones A–F se asignan antes del inicio'
+      : `${decided} de ${total} series jugadas`;
+  return {
+    note,
+    upper: rounds('upper'),
+    lower: rounds('lower'),
+    grandFinal: toView(de.series.find((s) => s.key === 'GF')!),
+    champion,
+    decided,
+    total,
+  };
+}
+
 function buildPhases(state: TournamentState, days: ScheduleDay[]): PublicPhase[] {
-  const { bracket, groupComplete } = state;
+  const { bracket, groupComplete, doubleElimination } = state;
+  const datesOf = (phase: 'group' | 'semifinal' | 'final') => formatDayList(days.filter((d) => d.phase === phase).map((d) => d.date));
+  if (doubleElimination) {
+    // Upper and lower series are stored (and scheduled) as semifinals, the grand final as the final.
+    const won = (key: DeSlotKey) => doubleElimination.series.find((s) => s.key === key)?.winnerId != null;
+    const current: PublicPhase['key'] =
+      doubleElimination.championId !== null || (won('U5') && won('L4')) ? 'final' : won('U5') ? 'lower' : 'upper';
+    return [
+      { key: 'upper', label: 'Llave superior', dates: datesOf('semifinal'), current: current === 'upper' },
+      { key: 'lower', label: 'Llave inferior', dates: datesOf('semifinal'), current: current === 'lower' },
+      { key: 'final', label: 'Gran final', dates: datesOf('final'), current: current === 'final' },
+    ];
+  }
   const decided = bracket.semifinals.every((s) => s.winnerId !== null);
   const current: PublicPhase['key'] =
     bracket.championId !== null ? 'final' : !groupComplete ? 'group' : decided ? 'final' : 'semifinal';
-  const datesOf = (phase: PublicPhase['key']) => formatDayList(days.filter((d) => d.phase === phase).map((d) => d.date));
   return [
     { key: 'group', label: 'Fase de grupos', dates: datesOf('group'), current: current === 'group' },
     { key: 'semifinal', label: 'Semifinales', dates: datesOf('semifinal'), current: current === 'semifinal' },
@@ -458,26 +556,43 @@ function buildPhases(state: TournamentState, days: ScheduleDay[]): PublicPhase[]
 
 function buildRules(state: TournamentState): PublicModel['rules'] {
   const { tournament } = state;
-  const summary = [
-    { label: 'Victoria', value: points(tournament.pointsWin) },
-    { label: 'Derrota', value: points(tournament.pointsLoss) },
-    { label: 'Clasifican', value: `Top ${tournament.qualifiers}` },
-    ...(tournament.qualifiers === 4 ? [{ label: 'Semis', value: '1.º vs 4.º · 2.º vs 3.º' }] : []),
-  ];
+  const bestOf = (n: number) => `Al mejor de ${n}`;
+  const summary = state.doubleElimination
+    ? [
+        { label: 'Formato', value: FORMAT_INFO.double_elimination.name },
+        { label: 'Llaves', value: bestOf(seriesLengthFor(tournament, 'semifinal', false)) },
+        { label: 'Gran final', value: bestOf(seriesLengthFor(tournament, 'final', false)) },
+      ]
+    : [
+        { label: 'Victoria', value: points(tournament.pointsWin) },
+        { label: 'Derrota', value: points(tournament.pointsLoss) },
+        { label: 'Clasifican', value: `Top ${tournament.qualifiers}` },
+        ...(tournament.qualifiers === 4 ? [{ label: 'Semis', value: '1.º vs 4.º · 2.º vs 3.º' }] : []),
+      ];
   return {
     summary,
     tiebreakers: tournament.tiebreakers.map((k) => TIEBREAK_LONG[k]),
     legendTiebreak: tournament.tiebreakers.map((k) => TIEBREAK_SHORT[k]).join(', luego '),
     html: rulebookHtmlOf(tournament),
-    showTiebreakBox: tournament.showTiebreakBox,
+    // Tiebreakers order a table; a bracket has none.
+    showTiebreakBox: tournament.showTiebreakBox && state.doubleElimination === null,
     qualifiers: tournament.qualifiers,
     pointsWin: points(tournament.pointsWin),
     pointsLoss: points(tournament.pointsLoss),
   };
 }
 
+/** Name of a double elimination series: "Superior · Ronda 1 · S1", "Final superior · S5", "Gran final"; null for no series. */
+export function deSeriesTitle(phase: string, matchNumber: number): string | null {
+  const slot = deSlotFor(phase, matchNumber);
+  if (!slot) return null;
+  return slot.key === 'GF' ? slot.label : `${slot.label} · ${slot.code}`;
+}
+
 /** Name of the stage a match belongs to, without the game: "Semifinal 2", "Gran final", "Ronda 4 · Partido 11". */
-function matchLabel(match: Match): string {
+function matchLabel(state: TournamentState, match: Match): string {
+  const series = state.doubleElimination ? deSeriesTitle(match.phase, match.matchNumber) : null;
+  if (series) return series;
   if (match.phase === 'final') return 'Gran final';
   if (match.phase === 'semifinal') return `Semifinal ${match.matchNumber}`;
   return `Ronda ${match.round} · Partido ${match.matchNumber}`;
@@ -516,7 +631,7 @@ function buildLiveOf(state: TournamentState, mark: LiveMark): PublicLive | null 
     teamB,
     subtitleA: position(teamA.id),
     subtitleB: position(teamB.id),
-    label: series ? `${matchLabel(match)} · Juego ${mark.gameNumber} de ${series.length}` : matchLabel(match),
+    label: series ? `${matchLabel(state, match)} · Juego ${mark.gameNumber} de ${series.length}` : matchLabel(state, match),
     gameNumber: mark.gameNumber,
     series,
     startedAt: mark.startedAt,
@@ -529,6 +644,11 @@ export function buildPublicModel(state: TournamentState, scheduleDays: ScheduleD
   const now = options.now ?? new Date();
   const { live, next: nextRound } = liveAndNext(state.allGroupMatches, now);
   const played = groupMatches.length - state.pendingGroup;
+  const doubleElimination = buildDoubleEliminationView(state);
+  // A bracket tournament measures its progress in decided series, a league in group matches played.
+  const progress = doubleElimination
+    ? { played: doubleElimination.decided, total: doubleElimination.total }
+    : { played, total: groupMatches.length };
   const first = scheduleDays.map((d) => d.date).sort()[0];
   const kicker = first
     ? `${tournament.game} · ${MONTHS_LONG[parts(first).month]} ${parts(first).year}`
@@ -537,6 +657,7 @@ export function buildPublicModel(state: TournamentState, scheduleDays: ScheduleD
   return {
     name: tournament.name,
     slug: tournament.slug,
+    format: tournament.format,
     detailBase: `/t/${tournament.slug}/partido`,
     timezone: tournament.timezone,
     kicker,
@@ -545,15 +666,15 @@ export function buildPublicModel(state: TournamentState, scheduleDays: ScheduleD
     phases: buildPhases(state, scheduleDays),
     live: buildLive(state),
     progress: {
-      played,
-      total: groupMatches.length,
-      percent: groupMatches.length === 0 ? 0 : Math.round((played / groupMatches.length) * 100),
+      ...progress,
+      percent: progress.total === 0 ? 0 : Math.round((progress.played / progress.total) * 100),
     },
     teams: state.teams,
     days: buildDays(state, live, nextRound),
     standings: buildStandings(state),
     standingsSub: `${played} de ${groupMatches.length} partidos jugados`,
     bracket: buildBracket(state, scheduleDays),
+    doubleElimination,
     rules: buildRules(state),
   };
 }

@@ -6,11 +6,23 @@
   if (!app) return;
 
   var TABS = ['partidos', 'envivo', 'posiciones', 'playoffs', 'reglas'];
-  var state = { tab: tabFromHash() || TABS[0], filter: '' };
+  var state = { tab: tabFromHash() || defaultTab(), filter: '' };
+
+  // A format may not show every tab (double elimination has no Partidos or Posiciones): only a tab on the page counts.
+  function shownTab(key) {
+    return TABS.indexOf(key) >= 0 && !!app.querySelector('.tab[data-tab="' + key + '"]');
+  }
 
   function tabFromHash() {
     var key = location.hash.replace(/^#/, '');
-    return TABS.indexOf(key) >= 0 ? key : null;
+    return shownTab(key) ? key : null;
+  }
+
+  // The server marks the format's default tab as selected.
+  function defaultTab() {
+    var selected = app.querySelector('.tab[aria-selected="true"]');
+    var key = selected && selected.getAttribute('data-tab');
+    return shownTab(key) ? key : TABS[0];
   }
 
   function each(selector, fn) {
@@ -336,7 +348,7 @@
       if (!cta) return;
       dialog.close();
       var tabKey = cta.getAttribute('data-cta-tab');
-      var tab = tabKey && TABS.indexOf(tabKey) >= 0 ? app.querySelector('.tab[data-tab="' + tabKey + '"]') : null;
+      var tab = tabKey && shownTab(tabKey) ? app.querySelector('.tab[data-tab="' + tabKey + '"]') : null;
       if (tab) tab.click(); // the page's own tab handler: state, URL hash and panels
     });
   })();

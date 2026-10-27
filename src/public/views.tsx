@@ -9,6 +9,7 @@ import { emblemSourcesFor } from '../emblem-sources.js';
 import type {
   BracketMatchView,
   BracketSlotView,
+  DeMatchView,
   PublicBanner,
   PublicDay,
   PublicLive,
@@ -30,6 +31,21 @@ export const TABS = [
   { key: 'playoffs', label: 'Playoffs' },
   { key: 'reglas', label: 'Reglas' },
 ] as const;
+
+type TabKey = (typeof TABS)[number]['key'];
+
+/**
+ * The tabs a page shows, the first one open by default. A double elimination tournament has no fixture and no table:
+ * it opens on its bracket ("Llaves", same key as Playoffs so banners and shared links keep working).
+ */
+export function tabsFor(model: Pick<PublicModel, 'doubleElimination'>): { key: TabKey; label: string }[] {
+  if (!model.doubleElimination) return [...TABS];
+  return [
+    { key: 'playoffs', label: 'Llaves' },
+    { key: 'envivo', label: 'En vivo' },
+    { key: 'reglas', label: 'Reglas' },
+  ];
+}
 
 const PALETTE = ['#c8aa6e', '#6dbf4b', '#d2452f', '#6fa8ff', '#c58cff', '#62d0e0', '#ff9a5c'];
 
@@ -285,7 +301,7 @@ const Hero: FC<{ model: PublicModel }> = ({ model }) => (
       <div
         class="prog"
         role="progressbar"
-        aria-label="Progreso de la fase de grupos"
+        aria-label={model.doubleElimination ? 'Progreso del torneo' : 'Progreso de la fase de grupos'}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={model.progress.percent}
@@ -623,25 +639,34 @@ const BracketSlot: FC<{ slot: BracketSlotView }> = ({ slot }) =>
     </div>
   );
 
-const BracketMatch: FC<{ match: BracketMatchView; detailBase: string }> = ({ match, detailBase }) => (
-  <div class={`bm ${match.liveGame !== null ? (match.inStream ? 'on-air tv' : 'on-air') : ''}`}>
-    {match.liveGame !== null ? <NowPill game={match.series ? match.liveGame : null} tv={match.inStream} /> : null}
-    <header>
-      <span>
-        {match.title}
-        {match.series ? <em class="bo"> · al mejor de {match.series.length}</em> : null}
-      </span>
-      {match.when ? (
-        <b data-start={match.startsAt ?? undefined} data-format="short">
-          {match.when}
-        </b>
-      ) : null}
-    </header>
-    <BracketSlot slot={match.slots[0]} />
-    <BracketSlot slot={match.slots[1]} />
-    {match.hasDetail && match.matchId !== null ? <DetailButton url={`${detailBase}/${match.matchId}/detalle`} /> : null}
-  </div>
-);
+/** One series card. `seriesKey` marks a double elimination series; `bestOf` shows its length before the teams are known. */
+const BracketMatch: FC<{ match: BracketMatchView; detailBase: string; seriesKey?: string; bestOf?: number }> = ({
+  match,
+  detailBase,
+  seriesKey,
+  bestOf,
+}) => {
+  const length = match.series?.length ?? (bestOf !== undefined && bestOf > 1 ? bestOf : null);
+  return (
+    <div class={`bm ${match.liveGame !== null ? (match.inStream ? 'on-air tv' : 'on-air') : ''}`} data-series={seriesKey}>
+      {match.liveGame !== null ? <NowPill game={match.series ? match.liveGame : null} tv={match.inStream} /> : null}
+      <header>
+        <span>
+          {match.title}
+          {length !== null ? <em class="bo"> · al mejor de {length}</em> : null}
+        </span>
+        {match.when ? (
+          <b data-start={match.startsAt ?? undefined} data-format="short">
+            {match.when}
+          </b>
+        ) : null}
+      </header>
+      <BracketSlot slot={match.slots[0]} />
+      <BracketSlot slot={match.slots[1]} />
+      {match.hasDetail && match.matchId !== null ? <DetailButton url={`${detailBase}/${match.matchId}/detalle`} /> : null}
+    </div>
+  );
+};
 
 const AegisIcon: FC = () => (
   <svg viewBox="0 0 64 76" aria-hidden="true">
@@ -654,6 +679,14 @@ const AegisIcon: FC = () => (
     <path d="M32 2 60 12v22c0 18-12 32-28 40C16 66 4 52 4 34V12Z" fill="none" stroke="url(#aegis-g)" stroke-width="3" />
     <path d="M32 14 48 20v14c0 11-7 20-16 25-9-5-16-14-16-25V20Z" fill="url(#aegis-g)" opacity=".85" />
   </svg>
+);
+
+const Champion: FC<{ champion: Team | null }> = ({ champion }) => (
+  <div class={`aegis ${champion ? 'won' : ''}`}>
+    <AegisIcon />
+    <small>Campeón</small>
+    <b>{champion ? champion.name : 'Por definir'}</b>
+  </div>
 );
 
 const BracketPanel: FC<{ model: PublicModel }> = ({ model }) => {
@@ -674,10 +707,62 @@ const BracketPanel: FC<{ model: PublicModel }> = ({ model }) => {
           <BracketMatch match={bracket.final} detailBase={model.detailBase} />
         </div>
         <div class="link single"></div>
-        <div class={`aegis ${bracket.champion ? 'won' : ''}`}>
-          <AegisIcon />
-          <small>Campeón</small>
-          <b>{bracket.champion ? bracket.champion.name : 'Por definir'}</b>
+        <Champion champion={bracket.champion} />
+      </div>
+    </>
+  );
+};
+
+const DeMatch: FC<{ match: DeMatchView; detailBase: string }> = ({ match, detailBase }) => (
+  <BracketMatch match={match} detailBase={detailBase} seriesKey={match.key} bestOf={match.bestOf} />
+);
+
+const DE_ROUND_TITLES = {
+  upper: ['Ronda 1', 'Ronda 2', 'Final superior'],
+  lower: ['Ronda 1', 'Ronda 2', 'Final inferior'],
+} as const;
+
+/** One side of the double elimination bracket: its rounds as columns, scrolling sideways inside its own box. */
+const DeSide: FC<{ side: 'upper' | 'lower'; title: string; rounds: DeMatchView[][]; detailBase: string }> = ({
+  side,
+  title,
+  rounds,
+  detailBase,
+}) => (
+  <div class={`de-side ${side}`} role="group" aria-label={title}>
+    <h3>{title}</h3>
+    <div class="de-scroll">
+      <div class="de-cols">
+        {rounds.map((matches, i) => (
+          <div class="de-col">
+            <h4>{DE_ROUND_TITLES[side][i]}</h4>
+            <div class="de-col-body">
+              {matches.map((match) => (
+                <DeMatch match={match} detailBase={detailBase} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+const DoubleEliminationPanel: FC<{ model: PublicModel }> = ({ model }) => {
+  const de = model.doubleElimination!;
+  return (
+    <>
+      <Section title="Llaves" sub="Superior, inferior y gran final" />
+      <div class="notice">{de.note}</div>
+      <div class="de">
+        <DeSide side="upper" title="Llave superior" rounds={de.upper} detailBase={model.detailBase} />
+        <DeSide side="lower" title="Llave inferior" rounds={de.lower} detailBase={model.detailBase} />
+        <div class="de-side grand" role="group" aria-label="Gran final">
+          <h3>Gran final</h3>
+          <div class="de-final">
+            <DeMatch match={de.grandFinal} detailBase={model.detailBase} />
+            <Champion champion={de.champion} />
+          </div>
         </div>
       </div>
     </>
@@ -719,14 +804,31 @@ const RulesPanel: FC<{ model: PublicModel }> = ({ model }) => (
 
 // ---------- Page ----------
 
+/**
+ * A tab panel, open when it is the default tab. A tab the format does not show keeps an empty, hidden panel: the live
+ * refresh patches the page panel by panel and expects the same set of panels on every page.
+ */
+const Panel: FC<PropsWithChildren<{ tab: TabKey; open: TabKey; shown: boolean }>> = ({ tab, open, shown, children }) =>
+  shown ? (
+    <section class={tab === open ? 'panel on' : 'panel'} id={`p-${tab}`} role="tabpanel" data-panel={tab}>
+      {children}
+    </section>
+  ) : (
+    <section class="panel" id={`p-${tab}`} role="tabpanel" data-panel={tab} hidden></section>
+  );
+
 /** Everything inside #app; also served on its own as the live-update fragment. */
-export const PublicContent: FC<{ model: PublicModel; sources?: EmblemSources }> = ({ model, sources }) => (
+export const PublicContent: FC<{ model: PublicModel; sources?: EmblemSources }> = ({ model, sources }) => {
+  const tabs = tabsFor(model);
+  const open = tabs[0]!.key;
+  const shown = (key: TabKey) => tabs.some((tab) => tab.key === key);
+  return (
   <EmblemSourcesContext.Provider value={sources ?? defaultSources}>
     <span hidden data-server-now={model.serverNow}></span>
     <Hero model={model} />
     <div class="tabs-bar">
       <nav class="tabs" role="tablist" aria-label="Secciones">
-        {TABS.map((tab, i) => (
+        {tabs.map((tab, i) => (
           <button type="button" class="tab" role="tab" aria-selected={i === 0 ? 'true' : 'false'} data-tab={tab.key}>
             {tab.label}
             {tab.key === 'envivo' && model.stream ? <span class="tab-dot" role="img" aria-label="Transmisión activa"></span> : null}
@@ -735,24 +837,25 @@ export const PublicContent: FC<{ model: PublicModel; sources?: EmblemSources }> 
       </nav>
     </div>
     <main class="wrap">
-      <section class="panel on" id="p-partidos" role="tabpanel" data-panel="partidos">
+      <Panel tab="partidos" open={open} shown={shown('partidos')}>
         <MatchesPanel model={model} />
-      </section>
-      <section class="panel" id="p-envivo" role="tabpanel" data-panel="envivo">
+      </Panel>
+      <Panel tab="envivo" open={open} shown={shown('envivo')}>
         <StreamPanel model={model} />
-      </section>
-      <section class="panel" id="p-posiciones" role="tabpanel" data-panel="posiciones">
+      </Panel>
+      <Panel tab="posiciones" open={open} shown={shown('posiciones')}>
         <StandingsPanel model={model} />
-      </section>
-      <section class="panel" id="p-playoffs" role="tabpanel" data-panel="playoffs">
-        <BracketPanel model={model} />
-      </section>
-      <section class="panel" id="p-reglas" role="tabpanel" data-panel="reglas">
+      </Panel>
+      <Panel tab="playoffs" open={open} shown={shown('playoffs')}>
+        {model.doubleElimination ? <DoubleEliminationPanel model={model} /> : <BracketPanel model={model} />}
+      </Panel>
+      <Panel tab="reglas" open={open} shown={shown('reglas')}>
         <RulesPanel model={model} />
-      </section>
+      </Panel>
     </main>
   </EmblemSourcesContext.Provider>
-);
+  );
+};
 
 export const ComingSoonContent: FC = () => (
   <header class="hero hero-min">

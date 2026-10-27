@@ -3,6 +3,7 @@ import { resolveEmblem, type EmblemSources } from '../domain/emblem.js';
 import { resolveSeries, seriesLengthFor } from '../domain/series.js';
 import type { DotaSnapshot } from '../dota/snapshot.js';
 import type { TournamentState } from '../services/state.js';
+import { deSeriesTitle } from './model.js';
 
 // The JSON behind "Ver detalle de la partida": what the public modal shows about a match and its games.
 
@@ -35,8 +36,9 @@ export interface MatchDetail {
   games: DetailGame[];
 }
 
-const titleOf = (match: Match): string =>
-  match.phase === 'final' ? 'Gran final' : match.phase === 'semifinal' ? `Semifinal ${match.matchNumber}` : `Partido ${match.matchNumber}`;
+const titleOf = (state: TournamentState, match: Match): string =>
+  (state.doubleElimination ? deSeriesTitle(match.phase, match.matchNumber) : null) ??
+  (match.phase === 'final' ? 'Gran final' : match.phase === 'semifinal' ? `Semifinal ${match.matchNumber}` : `Partido ${match.matchNumber}`);
 
 function toTeam(team: Team, sources: EmblemSources): DetailTeam {
   const emblem = resolveEmblem(team, sources);
@@ -67,7 +69,7 @@ export function buildMatchDetail(state: TournamentState, match: Match, games: re
   const resolved = resolveSeries(team1.id, team2.id, length, games);
   return {
     matchId: match.id,
-    title: titleOf(match),
+    title: titleOf(state, match),
     teams: [toTeam(team1, sources), toTeam(team2, sources)],
     series: length === 1 ? null : { length, wins: resolved.wins, winnerId: resolved.winnerId },
     games: games.map((g) => ({
