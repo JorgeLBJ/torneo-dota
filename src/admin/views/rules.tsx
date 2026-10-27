@@ -80,7 +80,66 @@ const RulebookEditor: FC<{ html: string }> = ({ html }) => (
   </div>
 );
 
+/** "Al mejor de 1/3/5" select of one phase's series length. */
+const LengthSelect: FC<{ name: string; label: string; value: number }> = ({ name, label, value }) => (
+  <label class="f">
+    {label}
+    <Select name={name}>
+      <option value="1" selected={value === 1}>
+        Al mejor de 1
+      </option>
+      <option value="3" selected={value === 3}>
+        Al mejor de 3
+      </option>
+      <option value="5" selected={value === 5}>
+        Al mejor de 5
+      </option>
+    </Select>
+  </label>
+);
+
+/**
+ * Rules of a double-elimination tournament: no table, so no points, tiebreakers or group stage. Those values ride
+ * along as hidden fields so saving keeps them; the series are stored as semifinals and the grand final as the final.
+ */
+const DoubleEliminationRules: FC<{ tournament: Tournament }> = ({ tournament }) => (
+  <form method="post" action={`/admin/t/${tournament.id}/reglas`} class="stack">
+    <button type="submit" name="action" value="save" class="sr-only" tabindex={-1} aria-hidden="true">
+      Guardar
+    </button>
+    <PageHead title="Reglas" sub='Las llaves se juegan con estas partidas por serie. El reglamento se publica en la pestaña "Reglas" de la web.'>
+      <button class="btn pri" type="submit" name="action" value="save">
+        Guardar
+      </button>
+    </PageHead>
+    <input type="hidden" name="tiebreakers" value={tournament.tiebreakers.join(',')} />
+    <input type="hidden" name="points_win" value={String(tournament.pointsWin)} />
+    <input type="hidden" name="points_loss" value={String(tournament.pointsLoss)} />
+    <input type="hidden" name="group_legs" value={String(tournament.groupLegs)} />
+    <div class="card stack">
+      <h2>Formato</h2>
+      <div class="grid2">
+        <LengthSelect name="semifinal_games" label="Partidas por serie (llaves)" value={tournament.semifinalGames} />
+        <LengthSelect name="final_games" label="Partidas en la gran final" value={tournament.finalGames} />
+      </div>
+      <p class="muted" style="margin:0;font-size:12px">
+        Doble eliminación con 6 equipos: quien pierde en la llave superior baja a la inferior; quien pierde en la inferior
+        queda eliminado. Gana la serie quien llegue primero a la mitad más uno (1, 2 o 3 juegos).
+      </p>
+    </div>
+    <div class="card stack">
+      <h2>Reglamento</h2>
+      <p class="muted" style="margin:0;font-size:12px">
+        Se muestra en la pestaña «Reglas» de la web pública. Lo que pegues de Word o WhatsApp se limpia: solo quedan los
+        estilos de la barra.
+      </p>
+      <RulebookEditor html={rulebookHtmlOf(tournament)} />
+    </div>
+  </form>
+);
+
 export const RulesView: FC<{ tournament: Tournament }> = ({ tournament }) => {
+  if (tournament.format === 'double_elimination') return <DoubleEliminationRules tournament={tournament} />;
   const order = tournament.tiebreakers;
   const unused = ALL_CRITERIA.filter((key) => !order.includes(key));
   return (
@@ -206,20 +265,7 @@ export const RulesView: FC<{ tournament: Tournament }> = ({ tournament }) => {
                 ['final_games', 'Final', tournament.finalGames],
               ] as const
             ).map(([name, label, value]) => (
-              <label class="f">
-                {label}
-                <Select name={name}>
-                  <option value="1" selected={value === 1}>
-                    Al mejor de 1
-                  </option>
-                  <option value="3" selected={value === 3}>
-                    Al mejor de 3
-                  </option>
-                  <option value="5" selected={value === 5}>
-                    Al mejor de 5
-                  </option>
-                </Select>
-              </label>
+              <LengthSelect name={name} label={label} value={value} />
             ))}
           </div>
           <p class="muted" style="margin:0;font-size:12px">

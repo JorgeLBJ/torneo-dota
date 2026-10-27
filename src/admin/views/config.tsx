@@ -1,5 +1,6 @@
 import type { FC } from 'hono/jsx';
 import type { ScheduleDay, Tournament } from '../../db/repository.js';
+import { FORMAT_INFO } from '../../domain/formats.js';
 import { MAX_STREAM_URL, type StreamView } from '../../domain/stream.js';
 import { TIMEZONE_CHOICES } from '../../format/timezone.js';
 import { PageHead, Select } from './parts.js';
@@ -9,6 +10,15 @@ export const PHASE_LABELS: Record<ScheduleDay['phase'], string> = {
   semifinal: 'Semifinales',
   final: 'Final',
 };
+
+/** Calendar phases a tournament can use: double elimination stores its series as semifinals and its grand final as the final. */
+const phaseChoices = (tournament: Tournament): [ScheduleDay['phase'], string][] =>
+  tournament.format === 'double_elimination'
+    ? [
+        ['semifinal', 'Llaves'],
+        ['final', 'Gran final'],
+      ]
+    : (Object.keys(PHASE_LABELS) as ScheduleDay['phase'][]).map((p) => [p, PHASE_LABELS[p]]);
 
 export const ConfigView: FC<{ tournament: Tournament; days: ScheduleDay[]; stream: StreamView | null }> = ({ tournament, days, stream }) => (
   <>
@@ -24,6 +34,13 @@ export const ConfigView: FC<{ tournament: Tournament; days: ScheduleDay[]; strea
     </PageHead>
     <div class="card general-card">
       <h2>General</h2>
+      <div class="format-ro" style="grid-column:1 / -1">
+        <span class="muted" style="font-size:12px">Formato</span>
+        <b>{FORMAT_INFO[tournament.format].name}</b>
+        <span class="muted" style="font-size:12px">
+          {FORMAT_INFO[tournament.format].description} Se elige al crear el torneo y no se puede cambiar.
+        </span>
+      </div>
       <label class="f">
         Nombre
         <input name="name" value={tournament.name} required maxlength={80} />
@@ -51,7 +68,7 @@ export const ConfigView: FC<{ tournament: Tournament; days: ScheduleDay[]; strea
         local de cada visitante. Cambiarla no mueve los partidos ya creados en el tiempo.
       </p>
       <p class="muted" style="margin:0;font-size:12px">
-        Puntos, desempates, playoffs y reglamento se editan en{' '}
+        {tournament.format === 'double_elimination' ? 'Partidas por serie y reglamento' : 'Puntos, desempates, playoffs y reglamento'} se editan en{' '}
         <a href={`/admin/t/${tournament.id}/reglas`}>Reglas</a>.
       </p>
     </div>
@@ -80,9 +97,9 @@ export const ConfigView: FC<{ tournament: Tournament; days: ScheduleDay[]; strea
               <tr>
                 <td data-label="Fase">
                   <Select name="day_phase" aria-label="Fase">
-                    {(Object.keys(PHASE_LABELS) as ScheduleDay['phase'][]).map((p) => (
+                    {phaseChoices(tournament).map(([p, label]) => (
                       <option value={p} selected={p === d.phase}>
-                        {PHASE_LABELS[p]}
+                        {label}
                       </option>
                     ))}
                   </Select>

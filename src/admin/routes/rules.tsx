@@ -16,6 +16,12 @@ const PHASES = [
   { field: 'final_games', key: 'finalGames', phase: 'final', label: 'la final' },
 ] as const;
 
+/** Double elimination stores its bracket series as semifinals and its grand final as the final. */
+const DE_PHASE_LABELS: Record<(typeof PHASES)[number]['phase'], string> = {
+  group: 'la fase de grupos',
+  semifinal: 'las llaves',
+  final: 'la gran final',
+};
 
 /** The submitted order: any list (even empty) of known criteria, none repeated. */
 function parseOrder(csv: string): TiebreakerKey[] | null {
@@ -78,7 +84,9 @@ export function rulesRoutes(deps: Deps) {
     const lengths: Partial<Record<'groupGames' | 'semifinalGames' | 'finalGames', SeriesLength>> = {};
     const games = repo.listTournamentGames(tournament.id);
     const matches = repo.listMatches(tournament.id);
-    for (const { field, key, phase, label } of PHASES) {
+    const de = tournament.format === 'double_elimination';
+    for (const { field, key, phase, label: leagueLabel } of PHASES) {
+      const label = de ? DE_PHASE_LABELS[phase] : leagueLabel;
       const raw = str(body, field);
       if (raw === '') continue;
       const value = Number(raw);

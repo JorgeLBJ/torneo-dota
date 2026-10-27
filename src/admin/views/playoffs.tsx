@@ -1,6 +1,8 @@
 import type { FC } from 'hono/jsx';
 import type { Match, Schedule, Team, Tournament } from '../../db/repository.js';
+import { POSITIONS, type DeSeries, type DeSide } from '../../domain/double-elimination.js';
 import type { BracketSlot } from '../../domain/playoffs.js';
+import { seriesLengthFor } from '../../domain/series.js';
 import type { TournamentState } from '../../services/state.js';
 import { PageHead, Select } from './parts.js';
 import { ResultCard, scheduleLabel } from './results.js';
@@ -147,6 +149,142 @@ export const PlayoffsView: FC<PlayoffsViewProps> = ({ tournament, state, slots, 
           ) : null}
         </form>
       </details>
+    </>
+  );
+};
+
+interface DoubleEliminationViewProps {
+  tournament: Tournament;
+  state: TournamentState;
+  now: Date;
+}
+
+const SIDES: { side: DeSide; title: string }[] = [
+  { side: 'upper', title: 'Bracket superior' },
+  { side: 'lower', title: 'Bracket inferior' },
+  { side: 'grand', title: 'Gran final' },
+];
+
+/** The "Llaves" screen of a double-elimination tournament: positions A–F, then the ten series by side and round. */
+export const DoubleEliminationView: FC<DoubleEliminationViewProps> = ({ tournament, state, now }) => {
+  const bracket = state.doubleElimination!;
+  const { teamsById, teams } = state;
+  const base = `/admin/t/${tournament.id}/playoffs`;
+  const team = (id: number | null): Team | null => (id === null ? null : (teamsById.get(id) ?? null));
+  const placed = POSITIONS.every((p) => bracket.positions[p] !== null);
+  const anyStored = state.playoffMatches.length > 0;
+  const hasResults = state.playoffMatches.some((m) => (state.gamesByMatch.get(m.id) ?? []).length > 0);
+  const champion = team(bracket.championId);
+
+  const card = (s: DeSeries) => {
+    const length = seriesLengthFor(tournament, s.phase, false);
+    const t1 = team(s.team1Id);
+    const t2 = team(s.team2Id);
+    return (
+      <div class="de-series">
+        {t1 && t2 ? null : (
+          <p class="de-seats muted">
+            {t1?.name ?? s.sources[0]} vs {t2?.name ?? s.sources[1]} · Al mejor de {length}
+          </p>
+        )}
+        <ResultCard
+          action={`${base}/llave/${s.key}`}
+          header={`${s.code} · ${s.label} · BO${length}`}
+          team1={t1}
+          team2={t2}
+          match={state.playoffMatches.find((m) => m.id === s.matchId)}
+          matchId={s.matchId}
+          live={state.liveMarks.find((mark) => mark.matchId === s.matchId) ?? null}
+          onStream={s.matchId !== null && tournament.streamMatchId === s.matchId}
+          now={now}
+          games={state.gamesByMatch.get(s.matchId ?? -1) ?? []}
+          length={length}
+        />
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <PageHead title="Llaves" sub="Doble eliminación: los ganadores avanzan y los perdedores de la llave superior bajan a la inferior." />
+      <form method="post" action={`${base}/posiciones`} class="card stack">
+        <h2>Posiciones</h2>
+        <p class="muted" style="margin:0;font-size:12px">
+          A vs B y C vs D abren la llave superior; E espera al ganador de A/B y F al de C/D. Cambiar una posición borra
+          los resultados que dependían de ella.
+        </p>
+        <div class="de-positions">
+          {POSITIONS.map((p) => (
+            <label class="f">
+              Posición {p}
+              <Select name={`pos_${p.toLowerCase()}`}>
+                <option value="">Elegir…</option>
+                {teams.map((t) => (
+                  <option value={String(t.id)} selected={t.id === bracket.positions[p]}>
+                    {t.code} · {t.name}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          ))}
+        </div>
+        {teams.length < POSITIONS.length ? (
+          <p class="note" style="margin:0">
+            Hacen falta 6 equipos: agrégalos en <a href={`/admin/t/${tournament.id}/equipos`}>Equipos</a>.
+          </p>
+        ) : null}
+        <div class="actions">
+          <button class="btn pri" type="submit" name="action" value="save">
+            Guardar posiciones
+          </button>
+          {anyStored ? (
+            <button class="btn danger" type="submit" name="action" value="reset" data-confirm-open="resetBracketDialog">
+              Reiniciar llaves
+            </button>
+          ) : null}
+        </div>
+        {anyStored ? (
+          <dialog id="resetBracketDialog" class="confirm-modal" aria-labelledby="resetBracketTitle">
+            <h2 id="resetBracketTitle">¿Reiniciar las llaves?</h2>
+            <p>
+              Se borran las posiciones A–F{hasResults ? ' y todos los resultados de las llaves' : ''}. No se puede deshacer.
+            </p>
+            <div class="actions">
+              <button class="btn" type="button" autofocus data-confirm-cancel>
+                Cancelar
+              </button>
+              <button class="btn pri" type="submit" name="action" value="reset">
+                Reiniciar llaves
+              </button>
+            </div>
+          </dialog>
+        ) : null}
+      </form>
+      {placed ? null : (
+        <div class="note">Asigna las seis posiciones para empezar a cargar resultados.</div>
+      )}
+      {SIDES.map(({ side, title }) => {
+        const series = bracket.series.filter((s) => s.side === side);
+        const rounds = [...new Set(series.map((s) => s.round))];
+        return (
+          <section class="stack de-side">
+            <h2>{title}</h2>
+            <div class="de-rounds">
+              {rounds.map((round) => (
+                <div class="stack">{series.filter((s) => s.round === round).map(card)}</div>
+              ))}
+              {side === 'grand' ? (
+                <div class="champ">
+                  <div class="muted" style="font-size:11px;letter-spacing:.12em;text-transform:uppercase">
+                    Campeón
+                  </div>
+                  <b>{champion ? champion.name : 'Por definir'}</b>
+                </div>
+              ) : null}
+            </div>
+          </section>
+        );
+      })}
     </>
   );
 };

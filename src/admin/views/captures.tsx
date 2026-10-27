@@ -1,5 +1,7 @@
 import type { FC } from 'hono/jsx';
 import type { GsiCaptureLink, GsiCaptureRow } from '../../db/repository.js';
+import { deSlotFor } from '../../domain/double-elimination.js';
+import type { TournamentFormat } from '../../domain/formats.js';
 import type { GsiSummary } from '../../dota/gsi.js';
 import type { DotaPlayerLine } from '../../dota/snapshot.js';
 import { formatDuration } from '../../dota/import.js';
@@ -21,14 +23,23 @@ export const PAGE_SIZE = 50;
 export interface CaptureItem {
   row: GsiCaptureRow;
   state: CaptureState;
+  /** Format of the linked game's tournament; its playoff matches are named after it. */
+  linkFormat?: TournamentFormat;
 }
 
 const STATE_LABEL: Record<CaptureState, string> = { live: 'En curso', final: 'Finalizada', incomplete: 'Incompleta' };
 const SIDE_LABEL = { radiant: 'Radiant', dire: 'Dire' } as const;
 
+/** Where a playoff match sits: its bracket series in double elimination, else the semifinal or the final. */
+function playoffLabel(link: GsiCaptureLink, format: TournamentFormat): string {
+  const series = format === 'double_elimination' ? deSlotFor(link.phase, link.matchNumber) : undefined;
+  if (series) return series.label;
+  return link.phase === 'final' ? 'Gran final' : `Semifinal ${link.matchNumber}`;
+}
+
 /** "Fecha 3 · Equipo A vs Equipo B · Juego 2" */
-export function linkLabel(link: GsiCaptureLink): string {
-  const where = link.phase === 'group' ? `Fecha ${link.round}` : link.phase === 'final' ? 'Gran final' : `Semifinal ${link.matchNumber}`;
+export function linkLabel(link: GsiCaptureLink, format: TournamentFormat = 'league_playoffs'): string {
+  const where = link.phase === 'group' ? `Fecha ${link.round}` : playoffLabel(link, format);
   const teams = link.team1Name && link.team2Name ? ` · ${link.team1Name} vs ${link.team2Name}` : '';
   const game = link.phase === 'group' && link.gameNumber === 1 ? '' : ` · Juego ${link.gameNumber}`;
   return `${where}${teams}${game}`;
@@ -37,10 +48,10 @@ export function linkLabel(link: GsiCaptureLink): string {
 const linkHref = (link: GsiCaptureLink): string =>
   link.phase === 'group' ? `/admin/t/${link.tournamentId}/resultados?fecha=todos` : `/admin/t/${link.tournamentId}/playoffs`;
 
-export const LinkedTo: FC<{ link: GsiCaptureLink | null }> = ({ link }) =>
+export const LinkedTo: FC<{ link: GsiCaptureLink | null; format?: TournamentFormat }> = ({ link, format }) =>
   link ? (
     <a href={linkHref(link)}>
-      {link.tournamentName} · {linkLabel(link)}
+      {link.tournamentName} · {linkLabel(link, format)}
     </a>
   ) : (
     <span class="pill">Sin vincular</span>
@@ -123,7 +134,7 @@ export const CapturesView: FC<{
                 </td>
               </tr>
             ) : null}
-            {items.map(({ row, state }) => (
+            {items.map(({ row, state, linkFormat }) => (
               <tr data-capture-key={String(row.dotaMatchId)}>
                 <td data-label="Match ID">
                   <b>{row.dotaMatchId}</b>
@@ -140,7 +151,7 @@ export const CapturesView: FC<{
                   {formatDateTime(row.updatedAt, { timeZone })}
                 </td>
                 <td data-label="Vinculada a">
-                  {row.link || state === 'final' ? <LinkedTo link={row.link} /> : <span class="muted">—</span>}
+                  {row.link || state === 'final' ? <LinkedTo link={row.link} format={linkFormat} /> : <span class="muted">—</span>}
                 </td>
                 <td>
                   <a class="btn sm" href={`/admin/capturas/${row.dotaMatchId}`}>
@@ -264,7 +275,7 @@ export const CaptureDetailView: FC<{ item: CaptureItem; summary: GsiSummary; raw
       {row.link || state === 'final' ? (
         <p>
           {row.link ? 'Vinculada a ' : null}
-          <LinkedTo link={row.link} />
+          <LinkedTo link={row.link} format={item.linkFormat} />
         </p>
       ) : null}
       {state === 'final' && row.link === null ? (

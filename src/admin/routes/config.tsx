@@ -103,7 +103,8 @@ export function configRoutes(deps: Deps) {
     if (action === 'add') {
       const last = days.at(-1);
       days.push({
-        phase: last?.phase ?? 'group',
+        // A double-elimination tournament has no group stage: its calendar starts with the bracket.
+        phase: last?.phase ?? (tournament.format === 'double_elimination' ? 'semifinal' : 'group'),
         date: last ? nextDay(last.date) : new Date().toISOString().slice(0, 10),
         startTimes: last?.startTimes ?? ['14:00'],
         slotMinutes: last?.slotMinutes ?? 60,

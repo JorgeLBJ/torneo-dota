@@ -1,5 +1,8 @@
 import { Hono, type Context } from 'hono';
+import type { Checked } from '../../checked.js';
+import { deSlotForKey } from '../../domain/double-elimination.js';
 import { seriesLengthFor } from '../../domain/series.js';
+import { assignPositions, deleteBracketGame, isDeSlotKey, markBracketLive, recordBracketResult, resetBracket } from '../../services/double-elimination.js';
 import { clearLive, setStream, unstreamMatch } from '../../services/live.js';
 import { assignSemifinalTeams, deletePlayoffGame, markPlayoffLive, phaseSlots, recordPlayoffResult, resetPlayoffs } from '../../services/playoffs.js';
 import { parseGameNumber, readGameForm } from '../game-form.js';
@@ -8,14 +11,45 @@ import type { AdminEnv, Deps } from '../context.js';
 import { readBody, str } from '../form.js';
 import { setFlash } from '../flash.js';
 import { renderPage } from '../render.js';
-import { PlayoffsView } from '../views/playoffs.js';
+import { DoubleEliminationView, PlayoffsView } from '../views/playoffs.js';
+
+const POSITION_FIELDS = ['pos_a', 'pos_b', 'pos_c', 'pos_d', 'pos_e', 'pos_f'] as const;
+const isDoubleElimination = (c: Context<AdminEnv>): boolean => c.get('tournament').format === 'double_elimination';
 
 export function playoffRoutes(deps: Deps) {
   const app = new Hono<AdminEnv>();
   const { repo } = deps;
 
+  /** The live verbs of a series game, shared by league playoffs and bracket series: clear, stream, unstream or mark. */
+  const liveAction = (c: Context<AdminEnv>, verb: string, matchId: number | null, gameNumber: number, mark: () => Checked<void>) => {
+    const tournament = c.get('tournament');
+    if (verb === 'clear') {
+      if (clearLive(repo, tournament, matchId, gameNumber)) setFlash(c, 'ok', 'Partida en vivo quitada.');
+      else setFlash(c, 'warn', 'Ese partido ya no estaba en vivo.');
+    } else if (verb === 'stream') {
+      const done = setStream(repo, tournament, matchId);
+      if (!done.ok) setFlash(c, 'error', done.error);
+      else setFlash(c, 'ok', 'Partida pasada al stream.');
+    } else if (verb === 'unstream') {
+      if (unstreamMatch(repo, tournament, matchId)) setFlash(c, 'ok', 'Partida quitada del stream.');
+      else setFlash(c, 'warn', 'Ese partido ya no estaba en el stream.');
+    } else {
+      const marked = mark();
+      if (!marked.ok) setFlash(c, 'error', marked.error);
+      else setFlash(c, 'ok', 'Partida marcada en vivo.');
+    }
+  };
+
   app.get('/playoffs', (c) => {
     const tournament = c.get('tournament');
+    if (isDoubleElimination(c)) {
+      return renderPage(
+        c,
+        deps,
+        { title: 'Llaves', active: 'playoffs', tournament },
+        <DoubleEliminationView tournament={tournament} state={loadState(repo, tournament)} now={deps.now()} />,
+      );
+    }
     return renderPage(
       c,
       deps,
@@ -32,7 +66,98 @@ export function playoffRoutes(deps: Deps) {
     );
   });
 
+  // ---- Double elimination: positions A–F and the ten series. Registered before the league routes, whose
+  // `/playoffs/:phase/:number/...` patterns also match these paths.
+
+  app.post('/playoffs/posiciones', async (c) => {
+    if (!isDoubleElimination(c)) return c.text('Página no encontrada.', 404);
+    const tournament = c.get('tournament');
+    const back = `/admin/t/${tournament.id}/playoffs`;
+    const body = await readBody(c);
+    if (str(body, 'action') === 'reset') {
+      resetBracket(repo, tournament);
+      deps.events.tournamentChanged(tournament.id);
+      deps.events.capturesChanged();
+      setFlash(c, 'ok', 'Llaves reiniciadas: se borraron las posiciones y los resultados.');
+      return c.redirect(back, 303);
+    }
+    const raw = POSITION_FIELDS.map((key) => str(body, key));
+    if (raw.some((value) => !/^\d+$/.test(value))) {
+      setFlash(c, 'error', 'Elige los seis equipos de las posiciones A a F.');
+      return c.redirect(back, 303);
+    }
+    const checked = assignPositions(repo, tournament, raw.map(Number));
+    if (!checked.ok) setFlash(c, 'error', checked.error);
+    else {
+      deps.events.tournamentChanged(tournament.id);
+      deps.events.capturesChanged();
+      setFlash(c, 'ok', 'Posiciones guardadas.');
+    }
+    return c.redirect(back, 303);
+  });
+
+  /** Saves or clears one game of a bracket series. `/playoffs/llave/:key` (no game) is game 1. */
+  const bracketGame = async (c: Context<AdminEnv>, gameParam: string | undefined) => {
+    const key = c.req.param('key') ?? '';
+    if (!isDoubleElimination(c) || !isDeSlotKey(key)) return c.text('Serie de las llaves no encontrada.', 404);
+    const tournament = c.get('tournament');
+    const back = `/admin/t/${tournament.id}/playoffs`;
+    const body = await readBody(c);
+    const gameNumber = parseGameNumber(gameParam ?? (str(body, 'game') || '1'));
+    const refuse = (message: string) => {
+      setFlash(c, 'error', message);
+      return c.redirect(back, 303);
+    };
+    if (gameNumber === null) return refuse('Ese juego no existe.');
+    const multi = seriesLengthFor(tournament, deSlotForKey(key).phase, false) > 1;
+
+    if (str(body, 'action') === 'clear') {
+      const removed = deleteBracketGame(repo, tournament, key, gameNumber);
+      if (!removed.ok) return refuse(removed.error);
+      deps.events.tournamentChanged(tournament.id);
+      deps.events.capturesChanged();
+      setFlash(c, 'ok', multi ? `Juego ${gameNumber} borrado.` : 'Resultado borrado.');
+      return c.redirect(back, 303);
+    }
+
+    const series = loadState(repo, tournament).doubleElimination!.series.find((s) => s.key === key)!;
+    const existing = series.matchId === null ? undefined : repo.listGames(series.matchId).find((g) => g.gameNumber === gameNumber);
+    const input = await readGameForm(deps.dota, [series.team1Id, series.team2Id], body, existing);
+    if (!input.ok) return refuse(input.error);
+    const checked = recordBracketResult(repo, tournament, key, input.value.raw, { gameNumber, imported: input.value.imported });
+    if (!checked.ok) return refuse(checked.error);
+    deps.events.tournamentChanged(tournament.id);
+    deps.events.capturesChanged();
+    setFlash(c, 'ok', multi ? `Juego ${gameNumber} guardado.` : 'Resultado guardado.');
+    return c.redirect(back, 303);
+  };
+
+  /** Marks (or unmarks) a game of a bracket series as the one being played right now. */
+  app.post('/playoffs/llave/:key/juego/:n/en-vivo', async (c) => {
+    const key = c.req.param('key');
+    if (!isDoubleElimination(c) || !isDeSlotKey(key)) return c.text('Serie de las llaves no encontrada.', 404);
+    const tournament = c.get('tournament');
+    const back = `/admin/t/${tournament.id}/playoffs`;
+    const body = await readBody(c);
+    const gameNumber = parseGameNumber(c.req.param('n'));
+    if (gameNumber === null) {
+      setFlash(c, 'error', 'Ese juego no existe.');
+      return c.redirect(back, 303);
+    }
+    const slot = deSlotForKey(key);
+    const stored = repo.listMatches(tournament.id, slot.phase).find((m) => m.matchNumber === slot.matchNumber);
+    liveAction(c, str(body, 'action'), stored?.id ?? null, gameNumber, () => markBracketLive(repo, tournament, key, gameNumber, deps.now()));
+    deps.events.tournamentChanged(tournament.id);
+    return c.redirect(back, 303);
+  });
+
+  app.post('/playoffs/llave/:key/juego/:n', (c) => bracketGame(c, c.req.param('n')));
+  app.post('/playoffs/llave/:key', (c) => bracketGame(c, undefined));
+
+  // ---- League playoffs: two semifinals and the final. A double-elimination tournament has none of them.
+
   app.post('/playoffs/cruces', async (c) => {
+    if (isDoubleElimination(c)) return c.text('Página no encontrada.', 404);
     const tournament = c.get('tournament');
     const back = `/admin/t/${tournament.id}/playoffs`;
     const body = await readBody(c);
@@ -67,6 +192,7 @@ export function playoffRoutes(deps: Deps) {
 
   /** Saves or clears one game of a semifinal/final series. `/playoffs/:phase/:number` (no game) is game 1. */
   const playoffGame = async (c: Context<AdminEnv>, gameParam: string | undefined) => {
+    if (isDoubleElimination(c)) return c.text('Partido de playoffs no encontrado.', 404);
     const tournament = c.get('tournament');
     const phase = c.req.param('phase');
     const number = Number(c.req.param('number'));
@@ -109,6 +235,7 @@ export function playoffRoutes(deps: Deps) {
 
   /** Marks (or unmarks) a game of a semifinal/final as the one being played right now. */
   app.post('/playoffs/:phase/:number/juego/:n/en-vivo', async (c) => {
+    if (isDoubleElimination(c)) return c.text('Partido de playoffs no encontrado.', 404);
     const tournament = c.get('tournament');
     const phase = c.req.param('phase');
     const number = Number(c.req.param('number'));
@@ -121,23 +248,11 @@ export function playoffRoutes(deps: Deps) {
       setFlash(c, 'error', 'Ese juego no existe.');
       return c.redirect(back, 303);
     }
-    const verb = str(body, 'action');
-    const stored = repo.listMatches(tournament.id, phase as 'semifinal' | 'final').find((m) => m.matchNumber === number);
-    if (verb === 'clear') {
-      if (clearLive(repo, tournament, stored?.id ?? null, gameNumber)) setFlash(c, 'ok', 'Partida en vivo quitada.');
-      else setFlash(c, 'warn', 'Ese partido ya no estaba en vivo.');
-    } else if (verb === 'stream') {
-      const done = setStream(repo, tournament, stored?.id ?? null);
-      if (!done.ok) setFlash(c, 'error', done.error);
-      else setFlash(c, 'ok', 'Partida pasada al stream.');
-    } else if (verb === 'unstream') {
-      if (unstreamMatch(repo, tournament, stored?.id ?? null)) setFlash(c, 'ok', 'Partida quitada del stream.');
-      else setFlash(c, 'warn', 'Ese partido ya no estaba en el stream.');
-    } else {
-      const marked = markPlayoffLive(repo, tournament, loadState(repo, tournament), phase as 'semifinal' | 'final', number, gameNumber, deps.now());
-      if (!marked.ok) setFlash(c, 'error', marked.error);
-      else setFlash(c, 'ok', 'Partida marcada en vivo.');
-    }
+    const kind = phase as 'semifinal' | 'final';
+    const stored = repo.listMatches(tournament.id, kind).find((m) => m.matchNumber === number);
+    liveAction(c, str(body, 'action'), stored?.id ?? null, gameNumber, () =>
+      markPlayoffLive(repo, tournament, loadState(repo, tournament), kind, number, gameNumber, deps.now()),
+    );
     deps.events.tournamentChanged(tournament.id);
     return c.redirect(back, 303);
   });

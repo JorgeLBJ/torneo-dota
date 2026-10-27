@@ -79,6 +79,12 @@ td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
 .bm h3{margin:0;font-family:var(--fd);font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .champ{text-align:center;padding:20px;border-radius:14px;border:1px solid rgba(230,182,95,.5);background:var(--gold-soft)}
 .champ b{font-family:var(--fd);font-size:28px;color:var(--gold);text-transform:uppercase}
+/* Double elimination: positions A–F, then one column per round of each side, as wide as the page allows. */
+.de-positions{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr));gap:12px}
+.de-side{margin-top:8px}
+.de-rounds{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:20px;align-items:start}
+.de-series{display:grid;gap:6px}
+.de-seats{margin:0;font-size:12px}
 
 /* Login */
 .login{min-height:100vh;display:grid;place-items:center;padding:16px}
@@ -190,6 +196,7 @@ table.cal select,table.cal input{min-width:0;text-overflow:ellipsis}
 aside .btn{width:100%}
 .code-input{width:90px;border-left:3px solid var(--tc,var(--gold))}
 .general-card,.row-form{display:grid;gap:12px}
+.format-ro{display:grid;gap:2px}
 @media (min-width:1024px){
   .general-card{grid-template-columns:repeat(3,1fr);gap:14px}
   .general-card h2,.general-card p{grid-column:1 / -1}

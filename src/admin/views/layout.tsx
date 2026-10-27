@@ -50,7 +50,9 @@ interface LayoutProps {
   flash?: Flash;
 }
 
-const SECTIONS: { key: Exclude<Section, 'torneos' | 'usuarios' | 'observadores' | 'capturas' | 'cuenta'>; path: string; label: string }[] = [
+type TournamentSection = { key: Exclude<Section, 'torneos' | 'usuarios' | 'observadores' | 'capturas' | 'cuenta'>; path: string; label: string };
+
+const SECTIONS: TournamentSection[] = [
   { key: 'config', path: 'config', label: 'Configuración' },
   { key: 'reglas', path: 'reglas', label: 'Reglas' },
   { key: 'banners', path: 'banners', label: 'Banners' },
@@ -59,6 +61,14 @@ const SECTIONS: { key: Exclude<Section, 'torneos' | 'usuarios' | 'observadores' 
   { key: 'resultados', path: 'resultados', label: 'Resultados' },
   { key: 'playoffs', path: 'playoffs', label: 'Playoffs' },
 ];
+
+/** A double-elimination tournament has no group stage: no Fixture or Resultados, and its playoffs are "Llaves". */
+export function sectionsFor(tournament: Pick<Tournament, 'format'> | undefined): TournamentSection[] {
+  if (tournament?.format !== 'double_elimination') return SECTIONS;
+  return SECTIONS.filter((s) => s.key !== 'fixture' && s.key !== 'resultados').map((s) =>
+    s.key === 'playoffs' ? { ...s, label: 'Llaves' } : s,
+  );
+}
 
 const Document: FC<PropsWithChildren<{ title: string }>> = ({ title, children }) => (
   <>
@@ -88,6 +98,7 @@ const Document: FC<PropsWithChildren<{ title: string }>> = ({ title, children })
 export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, active, admin, nav, flash, children }) => {
   const { current } = nav;
   const section = SECTIONS.find((s) => s.key === active)?.path ?? 'config';
+  const sections = sectionsFor(current);
   const badge = (value: string | number) => <span>{value}</span>;
   return (
     <Document title={title}>
@@ -117,7 +128,7 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, active, admi
               Torneos
             </a>
             {current
-              ? SECTIONS.map((s) => (
+              ? sections.map((s) => (
                   <a href={`/admin/t/${current.id}/${s.path}`} class={active === s.key ? 'on' : ''}>
                     {s.label}
                     {s.key === 'equipos' ? badge(nav.teamCount) : null}

@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { summarizeGsiState } from '../../dota/gsi.js';
+import type { TournamentFormat } from '../../domain/formats.js';
 import { captureStateOf } from '../../gsi/state.js';
 import type { AdminEnv, Deps } from '../context.js';
 import { setFlash } from '../flash.js';
@@ -19,6 +20,17 @@ export function captureRoutes(deps: Deps) {
   const app = new Hono<AdminEnv>();
   const { repo } = deps;
 
+  /** Format of each linked tournament (looked up once per request), so playoff links get their series names. */
+  const withLinkFormat = () => {
+    const formats = new Map<number, TournamentFormat | undefined>();
+    return (item: CaptureItem): CaptureItem => {
+      const tid = item.row.link?.tournamentId;
+      if (tid === undefined) return item;
+      if (!formats.has(tid)) formats.set(tid, repo.getTournamentById(tid)?.format);
+      return { ...item, linkFormat: formats.get(tid) };
+    };
+  };
+
   app.get('/capturas', (c) => {
     const query = (c.req.query('q') ?? '').trim().slice(0, 20);
     const requested = c.req.query('estado');
@@ -27,7 +39,8 @@ export function captureRoutes(deps: Deps) {
     const items: CaptureItem[] = repo
       .listGsiCaptureRows(MAX_LISTED)
       .map((row) => ({ row, state: captureStateOf(row, now) }))
-      .filter(({ row }) => query === '' || String(row.dotaMatchId).includes(query));
+      .filter(({ row }) => query === '' || String(row.dotaMatchId).includes(query))
+      .map(withLinkFormat());
     const matches: Record<CaptureFilter, (i: CaptureItem) => boolean> = {
       todas: () => true,
       'en-curso': (i) => i.state === 'live',
@@ -116,7 +129,7 @@ export function captureRoutes(deps: Deps) {
       c,
       deps,
       { title: `Captura ${id}`, active: 'capturas', tournament: repo.getActiveTournament() },
-      <CaptureDetailView item={{ row, state }} summary={summarizeGsiState(parsed)} rawJson={rawJson} timeZone={adminTimeZone(deps)} />,
+      <CaptureDetailView item={withLinkFormat()({ row, state })} summary={summarizeGsiState(parsed)} rawJson={rawJson} timeZone={adminTimeZone(deps)} />,
     );
   });
 
