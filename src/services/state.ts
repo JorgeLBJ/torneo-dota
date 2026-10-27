@@ -1,4 +1,5 @@
 import type { Game, Match, Repository, Team, Tournament } from '../db/repository.js';
+import { buildDoubleElimination, type DoubleEliminationBracket } from '../domain/double-elimination.js';
 import type { LiveMark } from '../domain/live.js';
 import { buildPlayoffs, type Bracket, type PlayoffMatch } from '../domain/playoffs.js';
 import { computeStandings, type StandingRow } from '../domain/standings.js';
@@ -15,7 +16,10 @@ export interface TournamentState {
   allGroupMatches: Match[];
   playoffMatches: Match[];
   standings: StandingRow[];
+  /** The league playoff bracket; always empty for a double elimination tournament. */
   bracket: Bracket;
+  /** Upper/lower brackets of a double elimination tournament; null for any other format. */
+  doubleElimination: DoubleEliminationBracket | null;
   /** The games of every match, in game order. */
   gamesByMatch: Map<number, Game[]>;
   /** The games being played right now: the one on the stream first, then by the moment they were marked. */
@@ -38,9 +42,11 @@ export function loadState(repo: Repository, tournament: Tournament): TournamentS
     pointsLoss: tournament.pointsLoss,
     tiebreakers: tournament.tiebreakers,
   });
+  const doubleElimination = tournament.format === 'double_elimination' ? buildDoubleElimination(playoffMatches) : null;
+  // Double elimination stores its series as playoff matches too: they must not be read as semifinals.
   const bracket = buildPlayoffs(
     standings,
-    playoffMatches.map(
+    (doubleElimination ? [] : playoffMatches).map(
       (m): PlayoffMatch => ({
         id: m.id,
         phase: m.phase as 'semifinal' | 'final',
@@ -68,6 +74,7 @@ export function loadState(repo: Repository, tournament: Tournament): TournamentS
     playoffMatches,
     standings,
     bracket,
+    doubleElimination,
     gamesByMatch,
     liveMarks: repo.listLive(tournament.id),
     pendingGroup,
@@ -81,10 +88,15 @@ export interface StatusLabel {
 }
 
 export function describeStatus(state: TournamentState): StatusLabel {
-  const { bracket, teamsById } = state;
-  if (bracket.championId !== null) {
-    const champion = teamsById.get(bracket.championId);
+  const { bracket, doubleElimination, teamsById } = state;
+  const championId = doubleElimination ? doubleElimination.championId : bracket.championId;
+  if (championId !== null) {
+    const champion = teamsById.get(championId);
     return { label: `Finalizado · Campeón ${champion?.code ?? ''}`.trim(), cls: 'ok' };
+  }
+  if (doubleElimination) {
+    const placed = Object.values(doubleElimination.positions).some((id) => id !== null);
+    return placed ? { label: 'Llaves', cls: 'next' } : { label: 'Sin posiciones', cls: '' };
   }
   if (state.groupMatches.length === 0) return { label: 'Sin fixture', cls: '' };
   if (!state.groupComplete) return { label: 'Fase de grupos', cls: 'next' };

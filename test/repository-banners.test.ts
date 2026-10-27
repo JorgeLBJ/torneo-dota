@@ -30,8 +30,8 @@ const input = (over: Partial<NewBanner> = {}): NewBanner => ({
 });
 
 describe('promo_banners schema', () => {
-  it('migration 015 bumps user_version to 15', () => {
-    expect(db.pragma('user_version', { simple: true })).toBe(15);
+  it('migration 015 is applied (user_version at least 15)', () => {
+    expect(db.pragma('user_version', { simple: true })).toBe(16);
   });
 
   it('rejects an unknown CTA tab and a window that ends before it starts', () => {

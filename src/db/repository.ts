@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import { isHeroSlug } from '../data/heroes.js';
 import { bannerState, type BannerTab } from '../domain/banners.js';
+import { initialSeriesLengths, isTournamentFormat, type TournamentFormat } from '../domain/formats.js';
 import { liveEligibility, type LiveMark } from '../domain/live.js';
 import { resolveSeries, seriesLengthFor, type GameScore, type SeriesLength } from '../domain/series.js';
 import { isValidTimeZone, utcToZoned, zonedToUtc } from '../format/timezone.js';
@@ -14,6 +15,8 @@ export interface Tournament {
   id: number;
   name: string;
   slug: string;
+  /** Chosen at creation and fixed afterwards. */
+  format: TournamentFormat;
   qualifiers: number;
   game: string;
   pointsWin: number;
@@ -40,7 +43,7 @@ export interface Tournament {
   createdAt: string;
 }
 
-export type TournamentPatch = Partial<Omit<Tournament, 'id' | 'createdAt' | 'isActive' | 'streamMatchId'>>;
+export type TournamentPatch = Partial<Omit<Tournament, 'id' | 'createdAt' | 'isActive' | 'streamMatchId' | 'format'>>;
 
 export interface ScheduleDay {
   /** YYYY-MM-DD */
@@ -268,7 +271,7 @@ export interface Session {
 
 export const TIEBREAKER_KEYS = ['kd', 'kills', 'h2h', 'extra'] as const;
 
-const TOURNAMENT_COLS = `id, name, slug, qualifiers, game, points_win AS pointsWin, points_loss AS pointsLoss,
+const TOURNAMENT_COLS = `id, name, slug, format, qualifiers, game, points_win AS pointsWin, points_loss AS pointsLoss,
   tiebreakers, group_legs AS groupLegs, group_games AS groupGames, semifinal_games AS semifinalGames, final_games AS finalGames,
   stream_match_id AS streamMatchId,
   rules_text AS rulesText, rules_html AS rulesHtml, show_tiebreak_box AS showTiebreakBox, timezone, stream_url AS streamUrl, is_active AS isActive, created_at AS createdAt`;
@@ -299,7 +302,8 @@ const GSI_ROW_SELECT = `SELECT c.dota_match_id AS dotaMatchId, o.name AS observe
 const ADMIN_COLS = 'id, username, password_hash AS passwordHash, created_at AS createdAt';
 const SESSION_COLS = 'id, admin_id AS adminId, expires_at AS expiresAt';
 
-type TournamentRow = Omit<Tournament, 'tiebreakers' | 'isActive' | 'showTiebreakBox'> & {
+type TournamentRow = Omit<Tournament, 'tiebreakers' | 'isActive' | 'showTiebreakBox' | 'format'> & {
+  format: string;
   tiebreakers: string;
   isActive: number;
   showTiebreakBox: number;
@@ -316,7 +320,9 @@ type ScheduleDayRow = Omit<ScheduleDay, 'startTimes'> & { startTimes: string };
 
 function toTournament(row: TournamentRow): Tournament {
   const known = row.tiebreakers.split(',').filter((k): k is TiebreakerKey => (TIEBREAKER_KEYS as readonly string[]).includes(k));
-  return { ...row, tiebreakers: [...new Set(known)], isActive: row.isActive === 1, showTiebreakBox: row.showTiebreakBox === 1 };
+  // The column has no CHECK (see migration 016); an unknown key is read as the original format.
+  const format = isTournamentFormat(row.format) ? row.format : 'league_playoffs';
+  return { ...row, format, tiebreakers: [...new Set(known)], isActive: row.isActive === 1, showTiebreakBox: row.showTiebreakBox === 1 };
 }
 
 interface RawGsiRow {
@@ -375,7 +381,10 @@ function toGsiRow(r: RawGsiRow): GsiCaptureRow {
 
 export function createRepository(db: Database.Database, now: () => Date = () => new Date()) {
   const q = {
-    insertTournament: db.prepare('INSERT INTO tournaments (name, slug, qualifiers) VALUES (@name, @slug, @qualifiers)'),
+    insertTournament: db.prepare(
+      `INSERT INTO tournaments (name, slug, format, qualifiers, semifinal_games, final_games)
+       VALUES (@name, @slug, @format, @qualifiers, @semifinalGames, @finalGames)`,
+    ),
     tournamentById: db.prepare(`SELECT ${TOURNAMENT_COLS} FROM tournaments WHERE id = ?`),
     tournamentBySlug: db.prepare(`SELECT ${TOURNAMENT_COLS} FROM tournaments WHERE slug = ?`),
     listTournaments: db.prepare(`SELECT ${TOURNAMENT_COLS} FROM tournaments ORDER BY id`),
@@ -727,8 +736,9 @@ export function createRepository(db: Database.Database, now: () => Date = () => 
     transaction: inTransaction,
 
     // Tournaments
-    createTournament(input: { name: string; slug: string; qualifiers?: number }): Tournament {
-      const info = q.insertTournament.run({ qualifiers: 4, ...input });
+    createTournament(input: { name: string; slug: string; qualifiers?: number; format?: TournamentFormat }): Tournament {
+      const format = input.format ?? 'league_playoffs';
+      const info = q.insertTournament.run({ qualifiers: 4, ...input, format, ...initialSeriesLengths(format) });
       return requireRow(tournamentById(Number(info.lastInsertRowid)), 'Tournament');
     },
     getTournamentById: tournamentById,
