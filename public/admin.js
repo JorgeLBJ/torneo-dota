@@ -663,11 +663,14 @@
       event.preventDefault();
       return;
     }
+    // The page is left when the POST response arrives, long after this event: the flag stays set until then
+    // (a submit blocked by another listener, or a page restored from the back-forward cache, resets it).
     if (form && form.matches && form.matches('#team-new') && !dirtyStates().length) {
       leaving = true;
-      setTimeout(function () { leaving = false; }, 0);
+      setTimeout(function () { if (event.defaultPrevented) leaving = false; }, 0);
     }
   }, true);
+  window.addEventListener('pageshow', function () { leaving = false; });
   window.addEventListener('beforeunload', function (event) {
     if (leaving || !states.some(isDirty)) return;
     event.preventDefault();
