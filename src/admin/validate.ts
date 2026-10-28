@@ -31,7 +31,9 @@ export function checkFormat(raw: string): Checked<TournamentFormat> {
 
 /** Deleting a tournament is confirmed by typing its exact name. */
 export function checkDeleteConfirmation(typed: string, name: string): Checked<string> {
-  return typed === name ? ok(typed) : fail(`Escribe el nombre exacto del torneo ("${name}") para eliminarlo.`);
+  // Pages show runs of spaces as one, so a name copied from the screen may have lost some: spacing is not compared.
+  const shown = (text: string) => text.trim().replace(/\s+/g, ' ');
+  return shown(typed) === shown(name) ? ok(typed) : fail(`Escribe el nombre exacto del torneo ("${shown(name)}") para eliminarlo.`);
 }
 
 const USERNAME = /^[a-z0-9._-]{3,32}$/;

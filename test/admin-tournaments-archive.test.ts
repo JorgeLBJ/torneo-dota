@@ -136,6 +136,26 @@ describe('deleting tournaments', () => {
     expect(t.repo.getTournamentById(old.id)).toBeDefined();
   });
 
+  it('accepts the name as the page shows it when the stored name has repeated spaces', async () => {
+    // The browser collapses "a  b" to "a b" on screen, so a copied name loses the extra spaces.
+    const spaced = t.repo.createTournament({ name: 'Overthrow -  Dota Run  - Pudge Wars', slug: 'overthrow' });
+    t.repo.archiveTournament(spaced.id);
+    const res = await t.post(`/admin/t/${spaced.id}/eliminar`, { confirm_name: 'Overthrow - Dota Run - Pudge Wars' }, cookie);
+    expect(res.status).toBe(303);
+    expect(await flashText(t, res, cookie)).toContain('eliminado');
+    expect(t.repo.getTournamentById(spaced.id)).toBeUndefined();
+  });
+
+  it('still refuses a name that differs in more than spacing', async () => {
+    const spaced = t.repo.createTournament({ name: 'Overthrow -  Dota Run  - Pudge Wars', slug: 'overthrow' });
+    t.repo.archiveTournament(spaced.id);
+    for (const typed of ['Overthrow - Dota Run', 'overthrow - dota run - pudge wars', 'OverthrowDota Run - Pudge Wars']) {
+      const res = await t.post(`/admin/t/${spaced.id}/eliminar`, { confirm_name: typed }, cookie);
+      expect(await flashText(t, res, cookie)).toContain('Escribe el nombre exacto del torneo');
+    }
+    expect(t.repo.getTournamentById(spaced.id)).toBeDefined();
+  });
+
   it('deletes an archived tournament with its rows and stored images', async () => {
     const withImage = t.repo.createTeam(old.id, { code: 'A', name: 'Alpha' });
     t.repo.updateTeam(withImage.id, { imageKey: `teams/${old.id}/1-abc.webp` });
