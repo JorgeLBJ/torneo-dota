@@ -1,5 +1,5 @@
 import { fail, ok, type Checked } from '../checked.js';
-import type { Match, Repository, Tournament } from '../db/repository.js';
+import type { Match, Repository, Schedule, Tournament } from '../db/repository.js';
 import {
   buildDoubleElimination,
   DE_SLOTS,
@@ -156,6 +156,13 @@ export function clearBracketSeries(repo: Repository, tournament: Tournament, key
   repo.clearResult(match.id);
   repairBracket(repo, tournament);
   return ok(true);
+}
+
+/** Sets (or clears, with nulls) when a series is played; its teams and games stay as they are. */
+export function scheduleBracketSeries(repo: Repository, tournament: Tournament, key: string, schedule: Schedule): Checked<Match> {
+  if (!isDeSlotKey(key)) return fail(NOT_FOUND);
+  const match = storedFor(ensureBracketMatches(repo, tournament), deSlotForKey(key))!;
+  return ok(repo.updateMatchSchedule(match.id, schedule));
 }
 
 /** Deletes the ten series with their teams and games: the positions start empty again. */

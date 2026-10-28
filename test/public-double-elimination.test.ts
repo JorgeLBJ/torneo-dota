@@ -139,6 +139,18 @@ describe('tabs of a double elimination tournament', () => {
     expect(html).toContain('aria-label="Progreso del torneo"');
   });
 
+  it('dates each hero phase from its own series, falling back to the calendar only when none is scheduled', () => {
+    t.repo.replaceScheduleDays(tournament.id, [
+      { date: '2026-10-27', phase: 'semifinal', startTimes: ['11:00'], slotMinutes: 60 },
+      { date: '2026-10-27', phase: 'final', startTimes: ['18:00'], slotMinutes: 60 },
+    ]);
+    const phases = () => Object.fromEntries(model().phases.map((p) => [p.key, p.dates]));
+    expect(phases()).toEqual({ upper: '27 Oct', lower: '27 Oct', final: '27 Oct' });
+    t.repo.updateMatchSchedule(stored('U1').id, { scheduledDate: '2026-11-07', startTime: '11:00', endTime: null });
+    t.repo.updateMatchSchedule(stored('GF').id, { scheduledDate: '2026-11-08', startTime: '20:00', endTime: null });
+    expect(phases()).toEqual({ upper: '07 Nov', lower: '27 Oct', final: '08 Nov' });
+  });
+
   it('keeps the league tabs exactly as before', async () => {
     const league = t.repo.createTournament({ name: 'Liga Oct', slug: 'liga-oct' });
     const html = await page(`/t/${league.slug}`);

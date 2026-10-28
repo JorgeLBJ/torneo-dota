@@ -85,6 +85,8 @@ td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
 .de-rounds{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:20px;align-items:start}
 .de-series{display:grid;gap:6px}
 .de-seats{margin:0;font-size:12px}
+.de-when{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.8fr) auto;gap:6px;align-items:center}
+.de-when input{min-width:0;height:var(--control-h-sm);padding:0 8px}
 
 /* Login */
 .login{min-height:100vh;display:grid;place-items:center;padding:16px}

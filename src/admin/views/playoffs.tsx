@@ -180,6 +180,7 @@ export const DoubleEliminationView: FC<DoubleEliminationViewProps> = ({ tourname
     const length = seriesLengthFor(tournament, s.phase, false);
     const t1 = team(s.team1Id);
     const t2 = team(s.team2Id);
+    const match = state.playoffMatches.find((m) => m.id === s.matchId);
     return (
       <div class="de-series">
         {t1 && t2 ? null : (
@@ -187,12 +188,19 @@ export const DoubleEliminationView: FC<DoubleEliminationViewProps> = ({ tourname
             {t1?.name ?? s.sources[0]} vs {t2?.name ?? s.sources[1]} · Al mejor de {length}
           </p>
         )}
+        <form method="post" action={`${base}/llave/${s.key}/horario`} class="de-when">
+          <input type="date" name="date" value={match?.scheduledDate ?? ''} aria-label={`Fecha de ${s.code}`} />
+          <input type="time" name="time" value={match?.startTime ?? ''} aria-label={`Hora de ${s.code}`} />
+          <button class="btn sm" type="submit">
+            Guardar horario
+          </button>
+        </form>
         <ResultCard
           action={`${base}/llave/${s.key}`}
           header={`${s.code} · ${s.label} · BO${length}`}
           team1={t1}
           team2={t2}
-          match={state.playoffMatches.find((m) => m.id === s.matchId)}
+          match={match}
           matchId={s.matchId}
           live={state.liveMarks.find((mark) => mark.matchId === s.matchId) ?? null}
           onStream={s.matchId !== null && tournament.streamMatchId === s.matchId}

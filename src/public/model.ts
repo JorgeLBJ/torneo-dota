@@ -1,6 +1,6 @@
 import type { Banner, Game, Match, ScheduleDay, Team, TiebreakerKey } from '../db/repository.js';
 import type { BannerTab } from '../domain/banners.js';
-import { deSlotFor, type DeSeries, type DeSlotKey } from '../domain/double-elimination.js';
+import { deSlotFor, type DeSeries, type DeSide, type DeSlotKey } from '../domain/double-elimination.js';
 import { FORMAT_INFO, type TournamentFormat } from '../domain/formats.js';
 import type { LiveMark } from '../domain/live.js';
 import { resolveSeries, seriesLengthFor, type SeriesLength } from '../domain/series.js';
@@ -534,14 +534,24 @@ function buildPhases(state: TournamentState, days: ScheduleDay[]): PublicPhase[]
   const { bracket, groupComplete, doubleElimination } = state;
   const datesOf = (phase: 'group' | 'semifinal' | 'final') => formatDayList(days.filter((d) => d.phase === phase).map((d) => d.date));
   if (doubleElimination) {
-    // Upper and lower series are stored (and scheduled) as semifinals, the grand final as the final.
+    // Each phase is dated by its own series' schedules; the calendar (upper and lower series are stored as
+    // semifinals, the grand final as the final) only fills in while none of that phase's series has a date.
     const won = (key: DeSlotKey) => doubleElimination.series.find((s) => s.key === key)?.winnerId != null;
+    const seriesDates = (side: DeSide) =>
+      doubleElimination.series
+        .filter((s) => s.side === side)
+        .map((s) => state.playoffMatches.find((m) => m.id === s.matchId)?.scheduledDate)
+        .filter((date): date is string => Boolean(date));
+    const dates = (side: DeSide, phase: 'semifinal' | 'final') => {
+      const own = seriesDates(side);
+      return own.length > 0 ? formatDayList(own) : datesOf(phase);
+    };
     const current: PublicPhase['key'] =
       doubleElimination.championId !== null || (won('U5') && won('L4')) ? 'final' : won('U5') ? 'lower' : 'upper';
     return [
-      { key: 'upper', label: 'Llave superior', dates: datesOf('semifinal'), current: current === 'upper' },
-      { key: 'lower', label: 'Llave inferior', dates: datesOf('semifinal'), current: current === 'lower' },
-      { key: 'final', label: 'Gran final', dates: datesOf('final'), current: current === 'final' },
+      { key: 'upper', label: 'Llave superior', dates: dates('upper', 'semifinal'), current: current === 'upper' },
+      { key: 'lower', label: 'Llave inferior', dates: dates('lower', 'semifinal'), current: current === 'lower' },
+      { key: 'final', label: 'Gran final', dates: dates('grand', 'final'), current: current === 'final' },
     ];
   }
   const decided = bracket.semifinals.every((s) => s.winnerId !== null);

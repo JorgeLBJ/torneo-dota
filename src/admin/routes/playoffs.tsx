@@ -2,13 +2,22 @@ import { Hono, type Context } from 'hono';
 import type { Checked } from '../../checked.js';
 import { deSlotForKey } from '../../domain/double-elimination.js';
 import { seriesLengthFor } from '../../domain/series.js';
-import { assignPositions, deleteBracketGame, isDeSlotKey, markBracketLive, recordBracketResult, resetBracket } from '../../services/double-elimination.js';
+import { isValidTime } from '../../domain/fixture.js';
+import {
+  assignPositions,
+  deleteBracketGame,
+  isDeSlotKey,
+  markBracketLive,
+  recordBracketResult,
+  resetBracket,
+  scheduleBracketSeries,
+} from '../../services/double-elimination.js';
 import { clearLive, setStream, unstreamMatch } from '../../services/live.js';
 import { assignSemifinalTeams, deletePlayoffGame, markPlayoffLive, phaseSlots, recordPlayoffResult, resetPlayoffs } from '../../services/playoffs.js';
 import { parseGameNumber, readGameForm } from '../game-form.js';
 import { loadState } from '../../services/state.js';
 import type { AdminEnv, Deps } from '../context.js';
-import { readBody, str } from '../form.js';
+import { isDate, readBody, str } from '../form.js';
 import { setFlash } from '../flash.js';
 import { renderPage } from '../render.js';
 import { DoubleEliminationView, PlayoffsView } from '../views/playoffs.js';
@@ -148,6 +157,35 @@ export function playoffRoutes(deps: Deps) {
     const stored = repo.listMatches(tournament.id, slot.phase).find((m) => m.matchNumber === slot.matchNumber);
     liveAction(c, str(body, 'action'), stored?.id ?? null, gameNumber, () => markBracketLive(repo, tournament, key, gameNumber, deps.now()));
     deps.events.tournamentChanged(tournament.id);
+    return c.redirect(back, 303);
+  });
+
+  /** Sets when a series is played: a date with its start time, or nothing (the public page shows it only once set). */
+  app.post('/playoffs/llave/:key/horario', async (c) => {
+    const key = c.req.param('key');
+    if (!isDoubleElimination(c) || !isDeSlotKey(key)) return c.text('Serie de las llaves no encontrada.', 404);
+    const tournament = c.get('tournament');
+    const back = `/admin/t/${tournament.id}/playoffs`;
+    const body = await readBody(c);
+    const date = str(body, 'date');
+    const time = str(body, 'time');
+    const error =
+      Boolean(date) !== Boolean(time)
+        ? 'Indica la fecha y la hora de la serie, o deja ambas vacías para quitar el horario.'
+        : date && !isDate(date)
+          ? 'La fecha no es válida.'
+          : time && !isValidTime(time)
+            ? 'La hora no es válida (usa HH:MM).'
+            : null;
+    if (error) {
+      setFlash(c, 'error', error);
+      return c.redirect(back, 303);
+    }
+    const saved = scheduleBracketSeries(repo, tournament, key, { scheduledDate: date || null, startTime: time || null, endTime: null });
+    if (!saved.ok) return c.text(saved.error, 404);
+    deps.events.tournamentChanged(tournament.id);
+    const code = deSlotForKey(key).code;
+    setFlash(c, 'ok', date ? `Horario de ${code} guardado.` : `Horario de ${code} quitado.`);
     return c.redirect(back, 303);
   });
 

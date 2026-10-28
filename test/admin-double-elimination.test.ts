@@ -344,3 +344,64 @@ describe('league-only screens on a double elimination tournament', () => {
     expect((await t.get(`/admin/t/${league.id}/resultados`, cookie)).status).toBe(200);
   });
 });
+
+describe('series date and time', () => {
+  const schedule = (key: DeSlotKey, fields: Record<string, string>) => t.post(`${base}/llave/${key}/horario`, fields, cookie);
+
+  it('shows an empty date and time field on every series card', async () => {
+    const html = await page();
+    for (const slot of DE_SLOTS) expect(html).toContain(`action="${base}/llave/${slot.key}/horario"`);
+    expect(html).toContain('name="date"');
+    expect(html).toContain('name="time"');
+  });
+
+  it('stores the date and time in the tournament zone and shows them back', async () => {
+    const res = await schedule('U1', { date: '2026-11-07', time: '11:00' });
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toBe(base);
+    expect(await flashText(t, res, cookie)).toContain('Horario de S1 guardado');
+    expect(stored('U1')).toMatchObject({ startsAt: '2026-11-07T16:00:00Z', scheduledDate: '2026-11-07', startTime: '11:00' });
+    const html = await page();
+    expect(html).toContain('value="2026-11-07"');
+    expect(html).toContain('value="11:00"');
+  });
+
+  it('clears the schedule when both fields are left empty', async () => {
+    await schedule('GF', { date: '2026-11-07', time: '20:00' });
+    expect(stored('GF')).toMatchObject({ scheduledDate: '2026-11-07', startTime: '20:00' });
+    const res = await schedule('GF', { date: '', time: '' });
+    expect(await flashText(t, res, cookie)).toContain('Horario de GF quitado');
+    expect(stored('GF')).toMatchObject({ startsAt: null, scheduledDate: null, startTime: null });
+  });
+
+  it('refuses a date or time alone or invalid values and keeps the stored schedule', async () => {
+    await schedule('U2', { date: '2026-11-07', time: '12:00' });
+    for (const fields of [{ date: '', time: '12:00' }, { date: '2026-11-07', time: '' }, { date: '2026-13-40', time: '12:00' }, { date: '2026-11-07', time: '25:99' }]) {
+      const res = await schedule('U2', fields);
+      expect(res.status).toBe(303);
+      expect(await flashText(t, res, cookie)).toMatch(/fecha|hora/i);
+    }
+    expect(stored('U2')).toMatchObject({ scheduledDate: '2026-11-07', startTime: '12:00' });
+  });
+
+  it('keeps the series result and teams when the schedule changes', async () => {
+    await t.post(`${base}/posiciones`, positionsForm(), cookie);
+    await t.post(`${base}/llave/U1`, form(id(0)), cookie);
+    await schedule('U1', { date: '2026-11-07', time: '11:30' });
+    expect(stored('U1')).toMatchObject({ team1Id: id(0), team2Id: id(1), winnerId: id(0), startTime: '11:30' });
+  });
+
+  it('is not found for an unknown series or a league tournament', async () => {
+    expect((await schedule('U9' as DeSlotKey, { date: '2026-11-07', time: '11:00' })).status).toBe(404);
+    const res = await t.post(`/admin/t/${league.id}/playoffs/llave/U1/horario`, { date: '2026-11-07', time: '11:00' }, cookie);
+    expect(res.status).toBe(404);
+    expect(t.repo.listMatches(league.id)).toHaveLength(0);
+  });
+
+  it('shows the schedule on the public bracket only once it is set', async () => {
+    const publicPage = async () => (await t.get('/t/relampago')).text();
+    expect(await publicPage()).not.toContain('07 Nov · 11:00');
+    await schedule('U1', { date: '2026-11-07', time: '11:00' });
+    expect(await publicPage()).toContain('07 Nov · 11:00');
+  });
+});
